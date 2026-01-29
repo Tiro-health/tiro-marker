@@ -1,0 +1,82 @@
+name: "Nested pain assessment"
+description: "Pain assessment with nested location and characteristics"
+
+clinical_note: |
+  <html>
+    <body>
+      <p>Patient reports lower back pain for 1 week.</p>
+      <p>Pain is constant, aching in nature, rated 6/10.</p>
+      <p>Worse with movement, better with rest.</p>
+      <p>No radiation to legs. No numbness or tingling.</p>
+    </body>
+  </html>
+
+questionnaire:
+  - linkId: pain-present
+    type: boolean
+    text: "Does the patient have pain?"
+  - linkId: pain-details
+    type: group
+    text: "Pain Details"
+    item:
+      - linkId: pain-location
+        type: choice
+        text: "Location"
+        answerOptions:
+          - head
+          - neck
+          - upper back
+          - lower back
+          - chest
+          - abdomen
+      - linkId: pain-characteristics
+        type: group
+        text: "Pain Characteristics"
+        item:
+          - linkId: pain-duration
+            type: integer
+            text: "Duration (days)"
+          - linkId: pain-quality
+            type: choice
+            text: "Quality"
+            answerOptions:
+              - sharp
+              - dull
+              - aching
+              - burning
+              - throbbing
+          - linkId: pain-severity
+            type: integer
+            text: "Severity (0-10)"
+      - linkId: pain-modifiers
+        type: group
+        text: "Modifying Factors"
+        item:
+          - linkId: worse-with
+            type: choice
+            text: "Worse with"
+            repeats: true
+            answerOptions:
+              - movement
+              - sitting
+              - standing
+              - coughing
+          - linkId: better-with
+            type: choice
+            text: "Better with"
+            repeats: true
+            answerOptions:
+              - rest
+              - medication
+              - heat
+              - ice
+  - linkId: neurological-symptoms
+    type: choice
+    text: "Associated neurological symptoms"
+    repeats: true
+    answerOptions:
+      - radiation to legs
+      - numbness
+      - tingling
+      - weakness
+      - none
