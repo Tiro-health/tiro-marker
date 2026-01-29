@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiro-Marker - FHIR Questionnaire Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tiro-Marker</h1>
+            <p class="subtitle">AI-powered FHIR Questionnaire Filling Assistant</p>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <h2>Clinical Notes Input</h2>
+                <textarea
+                    id="clinical-notes"
+                    placeholder="Enter clinical notes here...
+
+Example: Patient presents with persistent headache for 3 days. Pain is moderate, localized to the frontal region. No fever or nausea reported."
+                    rows="8"
+                ></textarea>
+                <button id="extract-btn" type="button">Extract Structured Data</button>
+            </section>
+
+            <section class="output-section">
+                <h2>Extracted Data</h2>
+                <div id="loading" class="loading hidden">
+                    <span class="spinner"></span>
+                    Processing...
+                </div>
+                <div id="results" class="results"></div>
+                <div id="error" class="error hidden"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>MedGemma Impact Challenge Project</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "tiro-marker"
+version = "0.1.0"
+description = "AI-powered FHIR Questionnaire filling assistant"
+authors = ["zazou2552 <tomnissens@hotmail.com>"]
+readme = "README.md"
+packages = [{include = "tiro_marker"}, {include = "backend"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic-ai = "^0.1"
+fastapi = "^0.115"
+uvicorn = "^0.34"
+httpx = "^0.28"
+pyyaml = "^6.0"
+sentencex = "^1.0.13"
+lxml = "^6.0.2"
+lxml-stubs = "^0.5.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pyright = "^1.1"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+
+[tool.pyright]
+strict = ["backend/**/*.py"]
+pythonVersion = "3.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
