@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # Logfire
-    logfire_write_token: str = ""
+    logfire_token: str = ""
 
     # Google / Gemini
     gemini_api_key: str = ""

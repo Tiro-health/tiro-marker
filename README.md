@@ -1,19 +1,55 @@
 # tiro-marker
 
-## Young Foxes
+Entry for the [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge) on Kaggle.
 
-**Young Foxes** is a band from Wetteren, Belgium that plays Rock, Funk & Blues.
+## About the Challenge
 
-The band consists of 5 young members whose love for music is as great as their love for each other. They combine different musical styles in their songs, with a focus on creating music that moves both themselves and the listener.
+The MedGemma Impact Challenge invites participants to build human-centered AI applications using [MedGemma](https://research.google/blog/next-generation-medical-image-interpretation-with-medgemma-15-and-medical-speech-to-text-with-medasr/) and other open models from Google's Health AI Developer Foundations (HAI-DEF).
 
-### Line-up
-- 3 guitarists (including the singer)
-- 1 bassist
-- 1 drummer
+## Our Solution
 
-### About Their Music
-Their music is delivered with lots of energy, emotion, and serves as a release from daily life. Their repertoire consists entirely of original work.
+**Problem**: Clinicians spend significant time manually extracting structured data from clinical notes to fill out FHIR Questionnaires.
 
-### Links
-- [Young Foxes on vi.be](https://vi.be/platform/youngfoxes)
-- [Book Young Foxes on Gigstarter](https://www.gigstarter.be/artiesten/young-foxes)
+**Solution**: An AI-powered tool that automatically identifies relevant text spans in clinical documents and extracts values to populate FHIR QuestionnaireResponses.
+
+## Architecture
+
+### Backend
+
+FastAPI service with two AI-powered agents:
+
+- **Marking Agent**: Analyzes HTML clinical notes and annotates text with `<mark>` tags linking relevant spans to questionnaire items. See [backend/agents/mark/Readme.md](backend/agents/mark/Readme.md).
+
+- **Populate Agent**: Extracts values from marked HTML to generate FHIR QuestionnaireResponses.
+
+### Frontend
+
+Web interface for visualizing and reviewing the marking and population results.
+
+## Development
+
+### Setup
+
+```bash
+poetry install
+```
+
+### Environment
+
+Create a `.env` file:
+```
+GEMINI_API_KEY=your-api-key
+LOGFIRE_TOKEN=your-logfire-token
+```
+
+### Run tests
+
+```bash
+poetry run pytest
+```
+
+### Run server
+
+```bash
+poetry run uvicorn backend.main:app --reload
+```

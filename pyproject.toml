@@ -16,6 +16,7 @@ pyyaml = "^6.0"
 sentencex = "^1.0.13"
 lxml = "^6.0.2"
 lxml-stubs = "^0.5.1"
+logfire = "^4.21.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
