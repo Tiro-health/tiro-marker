@@ -1,9 +1,17 @@
 """FastAPI application entry point."""
 
+import logfire
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router
+from backend.config import settings
+
+# Configure logfire if token is present
+if settings.logfire_token:
+    logfire.configure(token=settings.logfire_token, send_to_logfire=True)
+    logfire.instrument_pydantic_ai()
+    logfire.info("Logfire configured for tiro-marker")
 
 app = FastAPI(
     title="Tiro-Marker API",

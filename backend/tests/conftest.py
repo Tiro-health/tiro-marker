@@ -39,7 +39,7 @@ def output_dir() -> Path:
 
 def load_yaml_cases() -> list[dict[str, Any]]:
     """Load all YAML test cases from the cases directory."""
-    cases = []
+    cases: list[dict[str, Any]] = []
     for yaml_file in sorted(CASES_DIR.glob("*.yaml")):
         with open(yaml_file) as f:
             case_data = yaml.safe_load(f)
@@ -55,9 +55,7 @@ def yaml_item_to_fhir(yaml_item: dict[str, Any]) -> QuestionnaireItem:
         for opt in yaml_item.get("answerOptions", [])
     ]
 
-    nested_items = [
-        yaml_item_to_fhir(child) for child in yaml_item.get("item", [])
-    ]
+    nested_items = [yaml_item_to_fhir(child) for child in yaml_item.get("item", [])]
 
     return QuestionnaireItem(
         linkId=yaml_item["linkId"],
@@ -115,7 +113,9 @@ def test_case(request: pytest.FixtureRequest) -> dict[str, Any]:
     return get_case_by_id(request.param)
 
 
-def save_output(output_dir: Path, case_name: str, suffix: str, data: dict[str, Any]) -> None:
+def save_output(
+    output_dir: Path, case_name: str, suffix: str, data: dict[str, Any]
+) -> None:
     """Save output to JSON file."""
     output_file = output_dir / f"{case_name}_{suffix}.json"
     with open(output_file, "w") as f:
