@@ -32,17 +32,47 @@ async function init() {
 
   // Initialize Lexical editor
   if (editorContainer) {
+    // 30 sentences matching 30 questionnaire questions
     const initialContent = `Patient presents with persistent headache for 3 days.
 Pain is moderate (6/10), localized to the frontal region.
-No fever or nausea reported. Blood pressure: 130/85 mmHg.
-Patient reports mild sensitivity to light.`;
+No fever or nausea reported.
+Blood pressure: 130/85 mmHg, heart rate 72 bpm.
+Patient reports mild sensitivity to light.
+History of migraines in the family, mother has chronic migraines.
+Currently taking ibuprofen 400mg as needed.
+No known drug allergies reported.
+Works as software developer with moderate work stress.
+Initial assessment suggests tension-type headache.
+Patient reports sleeping only 5-6 hours per night.
+Drinks 3-4 cups of coffee daily.
+Water intake approximately 4 glasses per day.
+Recent project deadline causing increased stress levels.
+Spends 10+ hours daily in front of computer screens.
+No regular exercise routine currently.
+Diet consists mainly of fast food and snacks.
+Has experienced similar headaches twice in the past year.
+Previous ibuprofen use provided partial relief.
+Pain typically reduces from 6 to 3 after medication.
+No blurred vision or visual disturbances noted.
+Mild neck tension present but no stiffness.
+No focal neurological deficits observed on examination.
+No red flag symptoms such as thunderclap onset or papilledema.
+Patient concerned about missing work deadlines.
+Headache affecting concentration and productivity significantly.
+Has missed 2 days of work this week due to symptoms.
+Recommend lifestyle modifications and stress management.
+Schedule follow-up appointment in 2 weeks.
+Advised on proper hydration and sleep hygiene practices.`;
 
     editorAPI = initializeEditor(editorContainer, initialContent);
     console.log('Lexical editor initialized');
 
+    // Get questionnaire for marking system
+    const questionnaire = getQuestionnaire();
+
     // Initialize marking system (sentence detection, etc.)
     try {
-      await initMarking(editorAPI);
+      await initMarking(editorAPI, questionnaire);
     } catch (error) {
       console.warn('Marking system initialization failed:', error);
     }
