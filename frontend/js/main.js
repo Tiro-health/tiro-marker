@@ -5,6 +5,7 @@
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js';
 import { initMarking } from './marking/index.js';
+import { initLinkHandler } from './questionnaire/linkHandler.js';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -44,6 +45,11 @@ Patient reports mild sensitivity to light.`;
       await initMarking(editorAPI);
     } catch (error) {
       console.warn('Marking system initialization failed:', error);
+    }
+
+    // Initialize questionnaire link handler (mark click -> question navigation)
+    if (clinicalForm) {
+      initLinkHandler(editorAPI, clinicalForm);
     }
   }
 
