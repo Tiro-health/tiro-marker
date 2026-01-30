@@ -19,6 +19,7 @@ import { registerRichText } from '@lexical/rich-text';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
 import { editorConfig } from './config.js';
+import { applyMark, applyMarksAtomically, replaceAllMarksAtomically, removeMark, getAllMarkIDs, isTextMarked, registerMarkClickHandler } from './markPlugin.js';
 
 let editorInstance = null;
 
@@ -66,6 +67,14 @@ export function initializeEditor(containerElement, initialContent = '') {
     registerUpdateListener: (callback) => registerUpdateListener(callback),
     getCursorOffset: () => getCursorOffset(),
     setCursorOffset: (offset) => setCursorOffset(offset),
+    // Mark functions
+    applyMark: (text, markId) => applyMark(editor, text, markId),
+    applyMarksAtomically: (marks) => applyMarksAtomically(editor, marks),
+    replaceAllMarksAtomically: (marks) => replaceAllMarksAtomically(editor, marks),
+    removeMark: (markId) => removeMark(editor, markId),
+    getAllMarkIDs: () => getAllMarkIDs(editor),
+    isTextMarked: (text) => isTextMarked(editor, text),
+    registerMarkClickHandler: (onClick) => registerMarkClickHandler(editor, onClick),
   };
 }
 
@@ -181,7 +190,6 @@ export function getCursorOffset() {
       // Get text content up to cursor position
       const anchor = selection.anchor;
       const root = $getRoot();
-      const textContent = root.getTextContent();
 
       // Calculate offset by walking through nodes
       let currentOffset = 0;
@@ -201,8 +209,11 @@ export function getCursorOffset() {
           for (const child of children) {
             if (walkNodes(child)) return true;
           }
-          // Add newline for block elements (except last)
-          currentOffset += 1;
+          // Only add newline for block-level elements (paragraphs), not inline elements (marks)
+          const nodeType = node.getType();
+          if (nodeType === 'paragraph' || nodeType === 'root') {
+            currentOffset += 1;
+          }
         }
         return false;
       };
@@ -243,7 +254,11 @@ export function setCursorOffset(offset) {
         for (const child of children) {
           if (findPosition(child)) return true;
         }
-        currentOffset += 1; // newline
+        // Only add newline for block-level elements (paragraphs), not inline elements (marks)
+        const nodeType = node.getType();
+        if (nodeType === 'paragraph' || nodeType === 'root') {
+          currentOffset += 1;
+        }
       }
       return false;
     };

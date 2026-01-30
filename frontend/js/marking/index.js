@@ -13,7 +13,6 @@ import {
 let editorAPI = null;
 let lastMarkedContent = ''; // Track content at last mark
 let isMarking = false;
-let isUpdatingEditor = false;
 let markInterval = null;
 let spinnerEl = null;
 
@@ -86,7 +85,7 @@ function setSpinnerVisible(show) {
  * Check if marking should run and trigger it
  */
 function checkAndMark() {
-  if (isMarking || isUpdatingEditor) {
+  if (isMarking) {
     return;
   }
 
@@ -102,27 +101,81 @@ function checkAndMark() {
     return;
   }
 
-  // Trigger marking
+  // Trigger marking with current content (this is what goes to backend)
   triggerMarking(currentContent);
 }
 
 /**
  * Trigger the marking process
+ * Clears all existing marks and re-applies fresh marks to preserve clean formatting
+ *
+ * IMPORTANT: The content parameter is the text that gets sent to the backend.
+ * The backend is slow (3+ seconds), so the user may edit during that time.
+ * We need to merge the backend's marks (based on OLD content) with the user's
+ * edits (NEW content). This is the classic collaborative editing problem.
+ *
+ * Current approach: Text-based matching with cursor preservation.
+ * Future: Consider Yjs (CRDT) for proper collaborative merging.
  */
 async function triggerMarking(content) {
   isMarking = true;
   setSpinnerVisible(true);
 
+  // Detect sentences from the content we're sending to backend
   const stableSentences = getStableSentences(content);
   console.log(`Marking ${stableSentences.length} stable sentences...`);
 
-  // Simulate backend delay
+  // Simulate backend delay (in production, this is the API call)
+  // User may edit during this time!
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
 
-  // Apply mock marks
-  stableSentences.forEach((sentence) => {
-    applyMockMark(sentence);
-  });
+  // Clear existing color styles
+  clearMarkColorStyles();
+
+  // Reset color index for fresh coloring
+  colorIndex = 0;
+
+  // Prepare all marks with IDs and colors
+  const marksToApply = [];
+  for (const sentence of stableSentences) {
+    const sentenceText = sentence.text.trim();
+    const color = SENTENCE_COLORS[colorIndex % SENTENCE_COLORS.length];
+    colorIndex++;
+    const linkId = `mark-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    marksToApply.push({
+      text: sentenceText,
+      markId: linkId,
+      color: color,
+    });
+  }
+
+  // Clear all existing marks and apply fresh ones atomically (preserves cursor position)
+  if (marksToApply.length > 0) {
+    const appliedMarks = editorAPI.replaceAllMarksAtomically(
+      marksToApply.map(({ text, markId }) => ({ text, markId }))
+    );
+
+    // Apply colors for successfully applied marks
+    for (const applied of appliedMarks) {
+      const markInfo = marksToApply.find((m) => m.markId === applied.markId);
+      if (markInfo) {
+        console.log(
+          `%c MARKED: "${markInfo.text.substring(0, 50)}..."`,
+          `background: ${markInfo.color}; padding: 2px 4px;`
+        );
+
+        // Store color mapping
+        if (!window._markColors) window._markColors = {};
+        window._markColors[markInfo.markId] = markInfo.color;
+
+        // Apply color via CSS
+        applyMarkColor(markInfo.markId, markInfo.color);
+      }
+    }
+
+    console.log(`Applied ${appliedMarks.length} fresh marks`);
+  }
 
   // Update last marked content
   lastMarkedContent = editorAPI.getTextContent();
@@ -134,44 +187,34 @@ async function triggerMarking(content) {
 }
 
 /**
- * Apply a mock mark (just logs for now - visual marking needs @lexical/mark in Phase 4)
+ * Clear all dynamic mark color styles
  */
-function applyMockMark(sentence) {
-  const color = SENTENCE_COLORS[colorIndex % SENTENCE_COLORS.length];
-  colorIndex++;
-  const linkId = `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  const sentenceText = sentence.text.trim();
-  console.log(`%c MARKED: "${sentenceText.substring(0, 50)}..."`, `background: ${color}; padding: 2px 4px;`);
-
-  // Track marked sentences for display
-  if (!window._markedSentences) window._markedSentences = [];
-  window._markedSentences.push({ text: sentenceText, color, linkId });
-
-  // Update visual indicator
-  updateMarkingIndicator();
+function clearMarkColorStyles() {
+  const styleEl = document.getElementById('mark-colors-style');
+  if (styleEl) {
+    styleEl.textContent = '';
+  }
+  // Clear color mapping
+  window._markColors = {};
 }
 
 /**
- * Update the visual indicator showing marked sentences
+ * Apply color to a mark via dynamic CSS
  */
-function updateMarkingIndicator() {
-  let indicator = document.getElementById('marking-indicator');
-  if (!indicator) {
-    indicator = document.createElement('div');
-    indicator.id = 'marking-indicator';
-    indicator.style.cssText = 'margin-top: 8px; padding: 8px; background: #f0f0f0; border-radius: 4px; font-size: 12px;';
-    const editorContainer = document.getElementById('editor-container');
-    if (editorContainer) {
-      editorContainer.parentNode.insertBefore(indicator, editorContainer.nextSibling.nextSibling);
-    }
+function applyMarkColor(linkId, color) {
+  // Add CSS rule for this specific mark
+  let styleEl = document.getElementById('mark-colors-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'mark-colors-style';
+    document.head.appendChild(styleEl);
   }
 
-  const sentences = window._markedSentences || [];
-  indicator.innerHTML = `<strong>Marked ${sentences.length} sentences:</strong><br>` +
-    sentences.map(s =>
-      `<span style="background: ${s.color}; padding: 1px 4px; margin: 2px; display: inline-block; border-radius: 2px;">${s.text.substring(0, 30)}...</span>`
-    ).join('');
+  styleEl.textContent += `
+    .editor-mark[data-lexical-mark-ids*="${linkId}"] {
+      background-color: ${color};
+    }
+  `;
 }
 
 /**

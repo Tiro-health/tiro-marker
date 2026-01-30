@@ -2,6 +2,8 @@
  * Lexical Editor Configuration
  */
 
+import { MarkNode } from '@lexical/mark';
+
 export const editorTheme = {
   paragraph: 'editor-paragraph',
   text: {
@@ -15,6 +17,7 @@ export const editorTheme = {
 export const editorConfig = {
   namespace: 'TiroMarkerEditor',
   theme: editorTheme,
+  nodes: [MarkNode],
   onError: (error) => {
     console.error('Lexical error:', error);
   },

@@ -311,25 +311,56 @@ button:disabled {
 
 /* Mark nodes - highlighted text linked to questionnaire items */
 .editor-mark {
-    background-color: #fef3c7;
     padding: 0.1em 0.2em;
     border-radius: 2px;
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .editor-mark:hover {
-    background-color: #fde68a;
+    filter: brightness(0.95);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 }
 
-.editor-mark[data-link-id] {
-    cursor: pointer;
-}
-
-/* Different mark colors for different link types */
+/* Active/selected mark */
 .editor-mark.mark-active {
-    background-color: #fde68a;
     box-shadow: 0 0 0 2px #f59e0b;
+    animation: mark-pulse 0.3s ease-in-out;
+}
+
+@keyframes mark-pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Question highlight animation (for bidirectional linking) */
+.question-highlight {
+    animation: question-pulse 0.5s ease-in-out;
+    outline: 2px solid #f59e0b;
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+
+@keyframes question-pulse {
+    0% {
+        outline-color: transparent;
+        background-color: transparent;
+    }
+    30% {
+        outline-color: #f59e0b;
+        background-color: rgba(245, 158, 11, 0.1);
+    }
+    100% {
+        outline-color: #f59e0b;
+        background-color: transparent;
+    }
 }
 
 /* Highlighted/marked text in editor (fallback for HTML marks) */
