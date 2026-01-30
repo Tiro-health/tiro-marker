@@ -5,6 +5,22 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Tiro-Marker - FHIR Questionnaire Assistant</title>
         <link rel="stylesheet" href="styles.css" />
+
+        <!-- Import maps for ES modules -->
+        <script type="importmap">
+            {
+                "imports": {
+                    "lexical": "https://esm.sh/lexical@0.21.0",
+                    "@lexical/rich-text": "https://esm.sh/@lexical/rich-text@0.21.0",
+                    "@lexical/history": "https://esm.sh/@lexical/history@0.21.0",
+                    "@lexical/html": "https://esm.sh/@lexical/html@0.21.0",
+                    "@lexical/mark": "https://esm.sh/@lexical/mark@0.21.0",
+                    "@lexical/selection": "https://esm.sh/@lexical/selection@0.21.0",
+                    "@lexical/utils": "https://esm.sh/@lexical/utils@0.21.0",
+                    "sentencex-wasm": "https://esm.sh/sentencex-wasm"
+                }
+            }
+        </script>
     </head>
     <body>
         <div class="container">
@@ -23,7 +39,7 @@
                         Dictate or type clinical notes. The AI will extract structured data.
                     </p>
                     <div id="editor-container">
-                        <div id="lexical-editor" contenteditable="true"></div>
+                        <!-- Lexical editor will be mounted here -->
                     </div>
                     <div class="editor-actions">
                         <button id="populate-btn" type="button">
@@ -70,8 +86,10 @@
             </footer>
         </div>
 
-        <!-- Load SDK after DOM elements -->
+        <!-- Load Tiro SDK -->
         <script src="https://cdn.tiro.health/sdk/next/tiro-web-sdk.iife.js"></script>
-        <script src="app.js"></script>
+
+        <!-- Load application as ES module -->
+        <script type="module" src="js/main.js"></script>
     </body>
 </html>
