@@ -421,12 +421,12 @@ export function registerMarkClickHandler(editor, onClick) {
   if (!rootElement) return () => {};
 
   const handleClick = (event) => {
-    const target = event.target;
+    // Find the mark element (click target may be inner span)
+    const markElement = event.target.closest('.editor-mark');
 
-    // Check if clicked element has mark class
-    if (target.classList?.contains('editor-mark')) {
-      // Get mark IDs from the data attribute (Lexical stores them as space-separated IDs)
-      const markIdsAttr = target.getAttribute('data-lexical-mark-ids');
+    if (markElement) {
+      // Get mark IDs from the data attribute
+      const markIdsAttr = markElement.getAttribute('data-lexical-mark-ids');
       if (markIdsAttr) {
         const markIds = markIdsAttr.split(' ').filter(Boolean);
         if (markIds.length > 0) {

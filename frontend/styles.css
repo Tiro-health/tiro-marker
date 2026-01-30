@@ -235,7 +235,7 @@ button:disabled {
     min-height: 400px;
     border: 2px solid #e2e8f0;
     border-radius: 8px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 #lexical-editor {
@@ -247,6 +247,7 @@ button:disabled {
     outline: none;
     white-space: pre-wrap;
     word-wrap: break-word;
+    overflow: visible;
 }
 
 #editor-container:focus-within {
@@ -291,6 +292,7 @@ button:disabled {
 /* Lexical theme classes */
 .editor-paragraph {
     margin: 0 0 0.5em 0;
+    overflow: visible;
 }
 
 .editor-paragraph:last-child {
@@ -315,11 +317,43 @@ button:disabled {
     border-radius: 2px;
     cursor: pointer;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
 }
 
 .editor-mark:hover {
     filter: brightness(0.95);
     box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+}
+
+/* JavaScript tooltip container (appended to body) */
+#mark-tooltip {
+    position: fixed;
+    background-color: #1e293b;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+#mark-tooltip.visible {
+    opacity: 1;
+}
+
+#mark-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1e293b;
 }
 
 /* Active/selected mark */

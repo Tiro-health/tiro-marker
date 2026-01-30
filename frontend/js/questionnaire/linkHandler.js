@@ -46,19 +46,28 @@ function handleMarkClick(markId, event) {
 function scrollToQuestion(linkId) {
   if (!formFiller) return;
 
-  // Try to find the question element within the form filler
-  // tiro-form-filler may use shadow DOM, so we need to handle that
-  const questionElement = findQuestionElement(linkId);
+  // Find the question element within the form filler
+  const result = findQuestionElement(linkId);
 
-  if (questionElement) {
-    // Scroll into view
-    questionElement.scrollIntoView({
+  if (result) {
+    const { container, input } = result;
+
+    // Scroll the container into view (centered)
+    container.scrollIntoView({
       behavior: 'smooth',
       block: 'center',
     });
 
-    // Add visual pulse/highlight
-    pulseHighlight(questionElement);
+    // Add visual pulse/highlight to the question panel
+    const panel = container.querySelector('[data-question-panel]') || container;
+    pulseHighlight(panel);
+
+    // Focus the input after scroll animation
+    if (input) {
+      setTimeout(() => {
+        input.focus();
+      }, 300);
+    }
 
     console.log(`Scrolled to question: ${linkId}`);
   } else {
@@ -68,39 +77,29 @@ function scrollToQuestion(linkId) {
 
 /**
  * Find a question element by linkId
+ * tiro-form-filler uses shadow DOM with data-question-id attribute
  * @param {string} linkId - The linkId to find
- * @returns {HTMLElement|null}
+ * @returns {{container: HTMLElement, input: HTMLElement}|null}
  */
 function findQuestionElement(linkId) {
   if (!formFiller) return null;
 
-  // First try regular DOM query
-  let element = formFiller.querySelector(`[data-link-id="${linkId}"]`);
-  if (element) return element;
-
-  // Try by name attribute (common for form fields)
-  element = formFiller.querySelector(`[name="${linkId}"]`);
-  if (element) return element;
-
-  // Try by id
-  element = formFiller.querySelector(`#${CSS.escape(linkId)}`);
-  if (element) return element;
-
-  // If tiro-form-filler uses shadow DOM, try that
+  // tiro-form-filler uses shadow DOM
   if (formFiller.shadowRoot) {
-    element = formFiller.shadowRoot.querySelector(`[data-link-id="${linkId}"]`);
-    if (element) return element;
-
-    element = formFiller.shadowRoot.querySelector(`[name="${linkId}"]`);
-    if (element) return element;
+    // Find the question container by data-question-id
+    const container = formFiller.shadowRoot.querySelector(`[data-question-id="${linkId}"]`);
+    if (container) {
+      // Find the input inside (id format: "q1.answer")
+      const input = container.querySelector(`input, textarea, select`);
+      return { container, input };
+    }
   }
 
-  // Try finding by label text containing the linkId
-  const labels = formFiller.querySelectorAll('label');
-  for (const label of labels) {
-    if (label.textContent.includes(linkId)) {
-      return label.closest('.form-field') || label.parentElement || label;
-    }
+  // Fallback: try regular DOM
+  const container = formFiller.querySelector(`[data-question-id="${linkId}"]`);
+  if (container) {
+    const input = container.querySelector(`input, textarea, select`);
+    return { container, input };
   }
 
   return null;

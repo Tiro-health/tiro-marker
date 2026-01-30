@@ -11,6 +11,7 @@ import {
 } from './sentenceDetector.js';
 
 let editorAPI = null;
+let questionnaire = null; // Store questionnaire for linkId mapping
 let lastMarkedContent = ''; // Track content at last mark
 let isMarking = false;
 let markInterval = null;
@@ -19,7 +20,10 @@ let spinnerEl = null;
 const MARK_INTERVAL_MS = 4000; // Check every 4 seconds
 const MOCK_DELAY_MS = 3000; // Simulate 3 second backend delay
 
-// Distinct colors for each sentence
+// Store question text for tooltips (linkId -> question text)
+window._markQuestionText = {};
+
+// Distinct colors for each sentence (30 colors for 30 sentences)
 const SENTENCE_COLORS = [
   'hsl(45, 90%, 80%)',   // Yellow
   'hsl(120, 70%, 80%)',  // Green
@@ -29,19 +33,46 @@ const SENTENCE_COLORS = [
   'hsl(30, 90%, 80%)',   // Orange
   'hsl(170, 70%, 80%)',  // Teal
   'hsl(320, 70%, 85%)',  // Magenta
+  'hsl(60, 85%, 80%)',   // Lime
+  'hsl(190, 75%, 80%)',  // Cyan
+  'hsl(15, 90%, 82%)',   // Coral
+  'hsl(140, 65%, 80%)',  // Mint
+  'hsl(260, 70%, 85%)',  // Lavender
+  'hsl(340, 75%, 85%)',  // Rose
+  'hsl(80, 70%, 78%)',   // Chartreuse
+  'hsl(210, 75%, 82%)',  // Sky
+  'hsl(25, 85%, 80%)',   // Peach
+  'hsl(160, 65%, 78%)',  // Seafoam
+  'hsl(300, 60%, 85%)',  // Orchid
+  'hsl(50, 88%, 78%)',   // Gold
+  'hsl(100, 60%, 80%)',  // Sage
+  'hsl(220, 70%, 82%)',  // Periwinkle
+  'hsl(5, 80%, 85%)',    // Salmon
+  'hsl(150, 60%, 80%)',  // Jade
+  'hsl(290, 65%, 85%)',  // Plum
+  'hsl(40, 90%, 78%)',   // Amber
+  'hsl(180, 60%, 80%)',  // Aqua
+  'hsl(240, 65%, 85%)',  // Indigo light
+  'hsl(355, 75%, 85%)',  // Blush
+  'hsl(110, 65%, 80%)',  // Spring
 ];
 let colorIndex = 0;
 
 /**
  * Initialize the marking system
  * @param {Object} editor - Editor API from editor/index.js
+ * @param {Object} q - Questionnaire object with items containing linkIds
  * @returns {Promise<void>}
  */
-export async function initMarking(editor) {
+export async function initMarking(editor, q = null) {
   editorAPI = editor;
+  questionnaire = q;
 
   // Create spinner element
   createSpinner();
+
+  // Create tooltip element
+  createTooltip();
 
   // Initialize sentence detector
   await initSentenceDetector();
@@ -50,6 +81,9 @@ export async function initMarking(editor) {
   markInterval = setInterval(checkAndMark, MARK_INTERVAL_MS);
 
   console.log('Marking system initialized (polling every 4s)');
+  if (questionnaire) {
+    console.log(`Questionnaire loaded with ${questionnaire.item?.length || 0} items`);
+  }
 }
 
 /**
@@ -70,6 +104,73 @@ function createSpinner() {
   if (editorContainer) {
     editorContainer.parentNode.insertBefore(spinnerEl, editorContainer.nextSibling);
   }
+}
+
+/**
+ * Create tooltip element and set up hover handlers
+ */
+function createTooltip() {
+  // Create tooltip element appended to body (escapes all containers)
+  const tooltip = document.createElement('div');
+  tooltip.id = 'mark-tooltip';
+  document.body.appendChild(tooltip);
+
+  // Set up hover handlers on the editor container using event delegation
+  const editorContainer = document.getElementById('editor-container');
+  if (!editorContainer) return;
+
+  editorContainer.addEventListener('mouseover', (e) => {
+    const mark = e.target.closest('.editor-mark');
+    if (mark) {
+      const questionText = mark.getAttribute('data-question-text');
+      if (questionText) {
+        showTooltip(tooltip, mark, `Q: ${questionText}`);
+      }
+    }
+  });
+
+  editorContainer.addEventListener('mouseout', (e) => {
+    const mark = e.target.closest('.editor-mark');
+    if (mark) {
+      hideTooltip(tooltip);
+    }
+  });
+}
+
+/**
+ * Show tooltip above an element
+ */
+function showTooltip(tooltip, element, text) {
+  tooltip.textContent = text;
+  tooltip.classList.add('visible');
+
+  // Position above the element
+  const rect = element.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+
+  // Center horizontally, position above
+  let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+  let top = rect.top - tooltipRect.height - 8;
+
+  // Keep within viewport
+  if (left < 8) left = 8;
+  if (left + tooltipRect.width > window.innerWidth - 8) {
+    left = window.innerWidth - tooltipRect.width - 8;
+  }
+  if (top < 8) {
+    // Show below if not enough space above
+    top = rect.bottom + 8;
+  }
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+/**
+ * Hide tooltip
+ */
+function hideTooltip(tooltip) {
+  tooltip.classList.remove('visible');
 }
 
 /**
@@ -135,18 +236,30 @@ async function triggerMarking(content) {
   // Reset color index for fresh coloring
   colorIndex = 0;
 
+  // Get questionnaire items for linkId mapping
+  const items = questionnaire?.item || [];
+
   // Prepare all marks with IDs and colors
+  // Sentence N maps to question N's linkId
   const marksToApply = [];
-  for (const sentence of stableSentences) {
+  for (let i = 0; i < stableSentences.length; i++) {
+    const sentence = stableSentences[i];
     const sentenceText = sentence.text.trim();
     const color = SENTENCE_COLORS[colorIndex % SENTENCE_COLORS.length];
     colorIndex++;
-    const linkId = `mark-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Use questionnaire linkId if available, otherwise fallback to index-based ID
+    const linkId = items[i]?.linkId || `mark-${i}`;
+    const questionText = items[i]?.text || '';
+
+    // Store question text for tooltip
+    window._markQuestionText[linkId] = questionText;
 
     marksToApply.push({
       text: sentenceText,
       markId: linkId,
       color: color,
+      questionText: questionText,
     });
   }
 
@@ -161,7 +274,7 @@ async function triggerMarking(content) {
       const markInfo = marksToApply.find((m) => m.markId === applied.markId);
       if (markInfo) {
         console.log(
-          `%c MARKED: "${markInfo.text.substring(0, 50)}..."`,
+          `%c MARKED [${markInfo.markId}]: "${markInfo.text.substring(0, 40)}..." → "${markInfo.questionText}"`,
           `background: ${markInfo.color}; padding: 2px 4px;`
         );
 
@@ -173,6 +286,10 @@ async function triggerMarking(content) {
         applyMarkColor(markInfo.markId, markInfo.color);
       }
     }
+
+    // Apply data attributes to DOM elements after Lexical renders
+    // Match by order since marks are applied sequentially
+    applyMarkAttributesToDOM(appliedMarks, marksToApply);
 
     console.log(`Applied ${appliedMarks.length} fresh marks`);
   }
@@ -215,6 +332,40 @@ function applyMarkColor(linkId, color) {
       background-color: ${color};
     }
   `;
+}
+
+/**
+ * Apply data attributes to mark DOM elements
+ * Since Lexical's MarkNode doesn't expose IDs in DOM by default,
+ * we add them manually after marks are applied.
+ *
+ * @param {Array} appliedMarks - Marks that were successfully applied (in order)
+ * @param {Array} markInfos - Full mark info including questionText
+ */
+function applyMarkAttributesToDOM(appliedMarks, markInfos) {
+  // Use setTimeout to let Lexical finish DOM updates
+  setTimeout(() => {
+    const markElements = document.querySelectorAll('.editor-mark');
+
+    // Match marks by index (they're applied and rendered in order)
+    appliedMarks.forEach((applied, index) => {
+      const markInfo = markInfos.find((m) => m.markId === applied.markId);
+      const el = markElements[index];
+
+      if (el && markInfo) {
+        // Add the mark ID as data attribute for CSS and click handling
+        el.setAttribute('data-lexical-mark-ids', markInfo.markId);
+
+        // Add tooltip attributes
+        if (markInfo.questionText) {
+          el.setAttribute('title', `Question: ${markInfo.questionText}`);
+          el.setAttribute('data-question-text', markInfo.questionText);
+        }
+
+        console.log(`DOM: Added attributes to mark ${markInfo.markId}`);
+      }
+    });
+  }, 50); // Small delay to ensure Lexical DOM is ready
 }
 
 /**
