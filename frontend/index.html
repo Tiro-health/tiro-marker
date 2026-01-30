@@ -1,47 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tiro-Marker - FHIR Questionnaire Assistant</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Tiro-Marker</h1>
-            <p class="subtitle">AI-powered FHIR Questionnaire Filling Assistant</p>
-        </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Tiro-Marker - FHIR Questionnaire Assistant</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Tiro-Marker</h1>
+                <p class="subtitle">
+                    AI-powered FHIR Questionnaire Filling Assistant
+                </p>
+            </header>
 
-        <main>
-            <section class="input-section">
-                <h2>Clinical Notes Input</h2>
-                <textarea
-                    id="clinical-notes"
-                    placeholder="Enter clinical notes here...
+            <main class="split-layout">
+                <!-- Left Panel: Clinical Notes Editor -->
+                <section class="editor-section">
+                    <h2>Clinical Notes</h2>
+                    <p class="section-description">
+                        Dictate or type clinical notes. The AI will extract structured data.
+                    </p>
+                    <div id="editor-container">
+                        <div id="lexical-editor" contenteditable="true"></div>
+                    </div>
+                    <div class="editor-actions">
+                        <button id="populate-btn" type="button">
+                            Populate Questionnaire →
+                        </button>
+                    </div>
+                </section>
 
-Example: Patient presents with persistent headache for 3 days. Pain is moderate, localized to the frontal region. No fever or nausea reported."
-                    rows="8"
-                ></textarea>
-                <button id="extract-btn" type="button">Extract Structured Data</button>
-            </section>
+                <!-- Right Panel: FHIR Questionnaire -->
+                <section class="form-section">
+                    <h2>FHIR Questionnaire</h2>
+                    <p class="section-description">
+                        Form auto-populated from clinical notes.
+                    </p>
 
-            <section class="output-section">
-                <h2>Extracted Data</h2>
-                <div id="loading" class="loading hidden">
-                    <span class="spinner"></span>
-                    Processing...
-                </div>
-                <div id="results" class="results"></div>
-                <div id="error" class="error hidden"></div>
-            </section>
-        </main>
+                    <tiro-form-filler id="clinical-form">
+                        <script type="application/fhir+json" slot="questionnaire">
+                            {
+                                "resourceType": "Questionnaire",
+                                "status": "draft",
+                                "title": "Clinical Intake Form",
+                                "item": [
+                                    {
+                                        "linkId": "name",
+                                        "type": "string",
+                                        "text": "What is your name?"
+                                    }
+                                ]
+                            }
+                        </script>
+                    </tiro-form-filler>
 
-        <footer>
-            <p>MedGemma Impact Challenge Project</p>
-        </footer>
-    </div>
+                    <div class="form-actions">
+                        <button id="submit-form-btn" type="button">
+                            Submit Form
+                        </button>
+                    </div>
+                    <div id="form-response" class="form-response hidden"></div>
+                </section>
+            </main>
 
-    <script src="app.js"></script>
-</body>
+            <footer>
+                <p>MedGemma Impact Challenge Project</p>
+            </footer>
+        </div>
+
+        <!-- Load SDK after DOM elements -->
+        <script src="https://cdn.tiro.health/sdk/next/tiro-web-sdk.iife.js"></script>
+        <script src="app.js"></script>
+    </body>
 </html>

@@ -1,136 +1,170 @@
 /**
  * Tiro-Marker Frontend Application
- * Handles API calls and UI updates for the FHIR Questionnaire Assistant
+ * Handles clinical notes editor and FHIR Questionnaire form interactions
  */
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = "http://localhost:8000/api";
 
 // DOM Elements
-const clinicalNotesInput = document.getElementById('clinical-notes');
-const extractBtn = document.getElementById('extract-btn');
-const loadingEl = document.getElementById('loading');
-const resultsEl = document.getElementById('results');
-const errorEl = document.getElementById('error');
+const clinicalForm = document.getElementById("clinical-form");
+const submitFormBtn = document.getElementById("submit-form-btn");
+const populateBtn = document.getElementById("populate-btn");
+const formResponseEl = document.getElementById("form-response");
+const editorEl = document.getElementById("lexical-editor");
 
 /**
- * Show loading state
+ * Get the clinical notes text from the editor
  */
-function showLoading() {
-    loadingEl.classList.remove('hidden');
-    resultsEl.innerHTML = '';
-    errorEl.classList.add('hidden');
-    extractBtn.disabled = true;
+function getClinicalNotes() {
+  return editorEl ? editorEl.innerText.trim() : "";
 }
 
 /**
- * Hide loading state
+ * Get the inline questionnaire from the form
  */
-function hideLoading() {
-    loadingEl.classList.add('hidden');
-    extractBtn.disabled = false;
-}
-
-/**
- * Show error message
- * @param {string} message - Error message to display
- */
-function showError(message) {
-    errorEl.textContent = message;
-    errorEl.classList.remove('hidden');
-    resultsEl.innerHTML = '';
-}
-
-/**
- * Get confidence level class based on score
- * @param {number} confidence - Confidence score (0-1)
- * @returns {string} CSS class name
- */
-function getConfidenceClass(confidence) {
-    if (confidence >= 0.8) return 'confidence-high';
-    if (confidence >= 0.5) return 'confidence-medium';
-    return 'confidence-low';
-}
-
-/**
- * Format field name for display
- * @param {string} field - Raw field name
- * @returns {string} Formatted field name
- */
-function formatFieldName(field) {
-    return field.replace(/_/g, ' ');
-}
-
-/**
- * Render extraction results
- * @param {Object} data - API response data
- */
-function renderResults(data) {
-    if (!data.items || data.items.length === 0) {
-        resultsEl.innerHTML = '<div class="empty-state">No data extracted. Try adding more clinical details.</div>';
-        return;
+function getQuestionnaire() {
+  if (!clinicalForm) return null;
+  const script = clinicalForm.querySelector('script[type="application/fhir+json"]');
+  if (script) {
+    try {
+      return JSON.parse(script.textContent);
+    } catch (e) {
+      console.error("Failed to parse questionnaire:", e);
     }
-
-    const html = data.items.map(item => {
-        const confidencePercent = Math.round(item.confidence * 100);
-        const confidenceClass = getConfidenceClass(item.confidence);
-
-        return `
-            <div class="result-item">
-                <span class="result-field">${formatFieldName(item.field)}</span>
-                <span class="result-value">${item.value}</span>
-                <span class="result-confidence ${confidenceClass}">${confidencePercent}%</span>
-            </div>
-        `;
-    }).join('');
-
-    resultsEl.innerHTML = html;
+  }
+  return null;
 }
 
 /**
- * Extract structured data from clinical notes
+ * Call backend to populate questionnaire from clinical notes
  */
-async function extractData() {
-    const text = clinicalNotesInput.value.trim();
+async function populateFromBackend(clinicalNotes, questionnaire) {
+  const response = await fetch(`${API_BASE_URL}/populate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      clinical_notes: clinicalNotes,
+      questionnaire: questionnaire,
+    }),
+  });
 
-    if (!text) {
-        showError('Please enter clinical notes before extracting.');
-        return;
-    }
+  if (!response.ok) {
+    throw new Error(`Server error: ${response.status}`);
+  }
 
-    showLoading();
+  return response.json();
+}
+
+/**
+ * Mock populate response for testing without backend
+ */
+function getMockPopulateResponse(questionnaire) {
+  // Create a mock QuestionnaireResponse based on the questionnaire items
+  const items = questionnaire?.item || [];
+  return {
+    resourceType: "QuestionnaireResponse",
+    status: "in-progress",
+    item: items.map((item) => ({
+      linkId: item.linkId,
+      text: item.text,
+      answer: [{ valueString: `[Extracted: ${item.text}]` }],
+    })),
+  };
+}
+
+/**
+ * Handle populate button click
+ */
+async function handlePopulate() {
+  const clinicalNotes = getClinicalNotes();
+  const questionnaire = getQuestionnaire();
+
+  if (!clinicalNotes) {
+    alert("Please enter clinical notes first.");
+    return;
+  }
+
+  if (!questionnaire) {
+    alert("No questionnaire found.");
+    return;
+  }
+
+  populateBtn.disabled = true;
+  populateBtn.textContent = "Populating...";
+
+  try {
+    let questionnaireResponse;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/extract`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ text }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        renderResults(data);
-    } catch (err) {
-        console.error('Extraction error:', err);
-        showError(`Failed to extract data: ${err.message}`);
-    } finally {
-        hideLoading();
+      // Try to call backend
+      questionnaireResponse = await populateFromBackend(clinicalNotes, questionnaire);
+    } catch (backendError) {
+      console.warn("Backend unavailable, using mock response:", backendError);
+      // Fall back to mock response
+      questionnaireResponse = getMockPopulateResponse(questionnaire);
     }
+
+    // Set the response on the form
+    if (clinicalForm) {
+      if (typeof clinicalForm.setResponse === "function") {
+        await clinicalForm.setResponse(questionnaireResponse);
+      } else {
+        clinicalForm.response = questionnaireResponse;
+      }
+      console.log("Form populated:", questionnaireResponse);
+    }
+  } catch (error) {
+    console.error("Populate error:", error);
+    alert(`Failed to populate: ${error.message}`);
+  } finally {
+    populateBtn.disabled = false;
+    populateBtn.textContent = "Populate Questionnaire →";
+  }
 }
 
-// Event Listeners
-extractBtn.addEventListener('click', extractData);
+/**
+ * Handle form submission
+ */
+async function handleFormSubmit() {
+  if (!clinicalForm) return;
 
-// Allow Ctrl/Cmd + Enter to submit
-clinicalNotesInput.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        extractData();
-    }
-});
+  const response = await clinicalForm.getResponse();
+  formResponseEl.textContent = JSON.stringify(response, null, 2);
+  formResponseEl.classList.remove("hidden");
+}
 
-// Initial empty state
-resultsEl.innerHTML = '<div class="empty-state">Enter clinical notes and click "Extract Structured Data" to begin.</div>';
+// Event listeners
+if (populateBtn) {
+  populateBtn.addEventListener("click", handlePopulate);
+}
+
+if (submitFormBtn && clinicalForm) {
+  submitFormBtn.addEventListener("click", handleFormSubmit);
+}
+
+if (clinicalForm) {
+  clinicalForm.addEventListener("tiro-submit", (e) => {
+    formResponseEl.textContent = JSON.stringify(e.detail.response, null, 2);
+    formResponseEl.classList.remove("hidden");
+  });
+
+  clinicalForm.addEventListener("tiro-ready", (e) => {
+    console.log("Form ready:", e.detail.questionnaire);
+  });
+
+  clinicalForm.addEventListener("tiro-error", (e) => {
+    console.error("Form error:", e.detail.error);
+    formResponseEl.textContent = `Error: ${e.detail.error.message}`;
+    formResponseEl.classList.remove("hidden");
+  });
+}
+
+// Initialize editor with sample text
+if (editorEl) {
+  editorEl.innerHTML = `Patient presents with persistent headache for 3 days.
+Pain is moderate (6/10), localized to the frontal region.
+No fever or nausea reported. Blood pressure: 130/85 mmHg.
+Patient reports mild sensitivity to light.`;
+}
