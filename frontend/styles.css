@@ -245,9 +245,11 @@ button:disabled {
     font-size: 1rem;
     line-height: 1.6;
     outline: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
-#lexical-editor:focus {
+#editor-container:focus-within {
     border-color: #2563eb;
 }
 
@@ -260,18 +262,88 @@ button:disabled {
     margin-top: 1rem;
 }
 
-/* Highlighted/marked text in editor */
+/* Marking spinner */
+#marking-spinner {
+    margin-top: 0.5rem;
+}
+
+#marking-spinner .spinner-overlay {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 6px;
+    color: #0369a1;
+    font-size: 0.875rem;
+}
+
+#marking-spinner .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #bae6fd;
+    border-top-color: #0369a1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Lexical theme classes */
+.editor-paragraph {
+    margin: 0 0 0.5em 0;
+}
+
+.editor-paragraph:last-child {
+    margin-bottom: 0;
+}
+
+.editor-text-bold {
+    font-weight: bold;
+}
+
+.editor-text-italic {
+    font-style: italic;
+}
+
+.editor-text-underline {
+    text-decoration: underline;
+}
+
+/* Mark nodes - highlighted text linked to questionnaire items */
+.editor-mark {
+    background-color: #fef3c7;
+    padding: 0.1em 0.2em;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.editor-mark:hover {
+    background-color: #fde68a;
+}
+
+.editor-mark[data-link-id] {
+    cursor: pointer;
+}
+
+/* Different mark colors for different link types */
+.editor-mark.mark-active {
+    background-color: #fde68a;
+    box-shadow: 0 0 0 2px #f59e0b;
+}
+
+/* Highlighted/marked text in editor (fallback for HTML marks) */
 #lexical-editor mark {
     background-color: #fef3c7;
     padding: 0.1em 0.2em;
     border-radius: 2px;
 }
 
-#lexical-editor mark[data-linkid] {
+#lexical-editor mark[data-link-id] {
     cursor: pointer;
 }
 
-#lexical-editor mark[data-linkid]:hover {
+#lexical-editor mark[data-link-id]:hover {
     background-color: #fde68a;
 }
 
