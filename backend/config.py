@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     # Google / Gemini
     gemini_api_key: str = ""
 
+    # MedGemma on Vertex AI (set in .env)
+    medgemma_endpoint_host: str = ""
+    medgemma_project_id: str = ""
+    medgemma_region: str = ""
+    medgemma_endpoint_id: str = ""
+
+    # Default model
+    default_model: str = "gemini-2.5-flash"
+
     # App
     debug: bool = False
 
