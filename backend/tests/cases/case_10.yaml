@@ -1,0 +1,6 @@
+name: Presence check test - Single question with answer NOT present in clinical note (should not hallucinate)
+description: Presence check test - Single question with answer NOT present in clinical note (should not hallucinate)
+questionnaire:
+- linkId: blood-pressure
+  type: string
+  text: What is the patient's blood pressure?

@@ -30,25 +30,6 @@ HTML:
 """
 
 
-def format_simple_container_prompt(
-    question_text: str, child_questions: list[str], html: str
-) -> str:
-    """Format prompt for simple container strategy (group marking)."""
-    children_str = "\n".join(f"  - {q}" for q in child_questions) if child_questions else "  (no child questions)"
-    return f"""Find the HTML labels that mark the boundary of this section/container.
-
-Section: {question_text}
-Child questions in this section:
-{children_str}
-
-Return the label numbers that encompass this entire section (the container boundaries).
-This should include the section header and all content related to the child questions.
-
-HTML:
-{html}
-"""
-
-
 def format_repeating_group_prompt(
     question_text: str, child_questions: list[str], html: str
 ) -> str:

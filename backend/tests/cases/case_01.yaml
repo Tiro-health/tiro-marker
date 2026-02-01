@@ -1,14 +1,6 @@
 name: "Simple headache case"
 description: "Patient with headache for 3 days"
 
-clinical_note: |
-  <html>
-    <body>
-      <p>Patient presents with headache for 3 days.</p>
-      <p>Severity: moderate. No nausea.</p>
-    </body>
-  </html>
-
 questionnaire:
   - linkId: chief-complaint
     type: string

@@ -1,0 +1,125 @@
+name: Carotid endarterectomy procedure - Tests coding with nested children, date fields, decimal fields with units (BMI),
+  and nested groups
+description: Carotid endarterectomy procedure - Tests coding with nested children, date fields, decimal fields with units
+  (BMI), and nested groups
+questionnaire:
+- linkId: carotis-ingreep
+  type: group
+  text: Carotis ingreep
+  repeats: false
+  item:
+  - linkId: procedure-type
+    type: coding
+    text: Procedure type
+    answerOptions:
+    - Carotisendarterectomie
+    - Carotisstent
+  - linkId: ingreepdatum
+    type: date
+    text: Ingreepdatum
+  - linkId: zijde-ingreep
+    type: coding
+    text: Zijde ingreep
+    answerOptions:
+    - links
+    - rechts
+  - linkId: locatie
+    type: coding
+    text: Locatie
+    answerOptions:
+    - arteria carotis interna
+    - arteria carotis communis
+  - linkId: indicatie
+    type: coding
+    text: Indicatie
+    answerOptions:
+    - asymptomatisch lijden
+    - symptomatisch lijden
+    item:
+    - linkId: datum-eerste-symptomen
+      type: date
+      text: Datum eerste symptomen
+- linkId: patientkarakteristieken
+  type: group
+  text: Patiëntkarakteristieken
+  repeats: false
+  item:
+  - linkId: bmi-group
+    type: group
+    text: BMI
+    repeats: false
+    item:
+    - linkId: height
+      type: decimal
+      text: Height
+      unit: cm
+    - linkId: weight
+      type: decimal
+      text: Weight
+      unit: kg
+    - linkId: bmi
+      type: decimal
+      text: BMI
+- linkId: post-op-complications
+  type: group
+  text: Post-operatieve complicaties binnen 30d na ingreep
+  repeats: false
+  item:
+  - linkId: overlijden
+    type: coding
+    text: Overlijden
+    answerOptions:
+    - ja
+    - nee
+    item:
+    - linkId: overlijdensdatum
+      type: date
+      text: Overlijdensdatum
+  - linkId: cva
+    type: coding
+    text: CVA
+    answerOptions:
+    - ja
+    - nee
+    item:
+    - linkId: cva-datum
+      type: date
+      text: Datum
+    - linkId: cva-corresponderende-zijde
+      type: coding
+      text: Corresponderende zijde
+      answerOptions:
+      - ja
+      - nee
+  - linkId: tia
+    type: coding
+    text: TIA
+    answerOptions:
+    - ja
+    - nee
+    item:
+    - linkId: tia-datum
+      type: date
+      text: Datum
+    - linkId: tia-corresponderende-zijde
+      type: coding
+      text: Corresponderende zijde
+      answerOptions:
+      - ja
+      - nee
+  - linkId: perifeer-zenuwletsel
+    type: coding
+    text: Perifeer zenuwletsel
+    answerOptions:
+    - ja
+    - nee
+    item:
+    - linkId: perifeer-zenuwletsel-datum
+      type: date
+      text: Datum
+    - linkId: perifeer-zenuwletsel-corresponderende-zijde
+      type: coding
+      text: Corresponderende zijde
+      answerOptions:
+      - ja
+      - nee

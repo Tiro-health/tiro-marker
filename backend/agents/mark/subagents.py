@@ -10,12 +10,12 @@ from typing import cast
 
 from pydantic import BaseModel, Field, create_model
 
+from backend.agents.mark.labeling import get_root_labels
 from backend.agents.mark.prompts import (
     SYSTEM_PROMPT,
     format_default_prompt,
     format_repeating_coding_prompt,
     format_repeating_group_prompt,
-    format_simple_container_prompt,
 )
 from backend.agents.protocols import QuestionnaireItemProtocol
 from backend.ai_models import ModelName, create_agent
@@ -238,21 +238,19 @@ async def simple_container_strategy(
     item: QuestionnaireItemProtocol,
     location: str,
     html: str,
-    model_name: ModelName,
+    model_name: ModelName,  # noqa: ARG001 - unused, no LLM call needed
 ) -> tuple[list[MarkResult], list[ChildInput]]:
-    """Non-repeating group: mark root labels (whole container)."""
-    question_text = item.text or item.linkId
-    child_questions = [child.text or child.linkId for child in item.item or []]
+    """Non-repeating group: mark all root-level labels (whole container).
 
-    prompt = format_simple_container_prompt(question_text, child_questions, html)
-
-    agent = create_agent(model_name, DefaultLabelsResponse, SYSTEM_PROMPT)
-    result = await agent.run(prompt)
+    No LLM call needed - just extract all root-level labeled elements.
+    """
+    # Get all root-level labels from the HTML
+    root_labels = get_root_labels(html)
 
     marks = [
         MarkResult(
             location_string=location,
-            labels=result.output.labels,
+            labels=root_labels,
         )
     ]
 
