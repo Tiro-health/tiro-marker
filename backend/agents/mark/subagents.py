@@ -148,7 +148,7 @@ def _get_option_display_and_code(opt: object) -> tuple[str, str] | None:
 
 # Type for async strategy functions
 StrategyFn = Callable[
-    [QuestionnaireItemProtocol, str, str, ModelName],  # (item, location, html, model_name)
+    [QuestionnaireItemProtocol, str, str, ModelName, list[str]],  # (item, location, html, model_name, siblings)
     Awaitable[tuple[list[MarkResult], list[ChildInput]]],  # (marks, children)
 ]
 
@@ -183,6 +183,7 @@ async def process_item(
     location: str,
     html: str,
     model_name: ModelName = ModelName.GEMINI_FLASH_25,
+    siblings: list[str] | None = None,
 ) -> tuple[list[MarkResult], list[ChildInput]]:
     """Process item using appropriate strategy."""
     strategy_name = get_strategy_name(item)
@@ -191,7 +192,7 @@ async def process_item(
     if strategy is None:
         raise ValueError(f"Unknown strategy: {strategy_name}")
 
-    return await strategy(item, location, html, model_name)
+    return await strategy(item, location, html, model_name, siblings or [])
 
 
 # =============================================================================
@@ -205,12 +206,13 @@ async def default_strategy(
     location: str,
     html: str,
     model_name: ModelName,
+    siblings: list[str],
 ) -> tuple[list[MarkResult], list[ChildInput]]:
     """Default: LLM finds answer value in HTML."""
     marks: list[MarkResult] = []
 
     if item.type not in ("group", "display"):
-        prompt = format_default_prompt(item, html)
+        prompt = format_default_prompt(item, html, siblings)
 
         agent = create_agent(model_name, DefaultLabelsResponse, SYSTEM_PROMPT)
         result = await agent.run(prompt)
@@ -240,6 +242,7 @@ async def simple_container_strategy(
     location: str,
     html: str,
     model_name: ModelName,  # noqa: ARG001 - unused, no LLM call needed
+    siblings: list[str],  # noqa: ARG001 - unused for containers
 ) -> tuple[list[MarkResult], list[ChildInput]]:
     """Non-repeating group: mark all root-level labels (whole container).
 
@@ -276,6 +279,7 @@ async def repeating_group_strategy(
     location: str,
     html: str,
     model_name: ModelName,
+    siblings: list[str],  # noqa: ARG001 - groups don't need disambiguation
 ) -> tuple[list[MarkResult], list[ChildInput]]:
     """Repeating group: LLM detects instances, marks each."""
     prompt = format_repeating_group_prompt(item, html)
@@ -315,6 +319,7 @@ async def repeating_coding_strategy(
     location: str,
     html: str,
     model_name: ModelName,
+    siblings: list[str],
 ) -> tuple[list[MarkResult], list[ChildInput]]:
     """Repeating coding: LLM marks each answer option separately."""
     # Extract options as (code, display) tuples

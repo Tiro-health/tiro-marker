@@ -5,6 +5,25 @@
 
 let formFiller = null;
 
+// Lighter yellow for form field highlights
+const HIGHLIGHT_COLOR = 'hsl(45, 85%, 92%)';
+
+// Track currently highlighted elements for clearing on next click
+let highlightedContainers = [];
+
+/**
+ * Clear all currently highlighted containers
+ */
+function clearHighlightedContainers() {
+  for (const { container, originalBg, originalTransition } of highlightedContainers) {
+    if (container) {
+      container.style.backgroundColor = originalBg || '';
+      container.style.transition = originalTransition || '';
+    }
+  }
+  highlightedContainers = [];
+}
+
 /**
  * Initialize the link handler
  * @param {Object} editorAPI - Editor API from editor/index.js
@@ -21,19 +40,53 @@ export function initLinkHandler(editorAPI, formElement) {
 
 /**
  * Handle mark click event
- * @param {string} markId - The mark/linkId that was clicked
+ * Supports multiple mark IDs (space-separated) - navigates to most nested, highlights all
+ * Also collects IDs from ancestor mark elements for nested marks
+ * @param {string} markIdOrIds - The mark/linkId(s) that was clicked (may be space-separated)
  * @param {Event} event - The click event
  */
-function handleMarkClick(markId, event) {
-  console.log(`Mark clicked: linkId="${markId}"`);
+function handleMarkClick(markIdOrIds, event) {
+  console.log(`Mark clicked: linkId="${markIdOrIds}"`);
 
   if (!formFiller) {
     console.warn('Form filler not available');
     return;
   }
 
-  // Navigate to the corresponding question
-  scrollToQuestion(markId);
+  // Collect all IDs from the passed string AND from ancestor mark elements
+  const allMarkIds = new Set();
+
+  // Add IDs from the passed string
+  markIdOrIds.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+
+  // Also collect IDs from ancestor mark elements (for nested marks)
+  const clickedMark = event.target.closest('.editor-mark');
+  if (clickedMark) {
+    let parentMark = clickedMark.parentElement?.closest('.editor-mark');
+    while (parentMark) {
+      const parentIds = parentMark.getAttribute('data-lexical-mark-ids');
+      if (parentIds) {
+        parentIds.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+      }
+      parentMark = parentMark.parentElement?.closest('.editor-mark');
+    }
+  }
+
+  const markIds = Array.from(allMarkIds);
+  console.log(`[LinkHandler] Collected ${markIds.length} mark IDs:`, markIds);
+
+  if (markIds.length === 0) return;
+
+  // Find the most nested/specific mark (longest location path = most dots)
+  const mostNestedId = markIds.reduce((a, b) =>
+    a.split('.').length > b.split('.').length ? a : b
+  );
+
+  // Note: Highlighting is handled by marking/index.js click handler
+  // We only handle scrolling and focusing here to avoid duplicate highlights
+
+  // Navigate to the most nested one (scroll + focus)
+  scrollToQuestion(mostNestedId);
 
   // Highlight the mark temporarily
   highlightMark(event.target);
@@ -77,29 +130,48 @@ function scrollToQuestion(linkId) {
 
 /**
  * Find a question element by linkId
- * tiro-form-filler uses shadow DOM with data-question-id attribute
- * @param {string} linkId - The linkId to find
+ * tiro-form-filler inputs have id="linkId.answer" and name="linkId.answer"
+ * @param {string} linkId - The linkId to find (e.g., "q11.answer" or "q11")
  * @returns {{container: HTMLElement, input: HTMLElement}|null}
  */
 function findQuestionElement(linkId) {
   if (!formFiller) return null;
 
-  // tiro-form-filler uses shadow DOM
+  // The input has id="q11.answer" directly
+  // Try the exact linkId first, then with .answer suffix if not present
+  const fullLinkId = linkId.endsWith('.answer') ? linkId : `${linkId}.answer`;
+  const baseLinkId = linkId.replace(/\.answer$/, '');
+
+  // Selectors to try (use attribute selector to avoid escaping issues with dots)
+  const selectors = [
+    `[id="${fullLinkId}"]`,
+    `[name="${fullLinkId}"]`,
+    `[id="${baseLinkId}"]`,
+    `[name="${baseLinkId}"]`,
+  ];
+
+  // Try shadow DOM first
   if (formFiller.shadowRoot) {
-    // Find the question container by data-question-id
-    const container = formFiller.shadowRoot.querySelector(`[data-question-id="${linkId}"]`);
-    if (container) {
-      // Find the input inside (id format: "q1.answer")
-      const input = container.querySelector(`input, textarea, select`);
-      return { container, input };
+    for (const selector of selectors) {
+      const input = formFiller.shadowRoot.querySelector(selector);
+      if (input) {
+        const container = input.closest('div') || input.parentElement;
+        return { container, input };
+      }
     }
   }
 
-  // Fallback: try regular DOM
-  const container = formFiller.querySelector(`[data-question-id="${linkId}"]`);
-  if (container) {
-    const input = container.querySelector(`input, textarea, select`);
-    return { container, input };
+  // Try regular DOM (search entire document since tiro-form-filler might not contain inputs directly)
+  for (const selector of selectors) {
+    let input = formFiller.querySelector(selector);
+    if (!input) {
+      // Also try document-wide search
+      input = document.querySelector(selector);
+    }
+    if (input) {
+      const container = input.closest('div') || input.parentElement;
+      return { container, input };
+    }
   }
 
   return null;
@@ -107,22 +179,67 @@ function findQuestionElement(linkId) {
 
 /**
  * Apply a visual pulse highlight to an element
+ * Uses inline styles for shadow DOM compatibility
+ * Finds the grey box container to highlight
+ * Note: This is now handled by highlightQuestionContainer, kept for backwards compatibility
  * @param {HTMLElement} element
  */
 function pulseHighlight(element) {
-  // Remove any existing highlight
-  element.classList.remove('question-highlight');
+  // Highlighting is now handled by highlightQuestionContainer
+  // This function is kept for backwards compatibility but does nothing
+  // to avoid double highlighting
+}
 
-  // Force reflow to restart animation
-  void element.offsetWidth;
+/**
+ * Highlight the container of a question (for multi-question highlighting)
+ * Uses inline styles for shadow DOM compatibility
+ * Finds the grey box container (bg-gray-50) to highlight
+ * Highlight stays until clicking elsewhere or blur
+ * @param {string} linkId - The linkId to highlight
+ */
+function highlightQuestionContainer(linkId) {
+  const result = findQuestionElement(linkId);
 
-  // Add highlight class
-  element.classList.add('question-highlight');
+  if (result) {
+    const { input } = result;
 
-  // Remove after animation
-  setTimeout(() => {
-    element.classList.remove('question-highlight');
-  }, 2000);
+    // Find the grey box container - walk up to find element with grey background
+    let questionContainer = input.parentElement;
+    while (questionContainer) {
+      const bgColor = window.getComputedStyle(questionContainer).backgroundColor;
+      const hasGreyBg = questionContainer.classList?.contains('bg-gray-50') ||
+                       questionContainer.classList?.contains('bg-gray-100') ||
+                       bgColor.includes('246') || bgColor.includes('243');
+      if (hasGreyBg) break;
+      questionContainer = questionContainer.parentElement;
+    }
+    if (!questionContainer) questionContainer = input.closest('div');
+
+    if (questionContainer) {
+      // Store original styles for restoration
+      const originalBg = questionContainer.style.backgroundColor;
+      const originalTransition = questionContainer.style.transition;
+
+      // Apply highlight
+      questionContainer.style.transition = 'background-color 0.3s ease';
+      questionContainer.style.backgroundColor = HIGHLIGHT_COLOR; // Lighter yellow
+      questionContainer.style.borderRadius = '4px';
+
+      // Track for clearing later
+      highlightedContainers.push({ container: questionContainer, originalBg, originalTransition });
+
+      console.log(`[LinkHandler] Highlighted container for ${linkId}`);
+
+      // Add blur listener to the input to clear highlight when focus leaves
+      const blurHandler = () => {
+        setTimeout(() => {
+          clearHighlightedContainers();
+        }, 100);
+        input.removeEventListener('blur', blurHandler);
+      };
+      input.addEventListener('blur', blurHandler);
+    }
+  }
 }
 
 /**

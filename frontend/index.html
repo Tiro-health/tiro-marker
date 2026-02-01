@@ -39,13 +39,44 @@
                     <p class="section-description">
                         Dictate or type clinical notes. The AI will extract structured data.
                     </p>
+
+                    <!-- Agent Avatars -->
+                    <div class="agents-bar">
+                        <!-- Marker Agent -->
+                        <div class="agent-avatar-container" id="marker-agent">
+                            <div class="speech-bubble" id="marker-bubble">
+                                <span class="bubble-spinner"></span>
+                                <span class="bubble-text" id="marker-status">Watching</span>
+                            </div>
+                            <div class="avatar-circle" id="marker-avatar" title="Click to mark">
+                                🖍️
+                            </div>
+                            <label class="mini-toggle">
+                                <input type="checkbox" id="marker-live-toggle" checked>
+                                <span class="mini-toggle-slider"></span>
+                                <span class="mini-toggle-label">Live</span>
+                            </label>
+                        </div>
+
+                        <!-- Populate Agent -->
+                        <div class="agent-avatar-container" id="populate-agent">
+                            <div class="speech-bubble" id="populate-bubble">
+                                <span class="bubble-spinner"></span>
+                                <span class="bubble-text" id="populate-status">Ready</span>
+                            </div>
+                            <div class="avatar-circle" id="populate-avatar" title="Click to fill">
+                                📝
+                            </div>
+                            <label class="mini-toggle">
+                                <input type="checkbox" id="populate-live-toggle">
+                                <span class="mini-toggle-slider"></span>
+                                <span class="mini-toggle-label">Live</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div id="editor-container">
                         <!-- Lexical editor will be mounted here -->
-                    </div>
-                    <div class="editor-actions">
-                        <button id="populate-btn" type="button">
-                            Populate Questionnaire →
-                        </button>
                     </div>
                 </section>
 
@@ -60,6 +91,7 @@
                         <script type="application/fhir+json" slot="questionnaire">
                             {
                                 "resourceType": "Questionnaire",
+                                "url": "http://example.org/Questionnaire/clinical-intake",
                                 "status": "draft",
                                 "title": "Clinical Intake Form",
                                 "item": [

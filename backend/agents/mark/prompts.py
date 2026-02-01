@@ -125,6 +125,7 @@ Guidelines:
 def format_default_prompt(
     item: QuestionnaireItemProtocol,
     html: str,
+    siblings: list[str] | None = None,
 ) -> str:
     """Format prompt for default strategy (single answer value)."""
     question_tag = _format_question_tag(item)
@@ -137,9 +138,19 @@ def format_default_prompt(
         nested_section = ""
         instruction = "Return labels containing the answer value."
 
+    # Add sibling context to prevent marking content that belongs to another question
+    siblings_section = ""
+    if siblings:
+        siblings_list = "\n".join(f"    - {s}" for s in siblings)
+        siblings_section = f"""
+  <other_questions>
+    These questions are also being asked. Do NOT label content if it more specifically answers one of these:
+{siblings_list}
+  </other_questions>"""
+
     return f"""<prompt>
   {_format_context()}
-  {question_tag}{nested_section}
+  {question_tag}{nested_section}{siblings_section}
   <instruction>{instruction} Empty list if not found.</instruction>
   <clinical_note>{html}</clinical_note>
 </prompt>"""

@@ -50,6 +50,17 @@ export function applyMark(editor, text, markId) {
  * @returns {boolean} True if mark was applied
  */
 export function $applyMarkToText(text, markId) {
+  return $applyMarkToTextWithIds(text, [markId]);
+}
+
+/**
+ * Apply mark to text with multiple IDs (for overlapping marks)
+ * Uses Lexical's MarkNode which supports multiple IDs via __ids array
+ * @param {string} text - Text to find and mark
+ * @param {string[]} markIds - Array of mark IDs to apply
+ * @returns {boolean} True if mark was applied
+ */
+export function $applyMarkToTextWithIds(text, markIds) {
   const root = $getRoot();
 
   // Find the text position
@@ -61,10 +72,12 @@ export function $applyMarkToText(text, markId) {
     markSelection.anchor.set(position.startNode.getKey(), position.startOffset, 'text');
     markSelection.focus.set(position.endNode.getKey(), position.endOffset, 'text');
 
-    // Wrap in mark node without changing current selection
-    $wrapSelectionInMarkNode(markSelection, false, markId);
+    // Apply each mark ID - $wrapSelectionInMarkNode handles adding IDs to existing MarkNodes
+    for (const markId of markIds) {
+      $wrapSelectionInMarkNode(markSelection, false, markId);
+    }
 
-    console.log(`Applied mark "${markId}" to: "${text.trim().substring(0, 30)}..."`);
+    console.log(`Applied marks [${markIds.join(', ')}] to: "${text.trim().substring(0, 30)}..."`);
     return true;
   } else {
     console.warn(`Could not find text to mark: "${text.substring(0, 30)}..."`);
@@ -322,6 +335,7 @@ function $clearAllMarks() {
 /**
  * Clear all marks and apply new marks atomically with cursor preservation
  * This replaces all existing marks with fresh ones
+ * Groups marks by text to handle overlapping marks (multiple IDs for same text)
  * @param {LexicalEditor} editor - Lexical editor instance
  * @param {Array<{text: string, markId: string}>} marks - Marks to apply
  * @returns {Array<{text: string, markId: string}>} Successfully applied marks
@@ -333,20 +347,39 @@ export function replaceAllMarksAtomically(editor, marks) {
     () => {
       // Save current selection as text offset BEFORE any modifications
       const savedOffset = $getSelectionOffset();
+      console.log(`[Mark] Cursor offset before: ${savedOffset}`);
 
       // Clear all existing marks first
       $clearAllMarks();
+      console.log(`[Mark] Cleared all marks`);
 
-      // Apply each new mark
+      // Group marks by text to handle overlapping marks
+      const marksByText = new Map();
       for (const { text, markId } of marks) {
-        if ($applyMarkToText(text, markId)) {
-          appliedMarks.push({ text, markId });
+        const normalizedText = text.trim();
+        if (!marksByText.has(normalizedText)) {
+          marksByText.set(normalizedText, []);
+        }
+        marksByText.get(normalizedText).push(markId);
+      }
+
+      console.log(`[Mark] Grouped ${marks.length} marks into ${marksByText.size} unique text regions`);
+
+      // Apply marks grouped by text (all IDs at once for same text)
+      for (const [text, markIds] of marksByText) {
+        if ($applyMarkToTextWithIds(text, markIds)) {
+          // Record all individual marks as applied
+          for (const markId of markIds) {
+            appliedMarks.push({ text, markId });
+          }
         }
       }
+      console.log(`[Mark] Applied ${appliedMarks.length} marks`);
 
       // Restore selection using text offset AFTER all modifications
       if (savedOffset !== null) {
         $setSelectionByOffset(savedOffset);
+        console.log(`[Mark] Restored cursor to offset: ${savedOffset}`);
       }
     },
     { discrete: true }

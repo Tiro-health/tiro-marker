@@ -39,6 +39,7 @@ class MarkInput:
     html: str
     q_item: QuestionnaireItemProtocol
     location_string: str
+    sibling_questions: list[str] = field(default_factory=list)  # Other questions at same level
 
 
 @dataclass
@@ -79,13 +80,20 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
     async def fan_out(
         ctx: StepContext[MarkerState, None, MarkRequest],
     ) -> Sequence[MarkInput]:
+        # Collect sibling question texts for disambiguation
+        all_items = list(ctx.inputs.q_items)
         return [
             MarkInput(
                 html=ctx.inputs.html,
                 q_item=item,
                 location_string=item.linkId,
+                sibling_questions=[
+                    other.text or other.linkId
+                    for other in all_items
+                    if other.linkId != item.linkId
+                ],
             )
-            for item in ctx.inputs.q_items
+            for item in all_items
         ]
 
     @g.step
@@ -95,9 +103,10 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
         item = ctx.inputs.q_item
         location = ctx.inputs.location_string
         html = ctx.inputs.html
+        siblings = ctx.inputs.sibling_questions
 
         # Process using extensible strategy system (now async with html)
-        marks, children = await process_item(item, location, html)
+        marks, children = await process_item(item, location, html, siblings=siblings)
 
         # Add marks to state
         for mark in marks:
@@ -108,12 +117,24 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
                 )
             )
 
-        # Return children as MarkInputs with scoped HTML
+        # Collect sibling texts for children at this level
+        child_items = [c.q_item for c in children]
+        child_siblings = {
+            c.q_item.linkId: [
+                other.text or other.linkId
+                for other in child_items
+                if other.linkId != c.q_item.linkId
+            ]
+            for c in children
+        }
+
+        # Return children as MarkInputs with scoped HTML and sibling context
         return [
             MarkInput(
                 html=child.html,  # Use scoped HTML from child
                 q_item=child.q_item,
                 location_string=child.location_string,
+                sibling_questions=child_siblings.get(child.q_item.linkId, []),
             )
             for child in children
         ]
