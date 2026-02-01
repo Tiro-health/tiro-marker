@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
 from pydantic_graph.beta.join import reduce_null
 
+from backend.agents.mark.labeling import apply_marks as apply_marks_to_html
+from backend.agents.mark.labeling import label_html
 from backend.agents.protocols import QuestionnaireItemProtocol
 
 
@@ -28,7 +30,7 @@ class Mark:
 @dataclass
 class MarkerState:
     html: str
-    marks: list[Mark] = field(default_factory=list)
+    marks: list[Mark] = field(default_factory=lambda: [])
 
 
 @dataclass
@@ -55,12 +57,15 @@ async def mark_html(
         q_items: Questionnaire items to identify spans for.
 
     Returns:
-        HTML with <mark data-link-id="..."> tags around relevant spans.
+        HTML with <mark data-location="..."> tags around relevant spans.
     """
+    # First, label the HTML for AI selection
+    labeled_html, _label_count = label_html(html)
+
     g = create_graph()
     graph = g.build()
-    state = MarkerState(html=html)
-    request = MarkRequest(html=html, q_items=q_items)
+    state = MarkerState(html=labeled_html)
+    request = MarkRequest(html=labeled_html, q_items=q_items)
     result = await graph.run(state=state, inputs=request)
 
     return result
@@ -74,18 +79,42 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
         ctx: StepContext[MarkerState, None, MarkRequest],
     ) -> Sequence[MarkInput]:
         return [
-            MarkInput(html=ctx.inputs.html, q_item=item) for item in ctx.inputs.q_items
+            MarkInput(
+                html=ctx.inputs.html,
+                q_item=item,
+                location_string=item.linkId,
+            )
+            for item in ctx.inputs.q_items
         ]
 
     @g.step
     async def find_labels(
         ctx: StepContext[MarkerState, None, MarkInput],
     ) -> Sequence[MarkInput]:
-        # TODO: Find which HTML labels match this questionnaire item
         item = ctx.inputs.q_item
+        location = ctx.inputs.location_string
 
+        # Non-group/display types get .answer suffix for the actual value
+        is_answer_type = item.type not in ("group", "display")
+        mark_location = f"{location}.answer" if is_answer_type else location
+
+        # TODO: LLM finds which HTML labels match this item
+        # For now, assume label 1 applies to everything
+        ctx.state.marks.append(
+            Mark(
+                location_string=mark_location,
+                labels=[1],  # placeholder
+            )
+        )
+
+        # Pass full HTML to nested children (use base location, not .answer)
         return [
-            MarkInput(html=ctx.inputs.html, q_item=child) for child in item.item or []
+            MarkInput(
+                html=ctx.inputs.html,  # full HTML, not filtered
+                q_item=child,
+                location_string=f"{location}.{child.linkId}",
+            )
+            for child in item.item or []
         ]
 
     sync = g.join(reduce_null, initial=None)
@@ -94,8 +123,8 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
     async def apply_marks(
         ctx: StepContext[MarkerState, None, None],
     ) -> str:
-        # TODO: Apply accumulated marks to HTML
-        return ctx.state.html
+        # Apply marks to labeled HTML and clean up
+        return apply_marks_to_html(ctx.state.html, ctx.state.marks)
 
     g.add(
         g.edge_from(g.start_node).to(fan_out),
