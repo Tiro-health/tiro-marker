@@ -16,14 +16,14 @@ questionnaire:
     type: integer
     unit: days
   - linkId: severity
-    type: choice
+    type: coding
     repeats: false
     answerOptions:
       - mild
       - moderate
       - severe
   - linkId: symptoms
-    type: choice
+    type: coding
     repeats: true
     answerOptions:
       - nausea

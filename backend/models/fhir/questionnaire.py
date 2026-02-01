@@ -4,11 +4,11 @@ from typing import Literal
 
 from pydantic import Field
 
-from backend.models.fhir.primitives import Code, Id, LinkId, Uri, DateTime
 from backend.models.fhir.common import Coding, Extension, FHIRBaseModel
 from backend.models.fhir.extensions import QUESTIONNAIRE_UNIT_URL
+from backend.models.fhir.primitives import Code, DateTime, Id, LinkId, Uri
 
-# FHIR QuestionnaireItem.type values
+# FHIR R5 QuestionnaireItem.type values
 QuestionnaireItemType = Literal[
     "group",
     "display",
@@ -21,8 +21,7 @@ QuestionnaireItemType = Literal[
     "string",
     "text",
     "url",
-    "choice",
-    "open-choice",
+    "coding",
     "attachment",
     "reference",
     "quantity",
@@ -32,11 +31,7 @@ QuestionnaireItemType = Literal[
 class QuestionnaireItemAnswerOption(FHIRBaseModel):
     """FHIR Questionnaire.item.answerOption element."""
 
-    valueCoding: Coding | None = None
-    valueString: str | None = None
-    valueInteger: int | None = None
-    valueDate: str | None = None
-    valueReference: dict[str, object] | None = None
+    valueCoding: Coding
 
 
 class QuestionnaireItem(FHIRBaseModel):

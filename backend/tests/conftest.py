@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from backend.main import app
 from backend.models.fhir import (
     Attachment,
+    Coding,
     DocumentReference,
     DocumentReferenceContent,
     Questionnaire,
@@ -51,7 +52,13 @@ def load_yaml_cases() -> list[dict[str, Any]]:
 def yaml_item_to_fhir(yaml_item: dict[str, Any]) -> QuestionnaireItem:
     """Convert a single YAML item (and its nested items) to FHIR QuestionnaireItem."""
     answer_options = [
-        QuestionnaireItemAnswerOption(valueString=opt)
+        QuestionnaireItemAnswerOption(
+            valueCoding=Coding(
+                system="http://example.org/test",
+                code=opt,
+                display=opt,
+            )
+        )
         for opt in yaml_item.get("answerOptions", [])
     ]
 

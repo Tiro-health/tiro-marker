@@ -18,7 +18,7 @@ questionnaire:
     type: integer
     unit: hours
   - linkId: pain-character
-    type: choice
+    type: coding
     repeats: false
     answerOptions:
       - sharp
@@ -26,7 +26,7 @@ questionnaire:
       - crushing
       - burning
   - linkId: radiation
-    type: choice
+    type: coding
     repeats: true
     answerOptions:
       - left arm
@@ -35,7 +35,7 @@ questionnaire:
       - back
       - none
   - linkId: associated-symptoms
-    type: choice
+    type: coding
     repeats: true
     answerOptions:
       - shortness of breath
