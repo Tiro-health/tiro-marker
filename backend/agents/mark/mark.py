@@ -6,8 +6,8 @@ Takes HTML + questionnaire items, outputs marked HTML.
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from pydantic_graph.beta import GraphBuilder, StepContext
-from pydantic_graph.beta.join import reduce_list_append
+from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
+from pydantic_graph.beta.join import reduce_null
 
 from backend.agents.protocols import QuestionnaireItemProtocol
 
@@ -20,22 +20,28 @@ class Mark:
     """
 
     # Location
-    linkId: str
-    parent_answer: str | None
-    occurrence: int | None
+    location_string: str
     # HTML labels
     labels: list[int]
 
 
 @dataclass
 class MarkerState:
-    marks: list[Mark]
+    html: str
+    marks: list[Mark] = field(default_factory=list)
 
 
 @dataclass
 class MarkInput:
     html: str
     q_item: QuestionnaireItemProtocol
+    location_string: str
+
+
+@dataclass
+class MarkRequest:
+    html: str
+    q_items: Sequence[QuestionnaireItemProtocol]
 
 
 async def mark_html(
@@ -51,49 +57,68 @@ async def mark_html(
     Returns:
         HTML with <mark data-link-id="..."> tags around relevant spans.
     """
-    g = await create_graph()
+    g = create_graph()
     graph = g.build()
-    state = MarkerState()
-    result = await graph.run(state=state)
+    state = MarkerState(html=html)
+    request = MarkRequest(html=html, q_items=q_items)
+    result = await graph.run(state=state, inputs=request)
 
-    print(f"Squared: {sorted(result)}")
-    # > Squared: [1, 4, 9]
-    print(f"Tracked: {sorted(state.values)}")
-    # > Tracked: [1, 2, 3]
-
-    _ = q_items
-    return html
+    return result
 
 
-async def create_graph() -> GraphBuilder[
-    MarkerState, None, Sequence[QuestionnaireItemProtocol], str
-]:
-    g = GraphBuilder(state_type=MarkerState, output_type=str)
+def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
+    g = GraphBuilder(state_type=MarkerState, input_type=MarkRequest, output_type=str)
 
     @g.step
-    async def start(
-        ctx: StepContext[MarkerState, None, Sequence[QuestionnaireItemProtocol]],
-    ) -> Sequence[QuestionnaireItemProtocol]:
-        return ctx.inputs
+    async def fan_out(
+        ctx: StepContext[MarkerState, None, MarkRequest],
+    ) -> Sequence[MarkInput]:
+        return [
+            MarkInput(html=ctx.inputs.html, q_item=item) for item in ctx.inputs.q_items
+        ]
 
     @g.step
-    async def mark(
+    async def find_labels(
         ctx: StepContext[MarkerState, None, MarkInput],
-    ) -> Sequence[QuestionnaireItemProtocol]:
+    ) -> Sequence[MarkInput]:
+        # TODO: Find which HTML labels match this questionnaire item
         item = ctx.inputs.q_item
-        return item.item or []
 
-    collect = g.join(reduce_list_append, initial_factory=list[int])
+        return [
+            MarkInput(html=ctx.inputs.html, q_item=child) for child in item.item or []
+        ]
+
+    sync = g.join(reduce_null, initial=None)
+
+    @g.step
+    async def apply_marks(
+        ctx: StepContext[MarkerState, None, None],
+    ) -> str:
+        # TODO: Apply accumulated marks to HTML
+        return ctx.state.html
 
     g.add(
-        g.edge_from(g.start_node).to(start),
-        g.edge_from(start).map().to(mark),
-        g.edge_from(mark).to(
+        g.edge_from(g.start_node).to(fan_out),
+        g.edge_from(fan_out).map().to(find_labels),
+        g.edge_from(find_labels).to(
             g.decision()
-            .branch(g.match(lambda x: len(x) > 0).to(mark))
-            .branch(g.match(lambda x: len(x) == 0).to(mark))
+            .branch(
+                g.match(
+                    TypeExpression[Sequence[MarkInput]],
+                    matches=lambda x: len(x) > 0,
+                )
+                .map()
+                .to(find_labels)
+            )
+            .branch(
+                g.match(
+                    TypeExpression[Sequence[MarkInput]],
+                    matches=lambda x: len(x) == 0,
+                ).to(sync)
+            )
         ),
-        g.edge_from(collect).to(g.end_node),
+        g.edge_from(sync).to(apply_marks),
+        g.edge_from(apply_marks).to(g.end_node),
     )
 
     return g
