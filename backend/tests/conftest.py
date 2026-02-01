@@ -22,7 +22,8 @@ from backend.models.fhir import (
 from backend.models.fhir.common import Extension
 from backend.models.fhir.extensions import QUESTIONNAIRE_UNIT_URL
 
-CASES_DIR = Path(__file__).parent / "cases"
+# Cases moved to evals directory
+CASES_DIR = Path(__file__).parent.parent / "evals" / "cases"
 OUTPUTS_DIR = Path(__file__).parent / "outputs"
 
 

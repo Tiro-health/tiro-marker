@@ -21,3 +21,9 @@ questionnaire:
       - nausea
       - vomiting
       - photophobia
+
+expected_marks:
+  - "chief-complaint.answer"
+  - "duration.answer"
+  - "severity.answer"
+  - "symptoms.option-http://example.org/test|nausea.answer"

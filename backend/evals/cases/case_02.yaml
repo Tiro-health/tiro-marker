@@ -34,3 +34,12 @@ questionnaire:
       - dizziness
   - linkId: previous-cardiac-history
     type: boolean
+
+expected_marks:
+  - "onset.answer"
+  - "chief-complaint.answer"
+  - "pain-character.answer"
+  - "radiation.option-http://example.org/test|left arm.answer"
+  - "associated-symptoms.option-http://example.org/test|shortness of breath.answer"
+  - "associated-symptoms.option-http://example.org/test|sweating.answer"
+  - "previous-cardiac-history.answer"

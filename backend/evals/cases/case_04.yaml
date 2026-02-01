@@ -1,0 +1,28 @@
+name: Question with nested items - Tests string question that has child items (severity, duration, treatment)
+description: Question with nested items - Tests string question that has child items (severity, duration, treatment)
+questionnaire:
+  - linkId: visit-info
+    type: group
+    text: Visit Information
+    repeats: false
+    item:
+      - linkId: primary-symptom
+        type: string
+        text: Primary symptom
+        item:
+          - linkId: severity
+            type: string
+            text: Severity
+          - linkId: duration
+            type: string
+            text: Duration
+          - linkId: treatment
+            type: string
+            text: Treatment given
+
+expected_marks:
+  - "visit-info"
+  - "visit-info.primary-symptom.answer"
+  - "visit-info.primary-symptom.severity.answer"
+  - "visit-info.primary-symptom.duration.answer"
+  - "visit-info.primary-symptom.treatment.answer"
