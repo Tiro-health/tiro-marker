@@ -4,8 +4,9 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js';
-import { initMarking } from './marking/index.js';
+import { initMarking, setMarkingEnabled, triggerManualMark } from './marking/index.js';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
+import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -30,39 +31,31 @@ async function init() {
   formResponseEl = document.getElementById('form-response');
   editorContainer = document.getElementById('editor-container');
 
+  // Initialize agent controls (marker and populate agent UI)
+  initAgentControls({
+    onMarkerManual: () => {
+      // Manual "Mark Now" button clicked
+      triggerManualMark();
+    },
+    onPopulateManual: () => {
+      // Manual "Populate" button clicked
+      handlePopulate();
+    },
+    onMarkerLiveChange: (isLive) => {
+      // Live toggle changed for marker
+      setMarkingEnabled(isLive);
+    },
+    onPopulateLiveChange: (isLive) => {
+      // Live toggle changed for populate
+      // For now, populate doesn't have live mode
+      console.log(`Populate live mode: ${isLive}`);
+    },
+  });
+
   // Initialize Lexical editor
   if (editorContainer) {
-    // 30 sentences matching 30 questionnaire questions
-    const initialContent = `Patient presents with persistent headache for 3 days.
-Pain is moderate (6/10), localized to the frontal region.
-No fever or nausea reported.
-Blood pressure: 130/85 mmHg, heart rate 72 bpm.
-Patient reports mild sensitivity to light.
-History of migraines in the family, mother has chronic migraines.
-Currently taking ibuprofen 400mg as needed.
-No known drug allergies reported.
-Works as software developer with moderate work stress.
-Initial assessment suggests tension-type headache.
-Patient reports sleeping only 5-6 hours per night.
-Drinks 3-4 cups of coffee daily.
-Water intake approximately 4 glasses per day.
-Recent project deadline causing increased stress levels.
-Spends 10+ hours daily in front of computer screens.
-No regular exercise routine currently.
-Diet consists mainly of fast food and snacks.
-Has experienced similar headaches twice in the past year.
-Previous ibuprofen use provided partial relief.
-Pain typically reduces from 6 to 3 after medication.
-No blurred vision or visual disturbances noted.
-Mild neck tension present but no stiffness.
-No focal neurological deficits observed on examination.
-No red flag symptoms such as thunderclap onset or papilledema.
-Patient concerned about missing work deadlines.
-Headache affecting concentration and productivity significantly.
-Has missed 2 days of work this week due to symptoms.
-Recommend lifestyle modifications and stress management.
-Schedule follow-up appointment in 2 weeks.
-Advised on proper hydration and sleep hygiene practices.`;
+    // Start with empty editor
+    const initialContent = '';
 
     editorAPI = initializeEditor(editorContainer, initialContent);
     console.log('Lexical editor initialized');
@@ -72,7 +65,12 @@ Advised on proper hydration and sleep hygiene practices.`;
 
     // Initialize marking system (sentence detection, etc.)
     try {
-      await initMarking(editorAPI, questionnaire);
+      await initMarking(editorAPI, questionnaire, {
+        onStatusChange: (isWorking) => {
+          // Update marker agent UI when marking starts/stops
+          setMarkerWorking(isWorking);
+        },
+      });
     } catch (error) {
       console.warn('Marking system initialization failed:', error);
     }
@@ -91,9 +89,7 @@ Advised on proper hydration and sleep hygiene practices.`;
  * Set up event listeners
  */
 function setupEventListeners() {
-  if (populateBtn) {
-    populateBtn.addEventListener('click', handlePopulate);
-  }
+  // Note: Populate is now handled by agent controls (populate-manual-btn)
 
   if (submitFormBtn && clinicalForm) {
     submitFormBtn.addEventListener('click', handleFormSubmit);
@@ -202,8 +198,8 @@ async function handlePopulate() {
     return;
   }
 
-  populateBtn.disabled = true;
-  populateBtn.textContent = 'Populating...';
+  // Update agent UI to show working state
+  setPopulateWorking(true);
 
   try {
     let questionnaireResponse;
@@ -227,8 +223,7 @@ async function handlePopulate() {
     console.error('Populate error:', error);
     alert(`Failed to populate: ${error.message}`);
   } finally {
-    populateBtn.disabled = false;
-    populateBtn.textContent = 'Populate Questionnaire →';
+    setPopulateWorking(false);
   }
 }
 

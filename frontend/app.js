@@ -161,10 +161,4 @@ if (clinicalForm) {
   });
 }
 
-// Initialize editor with sample text
-if (editorEl) {
-  editorEl.innerHTML = `Patient presents with persistent headache for 3 days.
-Pain is moderate (6/10), localized to the frontal region.
-No fever or nausea reported. Blood pressure: 130/85 mmHg.
-Patient reports mild sensitivity to light.`;
-}
+// Editor is initialized by main.js - no placeholder text needed
