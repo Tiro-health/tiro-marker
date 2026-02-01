@@ -25,7 +25,8 @@ questionnaire:
         item:
           - linkId: pain-duration
             type: integer
-            text: "Duration (days)"
+            text: "Duration"
+            unit: days
           - linkId: pain-quality
             type: coding
             text: "Quality"
@@ -37,7 +38,8 @@ questionnaire:
               - throbbing
           - linkId: pain-severity
             type: integer
-            text: "Severity (0-10)"
+            text: "Severity"
+            unit: "0-10"
       - linkId: pain-modifiers
         type: group
         text: "Modifying Factors"

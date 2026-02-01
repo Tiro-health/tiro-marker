@@ -6,6 +6,7 @@ Prepares HTML for AI marking by:
 3. Applying marks and cleaning up
 """
 
+import copy
 from collections.abc import Sequence
 from typing import Protocol, cast
 
@@ -282,6 +283,40 @@ def get_root_labels(html: str) -> list[int]:
                 labels.append(int(label))
 
     return labels
+
+
+def extract_html_for_labels(html: str, labels: list[int]) -> str:
+    """Extract HTML content for elements with the given labels.
+
+    Creates a new HTML document containing only the elements with
+    the specified data-label values. Preserves element structure.
+
+    Args:
+        html: Labeled HTML with data-label attributes.
+        labels: Label numbers to extract.
+
+    Returns:
+        New HTML string containing only the labeled elements.
+    """
+    doc = _parse_html(html)
+    body = doc.body
+    if body is None or not labels:
+        return html
+
+    # Create new body with extracted elements
+    new_body = etree.Element("body")
+
+    for label in labels:
+        elements = body.xpath(f'.//*[@data-label="{label}"]')
+        for el in elements:
+            # Deep copy the element to preserve structure
+            new_body.append(copy.deepcopy(el))
+
+    # Wrap in html/body structure
+    new_doc = etree.Element("html")
+    new_doc.append(new_body)
+
+    return tostring(new_doc, encoding="unicode")
 
 
 def strip_labels(html: str) -> str:

@@ -10,7 +10,7 @@ from typing import cast
 
 from pydantic import BaseModel, Field, create_model
 
-from backend.agents.mark.labeling import get_root_labels
+from backend.agents.mark.labeling import extract_html_for_labels, get_root_labels
 from backend.agents.mark.prompts import (
     SYSTEM_PROMPT,
     format_default_prompt,
@@ -35,6 +35,7 @@ class ChildInput:
 
     q_item: QuestionnaireItemProtocol
     location_string: str
+    html: str  # Scoped HTML for this child
 
 
 # =============================================================================
@@ -209,8 +210,7 @@ async def default_strategy(
     marks: list[MarkResult] = []
 
     if item.type not in ("group", "display"):
-        question_text = item.text or item.linkId
-        prompt = format_default_prompt(question_text, item.type, html)
+        prompt = format_default_prompt(item, html)
 
         agent = create_agent(model_name, DefaultLabelsResponse, SYSTEM_PROMPT)
         result = await agent.run(prompt)
@@ -226,6 +226,7 @@ async def default_strategy(
         ChildInput(
             q_item=child,
             location_string=f"{location}.{child.linkId}",
+            html=html,  # Same HTML - default has no scope reduction
         )
         for child in item.item or []
     ]
@@ -254,10 +255,14 @@ async def simple_container_strategy(
         )
     ]
 
+    # Extract scoped HTML for children
+    scoped_html = extract_html_for_labels(html, root_labels) if root_labels else html
+
     children = [
         ChildInput(
             q_item=child,
             location_string=f"{location}.{child.linkId}",
+            html=scoped_html,
         )
         for child in item.item or []
     ]
@@ -273,10 +278,7 @@ async def repeating_group_strategy(
     model_name: ModelName,
 ) -> tuple[list[MarkResult], list[ChildInput]]:
     """Repeating group: LLM detects instances, marks each."""
-    question_text = item.text or item.linkId
-    child_questions = [child.text or child.linkId for child in item.item or []]
-
-    prompt = format_repeating_group_prompt(question_text, child_questions, html)
+    prompt = format_repeating_group_prompt(item, html)
 
     agent = create_agent(model_name, RepeatingGroupResponse, SYSTEM_PROMPT)
     result = await agent.run(prompt)
@@ -286,6 +288,9 @@ async def repeating_group_strategy(
 
     for i, instance in enumerate(result.output.instances):
         instance_location = f"{location}.{i}"
+        # Extract scoped HTML for this instance
+        instance_html = extract_html_for_labels(html, instance.labels) if instance.labels else html
+
         marks.append(
             MarkResult(
                 location_string=instance_location,
@@ -297,6 +302,7 @@ async def repeating_group_strategy(
                 ChildInput(
                     q_item=child,
                     location_string=f"{instance_location}.{child.linkId}",
+                    html=instance_html,  # Scoped to this instance
                 )
             )
 
@@ -314,9 +320,9 @@ async def repeating_coding_strategy(
     # Extract options as (code, display) tuples
     options: list[tuple[str, str]] = []
     for opt in item.answerOption:
-        result = _get_option_display_and_code(opt)
-        if result:
-            options.append(result)
+        opt_result = _get_option_display_and_code(opt)
+        if opt_result:
+            options.append(opt_result)
 
     if not options:
         # No valid options, return empty
@@ -325,8 +331,7 @@ async def repeating_coding_strategy(
     # Create dynamic response model
     response_model, field_to_code = _create_repeating_coding_model(options)
 
-    question_text = item.text or item.linkId
-    prompt = format_repeating_coding_prompt(question_text, options, html)
+    prompt = format_repeating_coding_prompt(item, options, html)
 
     agent = create_agent(model_name, response_model, SYSTEM_PROMPT)
     result = await agent.run(prompt)
@@ -338,6 +343,9 @@ async def repeating_coding_strategy(
         labels = getattr(result.output, field_name, [])
         if labels:
             option_location = f"{location}.option-{code}"
+            # Extract scoped HTML for this option
+            option_html = extract_html_for_labels(html, labels)
+
             marks.append(
                 MarkResult(
                     location_string=f"{option_location}.answer",
@@ -350,6 +358,7 @@ async def repeating_coding_strategy(
                     ChildInput(
                         q_item=child,
                         location_string=f"{option_location}.{child.linkId}",
+                        html=option_html,  # Scoped to this option
                     )
                 )
 

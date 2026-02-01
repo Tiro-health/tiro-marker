@@ -108,10 +108,10 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
                 )
             )
 
-        # Return children as MarkInputs
+        # Return children as MarkInputs with scoped HTML
         return [
             MarkInput(
-                html=ctx.inputs.html,
+                html=child.html,  # Use scoped HTML from child
                 q_item=child.q_item,
                 location_string=child.location_string,
             )

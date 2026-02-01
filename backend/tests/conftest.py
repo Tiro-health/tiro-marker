@@ -5,14 +5,9 @@ import json
 from pathlib import Path
 from typing import Any, Iterator
 
-import nest_asyncio
 import pytest
 import yaml
 from fastapi.testclient import TestClient
-
-# Fix for Gemini + pytest-asyncio event loop issues
-# See: https://ai.pydantic.dev/troubleshooting/#runtimeerror-this-event-loop-is-already-running
-nest_asyncio.apply()
 
 from backend.main import app
 from backend.models.fhir import (
@@ -24,6 +19,8 @@ from backend.models.fhir import (
     QuestionnaireItem,
     QuestionnaireItemAnswerOption,
 )
+from backend.models.fhir.common import Extension
+from backend.models.fhir.extensions import QUESTIONNAIRE_UNIT_URL
 
 CASES_DIR = Path(__file__).parent / "cases"
 OUTPUTS_DIR = Path(__file__).parent / "outputs"
@@ -81,12 +78,23 @@ def yaml_item_to_fhir(yaml_item: dict[str, Any]) -> QuestionnaireItem:
 
     nested_items = [yaml_item_to_fhir(child) for child in yaml_item.get("item", [])]
 
+    # Build extensions list (for units, etc.)
+    extensions: list[Extension] = []
+    if unit := yaml_item.get("unit"):
+        extensions.append(
+            Extension(
+                url=QUESTIONNAIRE_UNIT_URL,
+                valueCoding=Coding(code=unit, display=unit),
+            )
+        )
+
     return QuestionnaireItem(
         linkId=yaml_item["linkId"],
         type=yaml_item["type"],
         text=yaml_item.get("text"),
         repeats=yaml_item.get("repeats"),
         answerOption=answer_options,
+        extension=extensions,
         item=nested_items,
     )
 
