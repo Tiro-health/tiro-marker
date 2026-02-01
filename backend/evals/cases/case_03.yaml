@@ -72,3 +72,15 @@ questionnaire:
       - tingling
       - weakness
       - none
+
+expected_marks:
+  - "pain-details"
+  - "pain-details.pain-characteristics"
+  - "pain-details.pain-modifiers"
+  - "pain-present.answer"
+  - "pain-details.pain-location.answer"
+  - "pain-details.pain-characteristics.pain-duration.answer"
+  - "pain-details.pain-characteristics.pain-severity.answer"
+  - "pain-details.pain-modifiers.better-with.option-http://example.org/test|rest.answer"
+  - "pain-details.pain-modifiers.worse-with.option-http://example.org/test|movement.answer"
+  - "neurological-symptoms.option-http://example.org/test|none.answer"

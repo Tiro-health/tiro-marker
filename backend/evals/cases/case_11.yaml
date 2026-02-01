@@ -1,11 +1,14 @@
 name: Presence check test - Group with single child, answer NOT present (tests mark_context optimization)
 description: Presence check test - Group with single child, answer NOT present (tests mark_context optimization)
 questionnaire:
-- linkId: vital-signs
-  type: group
-  text: Vital Signs
-  repeats: false
-  item:
-  - linkId: temperature
-    type: decimal
-    text: Body temperature
+  - linkId: vital-signs
+    type: group
+    text: Vital Signs
+    repeats: false
+    item:
+      - linkId: temperature
+        type: decimal
+        text: Body temperature
+
+expected_marks:
+  - "vital-signs"

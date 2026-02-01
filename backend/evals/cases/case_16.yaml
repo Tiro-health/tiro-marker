@@ -1,0 +1,603 @@
+name:
+  Respiratory Oncology MDT Report - Tests complex nested groups, multiple coding types (chips, dropdown, combobox), decimal
+  fields with units, text areas, enableWhen conditions, repeating groups, tables, and calculated fields
+description:
+  Respiratory Oncology MDT Report - Tests complex nested groups, multiple coding types (chips, dropdown, combobox),
+  decimal fields with units, text areas, enableWhen conditions, repeating groups, tables, and calculated fields
+questionnaire:
+  - linkId: mdt-header
+    type: group
+    text: Verslag Multidisciplinair REO
+    repeats: false
+    item:
+      - linkId: consult-datum
+        type: date
+        text: Consultdatum
+      - linkId: moc-aanvrager
+        type: coding
+        text: MOC aanvrager
+        answerOptions:
+          - Dr. Janssen
+          - Dr. Peeters
+          - Dr. Vermeer
+  - linkId: medische-voorgeschiedenis
+    type: group
+    text: Medische voorgeschiedenis
+    repeats: false
+    item:
+      - linkId: voorgeschiedenis-tekst
+        type: text
+        text: Medische voorgeschiedenis
+  - linkId: primaire-presentatie
+    type: group
+    text: REO primaire presentatie
+    repeats: false
+    item:
+      - linkId: incidentiedatum
+        type: date
+        text: Incidentiedatum
+      - linkId: diagnose
+        type: coding
+        text: Diagnose
+        answerOptions:
+          - NSCLC - adenocarcinoom
+          - NSCLC - spinocellulair carcinoom
+          - Kleincellig longcarcinoom (SCLC)
+          - Mesothelioom - Epithelioïd
+          - Mesothelioom - Sarcomatoïd
+          - onbekend
+      - linkId: tumorlokalisatie
+        type: group
+        text: Primaire tumorlokalisatie
+        repeats: false
+        item:
+          - linkId: lokalisatie-links
+            type: coding
+            text: Links
+            answerOptions:
+              - linker onderkwab
+              - linker bovenkwab
+              - onbekend
+          - linkId: lokalisatie-rechts
+            type: coding
+            text: Rechts
+            answerOptions:
+              - rechter onderkwab
+              - rechter middenkwab
+              - rechter bovenkwab
+              - onbekend
+          - linkId: lokalisatie-hoofdbronchus
+            type: coding
+            text: Hoofdbronchus
+            answerOptions:
+              - hoofdbronchus Li
+              - hoofdbronchus Re
+              - trachea
+      - linkId: tnm-staging
+        type: group
+        text: TNM longkanker
+        repeats: false
+        item:
+          - linkId: ct-stage
+            type: coding
+            text: T-stage
+            answerOptions:
+              - T1a
+              - T1b
+              - T1c
+              - T2a
+              - T2b
+              - T3
+              - T4
+          - linkId: cn-stage
+            type: coding
+            text: N-stage
+            answerOptions:
+              - N0
+              - N1
+              - N2a
+              - N2b
+              - N3
+          - linkId: cm-stage
+            type: coding
+            text: M-stage
+            answerOptions:
+              - M0
+              - M1a
+              - M1b
+              - M1c1
+              - M1c2
+            item:
+              - linkId: locatie-metastase
+                type: coding
+                text: Locatie van metastase
+                repeats: true
+                answerOptions:
+                  - bot
+                  - hersenen
+                  - pleura
+                  - bijnier
+                  - lever
+                  - long
+          - linkId: stadium
+            type: coding
+            text: Stadium
+            answerOptions:
+              - IA1
+              - IA2
+              - IA3
+              - IB
+              - IIA
+              - IIB
+              - IIIA
+              - IIIB
+              - IIIC
+              - IVA
+              - IVB
+      - linkId: mutaties
+        type: coding
+        text: Mutatie
+        repeats: true
+        answerOptions:
+          - geen oncogene driver
+          - EGFR
+          - ALK
+          - ROS1
+          - KRAS
+          - BRAF
+          - RET
+          - HER2
+          - MET
+        item:
+          - linkId: egfr-subtypes
+            type: coding
+            text: EGFR subtypes
+            repeats: true
+            answerOptions:
+              - ex18
+              - ex19
+              - ex20(ins)
+              - ex21(L858R)
+          - linkId: kras-subtypes
+            type: coding
+            text: KRAS subtypes
+            repeats: true
+            answerOptions:
+              - G12A
+              - G12C
+              - G12D
+              - G12V
+      - linkId: ihc-profiel
+        type: group
+        text: IHC profiel
+        repeats: false
+        item:
+          - linkId: pd-l1
+            type: decimal
+            text: PD-L1
+            unit: "%"
+          - linkId: ttf-1
+            type: coding
+            text: TTF-1
+            answerOptions:
+              - negatief
+              - positief
+              - niet uitgevoerd
+          - linkId: p40
+            type: coding
+            text: P40
+            answerOptions:
+              - negatief
+              - positief
+              - niet uitgevoerd
+      - linkId: who-score
+        type: coding
+        text: WHO Score
+        answerOptions:
+          - WHO-score 0
+          - WHO-score 1
+          - WHO-score 2
+          - WHO-score 3
+          - WHO-score 4
+      - linkId: rookstatus
+        type: coding
+        text: Rookstatus bij diagnose
+        answerOptions:
+          - ex-roker
+          - niet-roker
+          - roker
+        item:
+          - linkId: pakjaren
+            type: decimal
+            text: Pakjaar
+            unit: pakjaar
+      - linkId: nierfunctie
+        type: decimal
+        text: Nierfunctie eGFR
+        unit: mL/min
+      - linkId: longfunctie
+        type: group
+        text: Longfunctie
+        repeats: false
+        item:
+          - linkId: longfunctie-status
+            type: coding
+            text: Longfunctie
+            answerOptions:
+              - niet uitgevoerd
+          - linkId: fev1
+            type: decimal
+            text: FEV1
+            unit: "%"
+          - linkId: dlco
+            type: decimal
+            text: DLCO
+            unit: "%"
+      - linkId: charlson-index
+        type: group
+        text: Charlson Comorbidity Index
+        repeats: false
+        item:
+          - linkId: cci-leeftijd
+            type: coding
+            text: Leeftijd
+            answerOptions:
+              - <50
+              - 50–59
+              - 60–69
+              - 70–79
+              - ≥80
+          - linkId: cci-myocardinfarct
+            type: coding
+            text: Myocardinfarct
+            answerOptions:
+              - nee
+              - ja
+          - linkId: cci-hartfalen
+            type: coding
+            text: Congestief hartfalen
+            answerOptions:
+              - nee
+              - ja
+          - linkId: cci-vaatziekte
+            type: coding
+            text: Perifere vaatziekte
+            answerOptions:
+              - nee
+              - ja
+          - linkId: cci-cva-tia
+            type: coding
+            text: CVA of TIA
+            answerOptions:
+              - nee
+              - ja
+          - linkId: cci-dementie
+            type: coding
+            text: Dementie
+            answerOptions:
+              - nee
+              - ja
+          - linkId: cci-copd
+            type: coding
+            text: COPD
+            answerOptions:
+              - nee
+              - ja
+          - linkId: cci-diabetes
+            type: coding
+            text: Diabetes mellitus
+            answerOptions:
+              - geen/dieet gecontroleerd
+              - ongecompliceerd
+              - met eindorgaanschade
+          - linkId: cci-solide-tumor
+            type: coding
+            text: Solide tumor
+            answerOptions:
+              - geen
+              - gelokaliseerd
+              - metastatisch
+          - linkId: cci-score
+            type: decimal
+            text: CCI-score
+      - linkId: extra-opmerkingen
+        type: text
+        text: Extra opmerkingen
+  - linkId: behandeloverzicht
+    type: group
+    text: Behandeloverzicht
+    repeats: false
+    item:
+      - linkId: behandeling-entry
+        type: group
+        text: Behandeloverzicht
+        repeats: true
+        item:
+          - linkId: lijn
+            type: coding
+            text: Lijn
+            answerOptions:
+              - R0
+              - 1L
+              - 2L
+              - 3L
+              - 4L
+          - linkId: periode-start
+            type: date
+            text: Periode start
+          - linkId: periode-einde
+            type: date
+            text: Periode einde
+          - linkId: behandeling-type
+            type: coding
+            text: Behandeling
+            answerOptions:
+              - Radiotherapie
+              - Systeemtherapie
+              - Chirurgie
+            item:
+              - linkId: omschrijving
+                type: string
+                text: Omschrijving
+              - linkId: aantal-fracties
+                type: decimal
+                text: Number of fractions
+              - linkId: radiatie-dosis
+                type: decimal
+                text: Delivered radiation dose
+                unit: Gy
+              - linkId: recist-bor
+                type: coding
+                text: RECIST BOR
+                answerOptions:
+                  - complete respons
+                  - partiële respons
+                  - stabiele ziekte
+                  - progressieve ziekte
+                  - NA
+              - linkId: pt-stage
+                type: coding
+                text: pT-stage
+                answerOptions:
+                  - pTX
+                  - pT0
+                  - pT1a
+                  - pT1b
+                  - pT1c
+                  - pT2a
+                  - pT2b
+                  - pT3
+                  - pT4
+              - linkId: pn-stage
+                type: coding
+                text: pN-stage
+                answerOptions:
+                  - pNX
+                  - pN0
+                  - pN1
+                  - pN2a
+                  - pN2b
+                  - pN3
+              - linkId: pr-stage
+                type: coding
+                text: pR-stage
+                answerOptions:
+                  - R0
+                  - R1
+                  - R2
+  - linkId: actuele-problematiek
+    type: group
+    text: REO actuele problematiek
+    repeats: false
+    item:
+      - linkId: beschrijving
+        type: string
+        text: Beschrijving
+      - linkId: rtnm-classificatie
+        type: group
+        text: rTNM classificatie
+        repeats: false
+        item:
+          - linkId: rt-stage
+            type: coding
+            text: rT-stage
+            answerOptions:
+              - TX
+              - T0
+              - T1a
+              - T1b
+              - T1c
+              - T2a
+              - T2b
+              - T3
+              - T4
+          - linkId: rn-stage
+            type: coding
+            text: rN-stage
+            answerOptions:
+              - NX
+              - N0
+              - N1
+              - N2a
+              - N2b
+              - N3
+          - linkId: rm-stage
+            type: coding
+            text: rM-stage
+            answerOptions:
+              - MX
+              - M0
+              - M1
+              - M1a
+              - M1b
+      - linkId: actuele-who-score
+        type: coding
+        text: Actuele WHO Score
+        answerOptions:
+          - WHO-score 0
+          - WHO-score 1
+          - WHO-score 2
+          - WHO-score 3
+          - WHO-score 4
+      - linkId: leeftijd-categorie
+        type: coding
+        text: Leeftijd
+        answerOptions:
+          - jonger dan 75 jaar
+          - 75 jaar of ouder
+        item:
+          - linkId: g8-screening
+            type: group
+            text: Geriatrische screening (G8)
+            repeats: false
+            item:
+              - linkId: g8-voedselinname
+                type: coding
+                text: Voedselinname afgelopen 3 maanden
+                answerOptions:
+                  - ernstige afname
+                  - matige afname
+                  - geen afname
+              - linkId: g8-gewichtsverlies
+                type: coding
+                text: Gewichtsverlies afgelopen 3 maanden
+                answerOptions:
+                  - ">3 kg"
+                  - onbekend
+                  - 1-3 kg
+                  - geen gewichtsverlies
+              - linkId: g8-mobiliteit
+                type: coding
+                text: Mobiliteit
+                answerOptions:
+                  - bed- of stoelgebonden
+                  - komt uit bed/stoel maar gaat niet naar buiten
+                  - gaat naar buiten
+              - linkId: g8-neuropsycho
+                type: coding
+                text: Neuropsychologische aandoeningen
+                answerOptions:
+                  - ernstige dementie of depressie
+                  - lichte dementie
+                  - geen psychologische aandoeningen
+              - linkId: g8-bmi
+                type: coding
+                text: BMI
+                answerOptions:
+                  - <19 kg/m²
+                  - 19-21 kg/m²
+                  - 21-23 kg/m²
+                  - ≥23 kg/m²
+              - linkId: g8-score
+                type: decimal
+                text: G8 score
+      - linkId: gewichtsverlies-3m
+        type: coding
+        text: Gewichtsverlies laatste 3m
+        answerOptions:
+          - "> 5%"
+          - < 5%
+          - onbekend
+  - linkId: besluit
+    type: group
+    text: REO besluit
+    repeats: false
+    item:
+      - linkId: behandelplan
+        type: text
+        text: Behandelplan
+      - linkId: therapie-intentie
+        type: coding
+        text: Primaire therapie intentie
+        answerOptions:
+          - Curatief/radicaal
+          - Palliatief (inclusief SABR-oligometastasen)
+          - Actieve follow-up
+          - Onbekend
+      - linkId: prognose
+        type: text
+        text: Prognose
+
+expected_marks:
+  - "mdt-header"
+  - "medische-voorgeschiedenis"
+  - "primaire-presentatie"
+  - "behandeloverzicht"
+  - "actuele-problematiek"
+  - "besluit"
+  - "primaire-presentatie.tumorlokalisatie"
+  - "primaire-presentatie.tnm-staging"
+  - "primaire-presentatie.ihc-profiel"
+  - "primaire-presentatie.longfunctie"
+  - "primaire-presentatie.charlson-index"
+  - "actuele-problematiek.rtnm-classificatie"
+  - "actuele-problematiek.beschrijving.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening"
+  - "mdt-header.consult-datum.answer"
+  - "mdt-header.moc-aanvrager.answer"
+  - "primaire-presentatie.charlson-index.cci-vaatziekte.answer"
+  - "primaire-presentatie.rookstatus.answer"
+  - "primaire-presentatie.charlson-index.cci-myocardinfarct.answer"
+  - "primaire-presentatie.charlson-index.cci-copd.answer"
+  - "primaire-presentatie.charlson-index.cci-dementie.answer"
+  - "medische-voorgeschiedenis.voorgeschiedenis-tekst.answer"
+  - "primaire-presentatie.rookstatus.pakjaren.answer"
+  - "primaire-presentatie.charlson-index.cci-diabetes.answer"
+  - "primaire-presentatie.incidentiedatum.answer"
+  - "actuele-problematiek.gewichtsverlies-3m.answer"
+  - "actuele-problematiek.leeftijd-categorie.answer"
+  - "primaire-presentatie.diagnose.answer"
+  - "primaire-presentatie.charlson-index.cci-leeftijd.answer"
+  - "primaire-presentatie.tumorlokalisatie.lokalisatie-rechts.answer"
+  - "primaire-presentatie.tnm-staging.cm-stage.answer"
+  - "primaire-presentatie.tnm-staging.cm-stage.locatie-metastase.option-http://example.org/test|bot.answer"
+  - "primaire-presentatie.tnm-staging.cm-stage.locatie-metastase.option-http://example.org/test|hersenen.answer"
+  - "primaire-presentatie.tnm-staging.cm-stage.locatie-metastase.option-http://example.org/test|lever.answer"
+  - "primaire-presentatie.tnm-staging.cn-stage.answer"
+  - "primaire-presentatie.tnm-staging.ct-stage.answer"
+  - "primaire-presentatie.tnm-staging.stadium.answer"
+  - "primaire-presentatie.ihc-profiel.pd-l1.answer"
+  - "primaire-presentatie.ihc-profiel.p40.answer"
+  - "primaire-presentatie.mutaties.option-http://example.org/test|EGFR.answer"
+  - "primaire-presentatie.mutaties.option-http://example.org/test|EGFR.egfr-subtypes.option-http://example.org/test|ex19.answer"
+  - "primaire-presentatie.mutaties.option-http://example.org/test|KRAS.answer"
+  - "primaire-presentatie.mutaties.option-http://example.org/test|ALK.answer"
+  - "primaire-presentatie.mutaties.option-http://example.org/test|ROS1.answer"
+  - "primaire-presentatie.mutaties.option-http://example.org/test|BRAF.answer"
+  - "primaire-presentatie.ihc-profiel.ttf-1.answer"
+  - "primaire-presentatie.longfunctie.fev1.answer"
+  - "primaire-presentatie.longfunctie.dlco.answer"
+  - "primaire-presentatie.longfunctie.longfunctie-status.answer"
+  - "primaire-presentatie.nierfunctie.answer"
+  - "primaire-presentatie.charlson-index.cci-solide-tumor.answer"
+  - "primaire-presentatie.charlson-index.cci-score.answer"
+  - "behandeloverzicht.behandeling-entry.0"
+  - "behandeloverzicht.behandeling-entry.0.behandeling-type.answer"
+  - "behandeloverzicht.behandeling-entry.0.lijn.answer"
+  - "behandeloverzicht.behandeling-entry.0.behandeling-type.radiatie-dosis.answer"
+  - "behandeloverzicht.behandeling-entry.0.behandeling-type.omschrijving.answer"
+  - "behandeloverzicht.behandeling-entry.0.periode-start.answer"
+  - "behandeloverzicht.behandeling-entry.0.behandeling-type.aantal-fracties.answer"
+  - "behandeloverzicht.behandeling-entry.0.behandeling-type.recist-bor.answer"
+  - "behandeloverzicht.behandeling-entry.1"
+  - "behandeloverzicht.behandeling-entry.1.lijn.answer"
+  - "behandeloverzicht.behandeling-entry.1.behandeling-type.answer"
+  - "behandeloverzicht.behandeling-entry.1.behandeling-type.aantal-fracties.answer"
+  - "behandeloverzicht.behandeling-entry.1.behandeling-type.omschrijving.answer"
+  - "behandeloverzicht.behandeling-entry.1.periode-start.answer"
+  - "behandeloverzicht.behandeling-entry.1.behandeling-type.radiatie-dosis.answer"
+  - "primaire-presentatie.who-score.answer"
+  - "actuele-problematiek.actuele-who-score.answer"
+  - "actuele-problematiek.rtnm-classificatie.rn-stage.answer"
+  - "actuele-problematiek.rtnm-classificatie.rm-stage.answer"
+  - "actuele-problematiek.rtnm-classificatie.rt-stage.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-voedselinname.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-score.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-bmi.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-gewichtsverlies.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-mobiliteit.answer"
+  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-neuropsycho.answer"
+  - "besluit.behandelplan.answer"
+  - "besluit.therapie-intentie.answer"
+  - "besluit.prognose.answer"
+  - "primaire-presentatie.extra-opmerkingen.answer"

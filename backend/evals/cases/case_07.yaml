@@ -1,0 +1,128 @@
+name: "Multiple answer types test - Tests all answer types including the hardest case: repeating coding with nested children"
+description:
+  "Multiple answer types test - Tests all answer types including the hardest case: repeating coding with nested
+  children"
+
+questionnaire:
+  - linkId: emergency-assessment
+    type: group
+    text: Emergency Assessment
+    repeats: false
+    item:
+      - linkId: patient-name
+        type: string
+        text: Patient name
+      - linkId: admission-datetime
+        type: dateTime
+        text: Admission date and time
+      - linkId: patient-conscious
+        type: coding
+        text: Patient conscious on arrival
+        answerOptions:
+          - "Yes"
+          - "No"
+      - linkId: chief-complaint
+        type: string
+        text: Chief complaint
+      - linkId: symptom-onset-time
+        type: time
+        text: Time of symptom onset
+      - linkId: pain-present
+        type: coding
+        text: Pain present
+        answerOptions:
+          - "Yes"
+          - "No"
+      - linkId: pain-severity
+        type: decimal
+        text: Pain severity (0-10 scale)
+      - linkId: triage-level
+        type: coding
+        text: Triage level
+        answerOptions:
+          - Critical
+          - Urgent
+          - Semi-urgent
+          - Non-urgent
+      - linkId: vital-signs-group
+        type: group
+        text: Vital Signs
+        repeats: false
+        item:
+          - linkId: temperature
+            type: decimal
+            text: Temperature (Celsius)
+          - linkId: heart-rate
+            type: decimal
+            text: Heart rate (bpm)
+          - linkId: oxygen-saturation
+            type: decimal
+            text: Oxygen saturation (%)
+      - linkId: medications
+        type: coding
+        text: Current medications
+        repeats: true
+        answerOptions:
+          - Aspirin
+          - Metformin
+          - Lisinopril
+          - Atorvastatin
+        item:
+          - linkId: medication-dosage
+            type: string
+            text: Dosage
+          - linkId: medication-frequency
+            type: string
+            text: Frequency
+          - linkId: medication-route
+            type: coding
+            text: Route
+            answerOptions:
+              - Oral
+              - Intravenous
+              - Intramuscular
+      - linkId: diagnosis
+        type: coding
+        text: Initial diagnosis
+        answerOptions:
+          - Acute myocardial infarction
+          - Appendicitis
+          - Fracture of bone
+          - Stroke
+      - linkId: last-meal-date
+        type: date
+        text: Date of last meal
+      - linkId: procedure-required
+        type: coding
+        text: Immediate procedure required
+        answerOptions:
+          - "Yes"
+          - "No"
+
+expected_marks:
+  - "emergency-assessment.patient-name.answer"
+  - "emergency-assessment.admission-datetime.answer"
+  - "emergency-assessment.patient-conscious.answer"
+  - "emergency-assessment.chief-complaint.answer"
+  - "emergency-assessment.symptom-onset-time.answer"
+  - "emergency-assessment.pain-present.answer"
+  - "emergency-assessment.pain-severity.answer"
+  - "emergency-assessment.triage-level.answer"
+  - "emergency-assessment.vital-signs-group.temperature.answer"
+  - "emergency-assessment.vital-signs-group.heart-rate.answer"
+  - "emergency-assessment.vital-signs-group.oxygen-saturation.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.medication-dosage.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.medication-frequency.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.medication-route.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Metformin.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Metformin.medication-dosage.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Metformin.medication-frequency.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Metformin.medication-route.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.medication-dosage.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.medication-frequency.answer"
+  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.medication-route.answer"
+  - "emergency-assessment.diagnosis.answer"
+  - "emergency-assessment.last-meal-date.answer"
+  - "emergency-assessment.procedure-required.answer"

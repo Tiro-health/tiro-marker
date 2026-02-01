@@ -1,0 +1,90 @@
+name: Complex mixed structure - Tests nested groups with questions that have nested items at multiple levels
+description: Complex mixed structure - Tests nested groups with questions that have nested items at multiple levels
+questionnaire:
+  - linkId: medical-assessment
+    type: group
+    text: Medical Assessment
+    repeats: false
+    item:
+      - linkId: medical-history
+        type: group
+        text: Medical History
+        repeats: false
+        item:
+          - linkId: patient-name
+            type: group
+            text: Patient name
+            repeats: false
+          - linkId: primary-condition
+            type: group
+            text: Primary condition
+            repeats: false
+            item:
+              - linkId: onset-date
+                type: string
+                text: Onset date
+              - linkId: current-status
+                type: string
+                text: Current status
+      - linkId: current-visit
+        type: group
+        text: Current Visit
+        repeats: false
+        item:
+          - linkId: chief-complaint
+            type: group
+            text: Chief complaint
+            repeats: false
+            item:
+              - linkId: complaint-severity
+                type: string
+                text: Severity
+              - linkId: complaint-location
+                type: string
+                text: Location
+          - linkId: vital-signs
+            type: group
+            text: Vital Signs
+            repeats: false
+            item:
+              - linkId: blood-pressure
+                type: string
+                text: Blood pressure
+              - linkId: temperature
+                type: string
+                text: Temperature
+          - linkId: medications
+            type: group
+            text: Current Medications
+            repeats: false
+            item:
+              - linkId: medication-name
+                type: group
+                text: Medication
+                repeats: false
+                item:
+                  - linkId: medication-dosage
+                    type: string
+                    text: Dosage
+                  - linkId: medication-frequency
+                    type: string
+                    text: Frequency
+
+expected_marks:
+  - "medical-assessment"
+  - "medical-assessment.medical-history"
+  - "medical-assessment.current-visit"
+  - "medical-assessment.medical-history.patient-name"
+  - "medical-assessment.medical-history.primary-condition"
+  - "medical-assessment.current-visit.chief-complaint"
+  - "medical-assessment.current-visit.vital-signs"
+  - "medical-assessment.current-visit.medications"
+  - "medical-assessment.current-visit.medications.medication-name"
+  - "medical-assessment.medical-history.primary-condition.onset-date.answer"
+  - "medical-assessment.medical-history.primary-condition.current-status.answer"
+  - "medical-assessment.current-visit.chief-complaint.complaint-severity.answer"
+  - "medical-assessment.current-visit.chief-complaint.complaint-location.answer"
+  - "medical-assessment.current-visit.vital-signs.blood-pressure.answer"
+  - "medical-assessment.current-visit.vital-signs.temperature.answer"
+  - "medical-assessment.current-visit.medications.medication-name.medication-dosage.answer"
+  - "medical-assessment.current-visit.medications.medication-name.medication-frequency.answer"

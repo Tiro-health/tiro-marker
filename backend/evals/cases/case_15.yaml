@@ -1,0 +1,37 @@
+name: "Deep nesting test - medication with nested details (6 levels: group → string → decimal → date → coding → string)"
+description: "Deep nesting test - medication with nested details (6 levels: group → string → decimal → date → coding → string)"
+questionnaire:
+  - linkId: medication-group
+    type: group
+    text: Medication
+    item:
+      - linkId: medication-name
+        type: string
+        text: Medication Name
+        item:
+          - linkId: dose
+            type: decimal
+            text: Dose (mg)
+            item:
+              - linkId: start-date
+                type: date
+                text: Start Date
+                item:
+                  - linkId: status
+                    type: coding
+                    text: Status
+                    answerOptions:
+                      - Active
+                      - Stopped
+                    item:
+                      - linkId: notes
+                        type: string
+                        text: Additional Notes
+
+expected_marks:
+  - "medication-group"
+  - "medication-group.medication-name.dose.start-date.status.answer"
+  - "medication-group.medication-name.dose.start-date.status.notes.answer"
+  - "medication-group.medication-name.answer"
+  - "medication-group.medication-name.dose.answer"
+  - "medication-group.medication-name.dose.start-date.answer"

@@ -1,0 +1,162 @@
+name:
+  MRI knee report - Tests nested groups with coding options, decimal fields with units for measurements, and multiple
+  anatomical locations
+description:
+  MRI knee report - Tests nested groups with coding options, decimal fields with units for measurements, and multiple
+  anatomical locations
+questionnaire:
+  - linkId: bevindingen-beenmerg-gewricht-9
+    type: group
+    text: Bevindingen beenmerg/gewricht
+    repeats: false
+    item:
+      - linkId: botstructuur
+        type: string
+        text: Botstructuur
+        item:
+          - linkId: botstructuur-pathologie
+            type: coding
+            text: Pathologie
+            answerOptions:
+              - Degeneratief
+              - Botletsel
+              - Normaal
+            item:
+              - linkId: botletsel-detail
+                type: coding
+                text: Botletsel detail
+                answerOptions:
+                  - Benigne
+                  - Maligne
+          - linkId: botstructuur-localisatie
+            type: coding
+            text: Localisatie
+            answerOptions:
+              - Mediale femurcondyl
+              - Laterale femurcondyl
+              - Mediaal tibiaplateau
+              - Lateraal tibiaplateau
+      - linkId: beenmergsignaal
+        type: string
+        text: Beenmergsignaal
+        item:
+          - linkId: beenmergsignaal-pathologie
+            type: coding
+            text: Pathologie
+            answerOptions:
+              - Oedeem
+              - Infarct
+              - Hematoom
+              - Normaal
+          - linkId: beenmergsignaal-localisatie
+            type: coding
+            text: Localisatie
+            answerOptions:
+              - Mediale femurcondyl
+              - Laterale femurcondyl
+              - Mediaal tibiaplateau
+              - Lateraal tibiaplateau
+          - linkId: beenmergsignaal-gradatie
+            type: coding
+            text: Gradatie
+            answerOptions:
+              - Beperkt
+              - Matig
+              - Uitgesproken
+          - linkId: beenmergsignaal-afmeting
+            type: coding
+            text: Afmeting
+            answerOptions:
+              - XXX mm (L x B x H)
+              - Niet besproken
+            item:
+              - linkId: afmeting-lbh
+                type: group
+                text: L x B x H
+                item:
+                  - linkId: afmeting-l
+                    type: decimal
+                    text: L
+                    unit: mm
+                  - linkId: afmeting-b
+                    type: decimal
+                    text: B
+                    unit: mm
+                  - linkId: afmeting-h
+                    type: decimal
+                    text: H
+                    unit: mm
+      - linkId: voorste-kruisband
+        type: string
+        text: Voorste kruisband
+        item:
+          - linkId: vkb-pathologie
+            type: coding
+            text: Voorste kruisband pathologie
+            repeats: true
+            answerOptions:
+              - Partieel gescheurd
+              - Volledige scheur
+              - Normaal
+            item:
+              - linkId: vkb-scheur-locatie
+                type: coding
+                text: Scheur locatie
+                answerOptions:
+                  - Anteromediaal
+                  - Posterolateraal
+      - linkId: achterste-kruisband
+        type: string
+        text: Achterste kruisband
+        item:
+          - linkId: akb-pathologie
+            type: coding
+            text: Achterste kruisband pathologie
+            answerOptions:
+              - Partieel gescheurd
+              - Volledige scheur
+              - Normaal
+      - linkId: intra-articulair-vocht
+        type: string
+        text: Intra-articulair vocht
+        item:
+          - linkId: vocht-status
+            type: coding
+            text: Status
+            answerOptions:
+              - Pathologie
+              - Haemartrosis / Lipohaemartrosis
+              - Normaal
+            item:
+              - linkId: vocht-gradatie
+                type: coding
+                text: Gradatie
+                answerOptions:
+                  - Beperkt
+                  - Matig
+                  - Uitgesproken
+
+expected_marks:
+  - "bevindingen-beenmerg-gewricht-9"
+  - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.vocht-status.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh"
+  - "bevindingen-beenmerg-gewricht-9.botstructuur.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-pathologie.answer"
+  - "bevindingen-beenmerg-gewricht-9.botstructuur.botstructuur-pathologie.answer"
+  - "bevindingen-beenmerg-gewricht-9.botstructuur.botstructuur-pathologie.botletsel-detail.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh.afmeting-h.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh.afmeting-b.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh.afmeting-l.answer"
+  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.answer"
+  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Partieel gescheurd.answer"
+  - "bevindingen-beenmerg-gewricht-9.botstructuur.botstructuur-localisatie.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-gradatie.answer"
+  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-localisatie.answer"
+  - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.vocht-status.vocht-gradatie.answer"
+  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Partieel gescheurd.vkb-scheur-locatie.answer"
+  - "bevindingen-beenmerg-gewricht-9.achterste-kruisband.answer"
+  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Normaal.answer"
+  - "bevindingen-beenmerg-gewricht-9.achterste-kruisband.akb-pathologie.answer"
+  - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.answer"
