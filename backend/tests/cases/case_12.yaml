@@ -1,0 +1,16 @@
+name: Presence check test - Coding question with single nested child, nested answer NOT present (tests mark_nested_children
+  optimization)
+description: Presence check test - Coding question with single nested child, nested answer NOT present (tests mark_nested_children
+  optimization)
+questionnaire:
+- linkId: smoking-status
+  type: coding
+  text: Smoking status
+  answerOptions:
+  - Current smoker
+  - Former smoker
+  - Never smoked
+  item:
+  - linkId: quit-date
+    type: date
+    text: Date quit smoking

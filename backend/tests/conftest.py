@@ -5,9 +5,14 @@ import json
 from pathlib import Path
 from typing import Any, Iterator
 
+import nest_asyncio
 import pytest
 import yaml
 from fastapi.testclient import TestClient
+
+# Fix for Gemini + pytest-asyncio event loop issues
+# See: https://ai.pydantic.dev/troubleshooting/#runtimeerror-this-event-loop-is-already-running
+nest_asyncio.apply()
 
 from backend.main import app
 from backend.models.fhir import (
@@ -39,13 +44,25 @@ def output_dir() -> Path:
 
 
 def load_yaml_cases() -> list[dict[str, Any]]:
-    """Load all YAML test cases from the cases directory."""
+    """Load all YAML test cases from the cases directory.
+
+    Each case consists of:
+    - case_XX.yaml: questionnaire definition and metadata
+    - case_XX.html: clinical note HTML (loaded separately)
+    """
     cases: list[dict[str, Any]] = []
     for yaml_file in sorted(CASES_DIR.glob("*.yaml")):
         with open(yaml_file) as f:
             case_data = yaml.safe_load(f)
             case_data["_file"] = yaml_file.stem
-            cases.append(case_data)
+
+        # Load clinical note from separate HTML file if it exists
+        html_file = yaml_file.with_suffix(".html")
+        if html_file.exists():
+            with open(html_file) as f:
+                case_data["clinical_note"] = f.read()
+
+        cases.append(case_data)
     return cases
 
 

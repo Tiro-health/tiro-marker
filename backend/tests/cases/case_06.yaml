@@ -1,0 +1,98 @@
+name: Large group test - One group with 30 questions to test parallel execution and marking at scale
+description: Large group test - One group with 30 questions to test parallel execution and marking at scale
+questionnaire:
+- linkId: complete-assessment
+  type: group
+  text: Complete Medical Assessment
+  repeats: false
+  item:
+  - linkId: patient-name
+    type: string
+    text: Patient name
+  - linkId: patient-age
+    type: string
+    text: Patient age
+  - linkId: patient-gender
+    type: string
+    text: Gender
+  - linkId: date-of-birth
+    type: string
+    text: Date of birth
+  - linkId: blood-pressure
+    type: string
+    text: Blood pressure
+  - linkId: heart-rate
+    type: string
+    text: Heart rate
+  - linkId: temperature
+    type: string
+    text: Temperature
+  - linkId: respiratory-rate
+    type: string
+    text: Respiratory rate
+  - linkId: oxygen-saturation
+    type: string
+    text: Oxygen saturation
+  - linkId: weight
+    type: string
+    text: Weight
+  - linkId: height
+    type: string
+    text: Height
+  - linkId: bmi
+    type: string
+    text: BMI
+  - linkId: chief-complaint
+    type: string
+    text: Chief complaint
+  - linkId: history-present-illness
+    type: string
+    text: History of present illness
+  - linkId: cardiovascular-review
+    type: string
+    text: Cardiovascular review
+  - linkId: respiratory-review
+    type: string
+    text: Respiratory review
+  - linkId: gastrointestinal-review
+    type: string
+    text: Gastrointestinal review
+  - linkId: neurological-review
+    type: string
+    text: Neurological review
+  - linkId: musculoskeletal-review
+    type: string
+    text: Musculoskeletal review
+  - linkId: past-medical-history
+    type: string
+    text: Past medical history
+  - linkId: current-medications
+    type: string
+    text: Current medications
+  - linkId: allergies
+    type: string
+    text: Allergies
+  - linkId: smoking-status
+    type: string
+    text: Smoking status
+  - linkId: alcohol-use
+    type: string
+    text: Alcohol use
+  - linkId: exercise-habits
+    type: string
+    text: Exercise habits
+  - linkId: occupation
+    type: string
+    text: Occupation
+  - linkId: family-history
+    type: string
+    text: Family history
+  - linkId: physical-exam
+    type: string
+    text: Physical examination findings
+  - linkId: assessment
+    type: string
+    text: Assessment
+  - linkId: plan
+    type: string
+    text: Plan

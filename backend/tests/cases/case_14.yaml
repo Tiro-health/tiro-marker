@@ -1,0 +1,27 @@
+name: Text with children including coding with nested item - Tests text question with decimal child and coding child that
+  has nested string item
+description: Text with children including coding with nested item - Tests text question with decimal child and coding child
+  that has nested string item
+questionnaire:
+- linkId: test
+  type: group
+  text: Test
+  repeats: false
+  item:
+  - linkId: patient-information
+    type: text
+    text: Patient information
+    item:
+    - linkId: age
+      type: decimal
+      text: Age
+    - linkId: country
+      type: coding
+      text: Country
+      answerOptions:
+      - Belgium
+      - France
+      item:
+      - linkId: city
+        type: string
+        text: City

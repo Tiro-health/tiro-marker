@@ -258,6 +258,32 @@ def _wrap_content_with_mark(element: HtmlElement, location: str) -> None:
     element.insert(0, mark_el)
 
 
+def get_root_labels(html: str) -> list[int]:
+    """Extract all root-level label numbers from labeled HTML.
+
+    Root-level labels are direct children of the body element.
+
+    Args:
+        html: Labeled HTML with data-label attributes.
+
+    Returns:
+        List of label integers for root-level elements.
+    """
+    doc = _parse_html(html)
+    body = doc.body
+    if body is None:
+        return []
+
+    labels: list[int] = []
+    for child in body:
+        if isinstance(child, HtmlElement):
+            label = child.get("data-label")
+            if label:
+                labels.append(int(label))
+
+    return labels
+
+
 def strip_labels(html: str) -> str:
     """Remove labeling artifacts from HTML.
 

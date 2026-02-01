@@ -1,16 +1,6 @@
 name: "Chest pain case"
 description: "Patient with acute chest pain and shortness of breath"
 
-clinical_note: |
-  <html>
-    <body>
-      <p>Patient presents with chest pain that started 2 hours ago.</p>
-      <p>Pain is described as crushing, radiating to left arm.</p>
-      <p>Associated symptoms: shortness of breath, sweating.</p>
-      <p>No previous cardiac history.</p>
-    </body>
-  </html>
-
 questionnaire:
   - linkId: chief-complaint
     type: string
