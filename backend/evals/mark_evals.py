@@ -231,7 +231,9 @@ class MarkingQualityJudge(Evaluator[MarkInput, MarkOutput]):
         """Output from the LLM judge."""
 
         total_marks: int = Field(description="Total number of marks in the marked HTML")
-        correct_marks: int = Field(description="Number of marks that are correctly placed")
+        correct_marks: int = Field(
+            description="Number of marks that are correctly placed"
+        )
         reasoning: str = Field(description="Brief explanation of any errors found")
 
     JUDGE_PROMPT = """<task>Evaluate if marked content semantically matches questionnaire questions.</task>
