@@ -20,7 +20,7 @@ questionnaire:
     text: "Pain Details"
     item:
       - linkId: pain-location
-        type: choice
+        type: coding
         text: "Location"
         answerOptions:
           - head
@@ -37,7 +37,7 @@ questionnaire:
             type: integer
             text: "Duration (days)"
           - linkId: pain-quality
-            type: choice
+            type: coding
             text: "Quality"
             answerOptions:
               - sharp
@@ -53,7 +53,7 @@ questionnaire:
         text: "Modifying Factors"
         item:
           - linkId: worse-with
-            type: choice
+            type: coding
             text: "Worse with"
             repeats: true
             answerOptions:
@@ -62,7 +62,7 @@ questionnaire:
               - standing
               - coughing
           - linkId: better-with
-            type: choice
+            type: coding
             text: "Better with"
             repeats: true
             answerOptions:
@@ -71,7 +71,7 @@ questionnaire:
               - heat
               - ice
   - linkId: neurological-symptoms
-    type: choice
+    type: coding
     text: "Associated neurological symptoms"
     repeats: true
     answerOptions:

@@ -11,6 +11,7 @@ from pydantic_graph.beta.join import reduce_null
 
 from backend.agents.mark.labeling import apply_marks as apply_marks_to_html
 from backend.agents.mark.labeling import label_html
+from backend.agents.mark.subagents import process_item
 from backend.agents.protocols import QuestionnaireItemProtocol
 
 
@@ -93,28 +94,28 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
     ) -> Sequence[MarkInput]:
         item = ctx.inputs.q_item
         location = ctx.inputs.location_string
+        html = ctx.inputs.html
 
-        # Non-group/display types get .answer suffix for the actual value
-        is_answer_type = item.type not in ("group", "display")
-        mark_location = f"{location}.answer" if is_answer_type else location
+        # Process using extensible strategy system (now async with html)
+        marks, children = await process_item(item, location, html)
 
-        # TODO: LLM finds which HTML labels match this item
-        # For now, assume label 1 applies to everything
-        ctx.state.marks.append(
-            Mark(
-                location_string=mark_location,
-                labels=[1],  # placeholder
+        # Add marks to state
+        for mark in marks:
+            ctx.state.marks.append(
+                Mark(
+                    location_string=mark.location_string,
+                    labels=mark.labels,
+                )
             )
-        )
 
-        # Pass full HTML to nested children (use base location, not .answer)
+        # Return children as MarkInputs
         return [
             MarkInput(
-                html=ctx.inputs.html,  # full HTML, not filtered
-                q_item=child,
-                location_string=f"{location}.{child.linkId}",
+                html=ctx.inputs.html,
+                q_item=child.q_item,
+                location_string=child.location_string,
             )
-            for child in item.item or []
+            for child in children
         ]
 
     sync = g.join(reduce_null, initial=None)
