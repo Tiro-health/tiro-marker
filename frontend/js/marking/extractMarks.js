@@ -13,7 +13,7 @@ import { ListNode, ListItemNode } from '@lexical/list';
 import { editorConfig } from '../editor/config.js';
 
 /**
- * Block-level elements that add \n\n separators in Lexical's text output.
+ * Block-level elements that add \n separators in Lexical's text output.
  * This matches how Lexical's getTextContent() works.
  */
 const BLOCK_ELEMENTS = new Set([
@@ -72,7 +72,10 @@ function getLexicalText(html) {
     plainText = $getRoot().getTextContent();
   });
 
-  return plainText;
+  // Normalize double newlines to single newlines to match our offset calculation
+  // Lexical's getTextContent() returns \n\n between paragraphs, but our offset
+  // counting uses single \n for consistency with the marking system
+  return plainText.replace(/\n\n+/g, '\n');
 }
 
 /**
@@ -118,11 +121,12 @@ export function extractMarksFromHTML(html) {
       const el = node;
       const tagName = el.tagName;
 
-      // Handle block elements - add \n\n between them (Lexical behavior)
+      // Handle block elements - add \n between them
+      // Note: Must match the backend's offset calculation (single newline)
       const isBlock = BLOCK_ELEMENTS.has(tagName);
 
       if (isBlock && !isFirstBlock) {
-        currentOffset += 2; // \n\n
+        currentOffset += 1; // \n
       }
 
       if (isBlock) {

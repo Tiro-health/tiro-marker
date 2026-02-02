@@ -898,10 +898,10 @@ function calculateMarkElementOffsets(editorEl, markElements) {
         offsets.set(el, { start: startOffset, end: currentOffset });
       }
 
-      // Add double newline after block elements to match Lexical's $getRoot().getTextContent()
-      // Lexical adds \n\n between consecutive paragraphs
+      // Add newline after block elements to match Lexical's $getRoot().getTextContent()
+      // Lexical adds \n between consecutive paragraphs
       if (el.tagName === 'P' || el.tagName === 'DIV') {
-        currentOffset += 2;
+        currentOffset += 1;
       }
       // BR tags add a single newline
       if (el.tagName === 'BR') {

@@ -84,6 +84,7 @@ describe('Integration: Extract and Validate', () => {
     const { marks, plainText } = extractMarksFromHTML(html);
 
     expect(marks).toHaveLength(2);
+    // Lexical uses \n\n between paragraphs
     expect(plainText).toBe('First.\n\nSecond.');
 
     const validated = validateMarksAgainstText(marks, plainText);
@@ -188,17 +189,18 @@ describe('Integration: User inserts word in marked sentence', () => {
 describe('Integration: User adds paragraph between existing ones', () => {
   it('shifts second mark when paragraph is inserted between', () => {
     const html = '<p><mark data-location="p1.answer">First paragraph</mark>.</p><p><mark data-location="p2.answer">Second paragraph</mark>.</p>';
-    const { marks } = extractMarksFromHTML(html);
+    const { marks, plainText } = extractMarksFromHTML(html);
 
-    // Initial offsets:
+    // Initial offsets with Lexical's \n\n between paragraphs:
     // "First paragraph" at 0-15
     // "." at 15
-    // \n\n at 16-17
+    // "\n\n" at 16-17
     // "Second paragraph" at 18-34
 
     expect(marks[0].start).toBe(0);
     expect(marks[0].end).toBe(15);
     expect(marks[1].start).toBe(18); // After "First paragraph.\n\n"
+    expect(marks[1].end).toBe(34); // 18 + 16 = 34
 
     // User inserts "New paragraph.\n\n" (16 chars) at position 18 (start of second para)
     const edits = [{ type: 'insert', pos: 18, len: 16 }];

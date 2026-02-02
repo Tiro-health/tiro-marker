@@ -81,9 +81,9 @@ describe('rebuildTextFromHTML', () => {
     expect(rebuildTextFromHTML(html)).toBe('Hello world');
   });
 
-  it('extracts text from multiple paragraphs with \\n\\n between them', () => {
+  it('extracts text from multiple paragraphs with \\n between them', () => {
     const html = '<p>First paragraph.</p><p>Second paragraph.</p>';
-    expect(rebuildTextFromHTML(html)).toBe('First paragraph.\n\nSecond paragraph.');
+    expect(rebuildTextFromHTML(html)).toBe('First paragraph.\nSecond paragraph.');
   });
 
   it('handles BR tags as \\n', () => {
@@ -103,12 +103,12 @@ describe('rebuildTextFromHTML', () => {
 
   it('handles headings like paragraphs', () => {
     const html = '<h1>Title</h1><p>Content here.</p>';
-    expect(rebuildTextFromHTML(html)).toBe('Title\n\nContent here.');
+    expect(rebuildTextFromHTML(html)).toBe('Title\nContent here.');
   });
 
   it('handles divs like paragraphs', () => {
     const html = '<div>First</div><div>Second</div>';
-    expect(rebuildTextFromHTML(html)).toBe('First\n\nSecond');
+    expect(rebuildTextFromHTML(html)).toBe('First\nSecond');
   });
 
   it('handles empty paragraphs', () => {
