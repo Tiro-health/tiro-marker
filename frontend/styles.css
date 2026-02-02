@@ -393,6 +393,22 @@ button:disabled {
     margin-top: 0.25rem;
 }
 
+/* Form Section - scrollable questionnaire */
+.form-section {
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+}
+
+.form-section tiro-form-filler {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 60vh;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
 /* Editor Section */
 .editor-section {
     display: flex;
@@ -418,6 +434,11 @@ button:disabled {
     white-space: pre-wrap;
     word-wrap: break-word;
     overflow: visible;
+    caret-color: #000 !important;
+}
+
+#lexical-editor * {
+    caret-color: inherit !important;
 }
 
 #editor-container:focus-within {
@@ -483,16 +504,17 @@ button:disabled {
 
 /* Mark nodes - highlighted text linked to questionnaire items */
 .editor-mark {
-    padding: 0.1em 0.2em;
+    padding: 0;
     border-radius: 2px;
-    cursor: pointer;
+    cursor: text;
+    caret-color: #000 !important;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
-    position: relative;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
 }
 
 .editor-mark:hover {
-    filter: brightness(0.95);
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+    background-color: hsl(45, 90%, 75%); /* Slightly darker yellow on hover */
 }
 
 /* JavaScript tooltip container (appended to body) */
@@ -601,11 +623,6 @@ button:disabled {
     background-color: hsl(45, 90%, 80%) !important; /* Same yellow as marks */
     transition: background-color 0.3s ease;
     border-radius: 4px;
-}
-
-/* Make marks clickable */
-.editor-mark {
-    cursor: pointer;
 }
 
 /* Footer */

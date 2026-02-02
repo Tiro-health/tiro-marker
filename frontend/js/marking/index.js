@@ -17,6 +17,7 @@ import { detectSentences, initSentenceDetector, getStableSentences } from './sen
 let editorAPI = null;
 let questionnaire = null; // Store questionnaire for linkId mapping
 let lastMarkedContent = ''; // Track content at last mark
+let lastMarkedEndPosition = 0; // Track end position of content that was actually sent to backend
 let lastSentenceCount = 0; // Track sentence count at last mark
 let lastMarkTime = 0; // Track when we last marked
 let lastContentChangeTime = 0; // Track when content last changed
@@ -146,50 +147,60 @@ function createTooltip() {
   });
 
   // Click handler to navigate to form field (handles multiple IDs and nested marks)
+  // Deferred to let browser finish placing cursor first
   editorContainer.addEventListener('click', (e) => {
     const mark = e.target.closest('.editor-mark');
     if (mark) {
-      // Clear any previous highlights first
-      clearHighlightedContainers();
+      // Defer to next tick so browser finishes cursor placement first
+      setTimeout(() => {
+        // Clear any previous highlights first
+        clearHighlightedContainers();
 
-      // Collect ALL mark IDs from the clicked element AND its mark ancestors
-      // This handles nested marks (e.g., "headache" inside "Patient has headache")
-      const allMarkIds = new Set();
+        // Collect ALL mark IDs from the clicked element AND its mark ancestors
+        // This handles nested marks (e.g., "headache" inside "Patient has headache")
+        const allMarkIds = new Set();
 
-      let currentMark = mark;
-      while (currentMark) {
-        const markIdsAttr = currentMark.getAttribute('data-lexical-mark-ids');
-        if (markIdsAttr) {
-          markIdsAttr.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+        let currentMark = mark;
+        while (currentMark) {
+          const markIdsAttr = currentMark.getAttribute('data-lexical-mark-ids');
+          if (markIdsAttr) {
+            markIdsAttr.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+          }
+          // Move to parent mark element (if any)
+          currentMark = currentMark.parentElement?.closest('.editor-mark');
         }
-        // Move to parent mark element (if any)
-        currentMark = currentMark.parentElement?.closest('.editor-mark');
-      }
 
-      const markIds = Array.from(allMarkIds);
-      console.log(`[Click] Collected ${markIds.length} mark IDs from element and ancestors:`, markIds);
+        const markIds = Array.from(allMarkIds);
+        console.log(`[Click] Collected ${markIds.length} mark IDs from element and ancestors:`, markIds);
 
-      if (markIds.length === 0) return;
+        if (markIds.length === 0) return;
 
-      // Find the most nested/specific mark (longest location path = most dots)
-      const mostNestedId = markIds.reduce((a, b) =>
-        a.split('.').length > b.split('.').length ? a : b
-      );
+        // Find the most nested/specific mark (longest location path = most dots)
+        const mostNestedId = markIds.reduce((a, b) =>
+          a.split('.').length > b.split('.').length ? a : b
+        );
 
-      // Highlight ALL related form field containers
-      for (const markId of markIds) {
-        highlightFormFieldContainer(markId);
-      }
+        // Highlight ALL related form field containers
+        for (const markId of markIds) {
+          highlightFormFieldContainer(markId);
+        }
 
-      // Navigate/scroll to the most nested one
-      navigateToFormField(mostNestedId);
+        // Navigate/scroll to the most nested one
+        // Use scrollIntoView on the scrollable form container
+        const formFiller = document.querySelector('tiro-form-filler');
+        const result = findFormField(mostNestedId);
+        if (result && formFiller) {
+          result.field.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 0);
     }
   });
 }
 
 /**
  * Navigate to and highlight the form field for a given linkId
- * Note: highlighting is handled by highlightFormFieldContainer, this just scrolls and focuses
+ * Note: highlighting is handled by highlightFormFieldContainer, this just scrolls
+ * Uses manual scroll to avoid focus stealing from scrollIntoView
  * @param {string} linkId - The linkId path (e.g., "q1.answer")
  */
 function navigateToFormField(linkId) {
@@ -198,12 +209,19 @@ function navigateToFormField(linkId) {
   if (result) {
     const { field: formField, inShadowDOM } = result;
 
-    // Scroll into view
-    formField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Find the scrollable form container
+    const formFiller = document.querySelector('tiro-form-filler');
+    if (formFiller) {
+      // Calculate scroll position to center the element
+      const fieldRect = formField.getBoundingClientRect();
+      const parentRect = formFiller.getBoundingClientRect();
+      const scrollTop = formFiller.scrollTop + (fieldRect.top - parentRect.top) - (parentRect.height / 2) + (fieldRect.height / 2);
 
-    // Focus if it's an input
-    if (formField.tagName === 'INPUT' || formField.tagName === 'TEXTAREA') {
-      formField.focus();
+      // Smooth scroll (doesn't affect focus)
+      formFiller.scrollTo({
+        top: scrollTop,
+        behavior: 'smooth'
+      });
     }
   } else {
     console.log(`Could not find form field for linkId: ${linkId}`);
@@ -213,6 +231,7 @@ function navigateToFormField(linkId) {
 /**
  * Find a form field element by linkId
  * Searches both regular DOM and shadow DOM (tiro-form-filler)
+ * Tries multiple encoding variants to match tiro-form-filler's ID format
  * @param {string} linkId - The linkId path (e.g., "q1.answer")
  * @returns {{field: HTMLElement, inShadowDOM: boolean}|null}
  */
@@ -221,14 +240,16 @@ function findFormField(linkId) {
   const baseLinkId = linkId.replace(/\.answer$/, '');
   const fullLinkId = linkId.endsWith('.answer') ? linkId : `${linkId}.answer`;
 
+  // Build list of ID variants to try
+  // tiro-form-filler encodes IDs with URL encoding + replacing . with -
+  const variants = [fullLinkId, baseLinkId];
+
   // Try multiple selectors to find the form field
-  const selectors = [
-    `[id="${fullLinkId}"]`,             // Exact ID match with .answer
-    `[name="${fullLinkId}"]`,           // Name attribute match with .answer
-    `[id="${baseLinkId}"]`,             // Base linkId as ID
-    `[name="${baseLinkId}"]`,           // Base linkId as name
-    `[data-linkid="${baseLinkId}"]`,    // data-linkid attribute
-  ];
+  const selectors = [];
+  for (const id of variants) {
+    selectors.push(`[id="${id}"]`);
+    selectors.push(`[name="${id}"]`);
+  }
 
   // First, try to find in shadow DOM (tiro-form-filler)
   const formFiller = document.querySelector('tiro-form-filler');
@@ -418,7 +439,12 @@ function checkAndMark() {
   }
 
   // Rule 2: Check if content changed since last MARK
-  const contentChanged = currentContent !== lastMarkedContent;
+  // Content is considered "changed" if:
+  // - The text is different from lastMarkedContent
+  // - OR there's unmarked content beyond lastMarkedEndPosition
+  const textChanged = currentContent !== lastMarkedContent;
+  const hasUnmarkedContent = currentContent.length > lastMarkedEndPosition;
+  const contentChanged = textChanged || hasUnmarkedContent;
 
   // Track when content last changed (for 10s timeout)
   if (contentChanged) {
@@ -430,13 +456,9 @@ function checkAndMark() {
     return;
   }
 
-  // Rule 1: Need at least 2 sentences (1 stable)
+  // Detect sentences
   const sentences = detectSentences(currentContent);
   const sentenceCount = sentences.length;
-
-  if (sentenceCount < 2) {
-    return; // Not enough sentences
-  }
 
   // Rule 3: At least 4 seconds since last mark
   const timeSinceLastMark = now - lastMarkTime;
@@ -445,24 +467,28 @@ function checkAndMark() {
   }
 
   // Rule 4: Sentence count changed - mark immediately (after min interval)
-  const sentenceCountChanged = sentenceCount !== lastSentenceCount;
+  const sentenceCountChanged = sentenceCount !== lastSentenceCount && sentenceCount >= 2;
 
-  // Rule 5: 10 seconds since last mark and content changed
-  const longTimeout = timeSinceLastMark >= STABLE_CONTENT_MARK_MS && contentChanged;
+  // Rule 5: 10 seconds since last mark and content changed - include last sentence (user done typing)
+  const timeSinceLastTyping = now - lastTypingTime;
+  const longTimeout = timeSinceLastMark >= STABLE_CONTENT_MARK_MS && contentChanged && timeSinceLastTyping >= STABLE_CONTENT_MARK_MS;
 
   // Rule 6: User idle for 2 seconds and content changed since last mark
-  const timeSinceLastTyping = now - lastTypingTime;
-  const idleTimeout = timeSinceLastTyping >= IDLE_MARK_MS && contentChanged;
+  const idleTimeout = timeSinceLastTyping >= IDLE_MARK_MS && contentChanged && sentenceCount >= 2;
 
   // Decide whether to mark
   const shouldMark = sentenceCountChanged || longTimeout || idleTimeout;
+
 
   if (!shouldMark) {
     return;
   }
 
-  // Get stable sentences (all except the last one being typed)
-  const stableSentences = getStableSentences(currentContent);
+  // Get stable sentences
+  // If user has been idle for 10+ seconds, include ALL sentences (user is done typing)
+  // Otherwise, exclude the last sentence (user might still be typing it)
+  const includeLastSentence = timeSinceLastTyping >= STABLE_CONTENT_MARK_MS;
+  const stableSentences = getStableSentences(currentContent, includeLastSentence);
   if (stableSentences.length === 0) {
     return; // No stable content to mark
   }
@@ -471,9 +497,13 @@ function checkAndMark() {
   const lastStableSentence = stableSentences[stableSentences.length - 1];
   const stableEndPosition = lastStableSentence.end;
 
+  // When including all sentences, use full content length to prevent re-marking
+  // (sentence end position might not match content length due to trailing whitespace)
+  const markedEndPosition = includeLastSentence ? currentContent.length : stableEndPosition;
+
   console.log(
     `Marking triggered: sentences=${sentenceCount} (was ${lastSentenceCount}), ` +
-      `stable=${stableSentences.length}, stableEnd=${stableEndPosition}`
+      `stable=${stableSentences.length}, stableEnd=${stableEndPosition}, includeAll=${includeLastSentence}`
   );
 
   // Update tracking
@@ -485,7 +515,7 @@ function checkAndMark() {
   const stableHtml = truncateHtmlToTextLength(cleanHtml, stableEndPosition);
 
   console.log(`[Mark] Sending stable HTML (${stableEndPosition} chars of text)`);
-  triggerMarking(stableHtml);
+  triggerMarking(stableHtml, markedEndPosition);
 }
 
 /**
@@ -561,7 +591,7 @@ function truncateHtmlToTextLength(html, textLength) {
  * IMPORTANT: The backend is slow (can take seconds), so the user may edit during that time.
  * We use text-based matching to apply marks from old content to potentially changed content.
  */
-async function triggerMarking(html) {
+async function triggerMarking(html, markedEndPosition = null) {
   isMarking = true;
   setSpinnerVisible(true);
   if (onMarkingStatusChange) onMarkingStatusChange(true);
@@ -637,6 +667,7 @@ async function triggerMarking(html) {
 
   // Update tracking state
   lastMarkedContent = editorAPI.getTextContent();
+  lastMarkedEndPosition = markedEndPosition || lastMarkedContent.length;
   lastMarkTime = Date.now();
 
   setSpinnerVisible(false);
@@ -695,8 +726,8 @@ function parseMarksFromHtml(html) {
       continue;
     }
 
-    // Get the text content (innermost text, not nested marks)
-    const text = getInnermostText(el);
+    // Get the full text content (including nested marks)
+    const text = el.textContent || '';
     if (text.trim()) {
       marks.push({
         linkId: linkId,
@@ -714,51 +745,61 @@ function parseMarksFromHtml(html) {
   });
 }
 
-/**
- * Get innermost text from an element, excluding nested mark elements
- */
-function getInnermostText(element) {
-  let text = '';
-  for (const node of element.childNodes) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      text += node.textContent;
-    } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== 'MARK') {
-      text += getInnermostText(node);
-    }
-  }
-  return text;
-}
 
 /**
  * Find question text from questionnaire by linkId
- * @param {string} linkId - The full linkId path (e.g., "q11.answer" or "group.q1.answer")
- * @param {Array} items - Questionnaire items to search
+ *
+ * Handles complex paths like:
+ * - "emergency-assessment.patient-name.answer" (simple nested)
+ * - "emergency-assessment.medications.option-http%3A%2F%2F...%7Cmetformin.medication-dosage.answer"
+ *   (URL-encoded option IDs)
+ *
+ * Strategy: Extract the last segment (actual question linkId) and search the tree.
+ *
+ * @param {string} linkId - The full linkId path
+ * @param {Array} items - Questionnaire items to search (defaults to root)
  */
 function findQuestionText(linkId, items = questionnaire?.item) {
   if (!items) return null;
 
-  for (const item of items) {
-    // Check if linkId starts with this item's linkId followed by a separator (. or end)
-    // This prevents "q1" from matching "q11.answer"
-    const itemLinkId = item.linkId;
-    const matchesExact = linkId === itemLinkId;
-    const matchesPrefix =
-      linkId.startsWith(itemLinkId + '.') ||
-      linkId.startsWith(itemLinkId + '/');
+  // Strip .answer suffix
+  const baseLinkId = linkId.replace(/\.answer$/, '');
 
-    if (matchesExact || matchesPrefix) {
-      // If this is a group with nested items, try to find a more specific match
-      if (item.item && item.item.length > 0) {
-        const nestedMatch = findQuestionText(linkId, item.item);
-        if (nestedMatch) return nestedMatch;
-      }
+  // Extract the last segment - this is the actual question linkId
+  // e.g., "emergency-assessment.medications.option-xxx.medication-dosage" -> "medication-dosage"
+  const lastDotIndex = baseLinkId.lastIndexOf('.');
+  const lastSegment = lastDotIndex >= 0 ? baseLinkId.slice(lastDotIndex + 1) : baseLinkId;
+
+  // URL-decode the segment in case it was encoded
+  let decodedSegment;
+  try {
+    decodedSegment = decodeURIComponent(lastSegment);
+  } catch (e) {
+    decodedSegment = lastSegment;
+  }
+
+  // Search for this segment anywhere in the questionnaire tree
+  const found = findByLinkIdInTree(decodedSegment, items) ||
+                findByLinkIdInTree(lastSegment, items);
+  if (found) return found;
+
+  // Fallback: try the full baseLinkId (for simple cases)
+  return findByLinkIdInTree(baseLinkId, items);
+}
+
+/**
+ * Search for an item by linkId anywhere in the questionnaire tree
+ * @param {string} targetLinkId - The linkId to find
+ * @param {Array} items - Items to search
+ * @returns {string|null} Question text or null
+ */
+function findByLinkIdInTree(targetLinkId, items) {
+  for (const item of items) {
+    if (item.linkId === targetLinkId) {
       return item.text || item.linkId;
     }
-
-    // Recursively search nested items even if parent doesn't match
-    // (for deeply nested structures)
     if (item.item) {
-      const found = findQuestionText(linkId, item.item);
+      const found = findByLinkIdInTree(targetLinkId, item.item);
       if (found) return found;
     }
   }
@@ -871,6 +912,7 @@ export function stopMarking() {
  */
 export function reset() {
   lastMarkedContent = '';
+  lastMarkedEndPosition = 0;
   lastSentenceCount = 0;
   lastMarkTime = 0;
   lastContentChangeTime = 0;
@@ -918,27 +960,27 @@ export async function triggerManualMark() {
     return;
   }
 
-  // Get stable sentences
-  const stableSentences = getStableSentences(currentContent);
-  if (stableSentences.length === 0) {
-    // If no stable sentences, mark all content
-    console.log('[Manual Mark] No stable sentences, marking all content');
+  // For manual mark, include ALL sentences (user explicitly wants to mark now)
+  const allSentences = getStableSentences(currentContent, true);
+  if (allSentences.length === 0) {
+    // No sentences detected, mark all content as-is
+    console.log('[Manual Mark] No sentences detected, marking all content');
     const rawHtml = editorAPI.getHtmlContent();
     const cleanHtml = stripMarksFromHtml(rawHtml);
-    triggerMarking(cleanHtml);
+    triggerMarking(cleanHtml, currentContent.length);
     return;
   }
 
-  // Calculate end position of stable content
-  const lastStableSentence = stableSentences[stableSentences.length - 1];
-  const stableEndPosition = lastStableSentence.end;
+  // Calculate end position of all content
+  const lastSentence = allSentences[allSentences.length - 1];
+  const endPosition = lastSentence.end;
 
-  console.log(`[Manual Mark] Marking ${stableSentences.length} stable sentences`);
+  console.log(`[Manual Mark] Marking all ${allSentences.length} sentences`);
 
-  // Get HTML, strip existing marks, and truncate to stable content
+  // Get HTML, strip existing marks, and truncate to sentence boundaries
   const rawHtml = editorAPI.getHtmlContent();
   const cleanHtml = stripMarksFromHtml(rawHtml);
-  const stableHtml = truncateHtmlToTextLength(cleanHtml, stableEndPosition);
+  const stableHtml = truncateHtmlToTextLength(cleanHtml, endPosition);
 
-  triggerMarking(stableHtml);
+  triggerMarking(stableHtml, endPosition);
 }

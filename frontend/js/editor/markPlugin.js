@@ -61,20 +61,39 @@ export function $applyMarkToText(text, markId) {
  * @returns {boolean} True if mark was applied
  */
 export function $applyMarkToTextWithIds(text, markIds) {
+  if (markIds.length === 0) return false;
+
   const root = $getRoot();
 
   // Find the text position
   const position = findTextPosition(root, text.trim());
 
   if (position) {
-    // Create a selection over the text to mark (don't affect actual selection)
+    // Create a selection over the text to mark
     const markSelection = $createRangeSelection();
     markSelection.anchor.set(position.startNode.getKey(), position.startOffset, 'text');
     markSelection.focus.set(position.endNode.getKey(), position.endOffset, 'text');
 
-    // Apply each mark ID - $wrapSelectionInMarkNode handles adding IDs to existing MarkNodes
-    for (const markId of markIds) {
-      $wrapSelectionInMarkNode(markSelection, false, markId);
+    // Wrap once with the first ID
+    $wrapSelectionInMarkNode(markSelection, false, markIds[0]);
+
+    // If there are additional IDs, add them to the existing MarkNode
+    if (markIds.length > 1) {
+      // Re-find the position after wrapping (nodes have changed)
+      const newPosition = findTextPosition(root, text.trim());
+      if (newPosition) {
+        // Walk up to find the MarkNode
+        let node = newPosition.startNode;
+        while (node && !$isMarkNode(node)) {
+          node = node.getParent();
+        }
+        if ($isMarkNode(node)) {
+          // Add remaining IDs to the existing MarkNode
+          for (let i = 1; i < markIds.length; i++) {
+            node.addID(markIds[i]);
+          }
+        }
+      }
     }
 
     console.log(`Applied marks [${markIds.join(', ')}] to: "${text.trim().substring(0, 30)}..."`);
