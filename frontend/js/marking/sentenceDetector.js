@@ -63,12 +63,22 @@ export function detectSentences(text) {
 /**
  * Get stable sentences (all except the last one being typed)
  * @param {string} text - Text to analyze
+ * @param {boolean} includeLastSentence - If true, include the last sentence (user is done typing)
  * @returns {Array<{text: string, start: number, end: number}>} Stable sentences
  */
-export function getStableSentences(text) {
+export function getStableSentences(text, includeLastSentence = false) {
   const sentences = detectSentences(text);
 
-  // Need at least 2 sentences for 1 to be stable
+  if (sentences.length === 0) {
+    return [];
+  }
+
+  // If including last sentence (user idle for a while), return all sentences
+  if (includeLastSentence) {
+    return sentences;
+  }
+
+  // Need at least 2 sentences for 1 to be stable (when not including last)
   if (sentences.length < 2) {
     return [];
   }

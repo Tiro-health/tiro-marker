@@ -32,8 +32,8 @@ function clearHighlightedContainers() {
 export function initLinkHandler(editorAPI, formElement) {
   formFiller = formElement;
 
-  // Register click handler on marks
-  editorAPI.registerMarkClickHandler(handleMarkClick);
+  // NOTE: Disabled registerMarkClickHandler - using marking/index.js click handler instead
+  // editorAPI.registerMarkClickHandler(handleMarkClick);
 
   console.log('Questionnaire link handler initialized');
 }
@@ -42,6 +42,7 @@ export function initLinkHandler(editorAPI, formElement) {
  * Handle mark click event
  * Supports multiple mark IDs (space-separated) - navigates to most nested, highlights all
  * Also collects IDs from ancestor mark elements for nested marks
+ * Deferred to let browser finish cursor placement first
  * @param {string} markIdOrIds - The mark/linkId(s) that was clicked (may be space-separated)
  * @param {Event} event - The click event
  */
@@ -53,47 +54,53 @@ function handleMarkClick(markIdOrIds, event) {
     return;
   }
 
-  // Collect all IDs from the passed string AND from ancestor mark elements
-  const allMarkIds = new Set();
-
-  // Add IDs from the passed string
-  markIdOrIds.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
-
-  // Also collect IDs from ancestor mark elements (for nested marks)
+  // Capture event target before deferring (it may change)
   const clickedMark = event.target.closest('.editor-mark');
-  if (clickedMark) {
-    let parentMark = clickedMark.parentElement?.closest('.editor-mark');
-    while (parentMark) {
-      const parentIds = parentMark.getAttribute('data-lexical-mark-ids');
-      if (parentIds) {
-        parentIds.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+
+  // Defer to next tick so browser finishes cursor placement first
+  setTimeout(() => {
+    // Collect all IDs from the passed string AND from ancestor mark elements
+    const allMarkIds = new Set();
+
+    // Add IDs from the passed string
+    markIdOrIds.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+
+    // Also collect IDs from ancestor mark elements (for nested marks)
+    if (clickedMark) {
+      let parentMark = clickedMark.parentElement?.closest('.editor-mark');
+      while (parentMark) {
+        const parentIds = parentMark.getAttribute('data-lexical-mark-ids');
+        if (parentIds) {
+          parentIds.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+        }
+        parentMark = parentMark.parentElement?.closest('.editor-mark');
       }
-      parentMark = parentMark.parentElement?.closest('.editor-mark');
     }
-  }
 
-  const markIds = Array.from(allMarkIds);
-  console.log(`[LinkHandler] Collected ${markIds.length} mark IDs:`, markIds);
+    const markIds = Array.from(allMarkIds);
+    console.log(`[LinkHandler] Collected ${markIds.length} mark IDs:`, markIds);
 
-  if (markIds.length === 0) return;
+    if (markIds.length === 0) return;
 
-  // Find the most nested/specific mark (longest location path = most dots)
-  const mostNestedId = markIds.reduce((a, b) =>
-    a.split('.').length > b.split('.').length ? a : b
-  );
+    // Find the most nested/specific mark (longest location path = most dots)
+    const mostNestedId = markIds.reduce((a, b) =>
+      a.split('.').length > b.split('.').length ? a : b
+    );
 
-  // Note: Highlighting is handled by marking/index.js click handler
-  // We only handle scrolling and focusing here to avoid duplicate highlights
+    // Note: Highlighting is handled by marking/index.js click handler
+    // We only handle scrolling here to avoid duplicate highlights
 
-  // Navigate to the most nested one (scroll + focus)
-  scrollToQuestion(mostNestedId);
+    // Navigate to the most nested one (scroll only)
+    scrollToQuestion(mostNestedId);
 
-  // Highlight the mark temporarily
-  highlightMark(event.target);
+    // Highlight the mark temporarily
+    highlightMark(clickedMark);
+  }, 0);
 }
 
 /**
  * Scroll to a question in the form filler by linkId
+ * Uses manual scroll to avoid focus stealing from scrollIntoView
  * @param {string} linkId - The questionnaire item linkId
  */
 function scrollToQuestion(linkId) {
@@ -105,22 +112,23 @@ function scrollToQuestion(linkId) {
   if (result) {
     const { container, input } = result;
 
-    // Scroll the container into view (centered)
-    container.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
+    // Find the scrollable parent (tiro-form-filler with overflow-y: auto)
+    const scrollParent = formFiller;
+
+    // Calculate scroll position to center the element
+    const containerRect = container.getBoundingClientRect();
+    const parentRect = scrollParent.getBoundingClientRect();
+    const scrollTop = scrollParent.scrollTop + (containerRect.top - parentRect.top) - (parentRect.height / 2) + (containerRect.height / 2);
+
+    // Smooth scroll the container (doesn't affect focus)
+    scrollParent.scrollTo({
+      top: scrollTop,
+      behavior: 'smooth'
     });
 
     // Add visual pulse/highlight to the question panel
     const panel = container.querySelector('[data-question-panel]') || container;
     pulseHighlight(panel);
-
-    // Focus the input after scroll animation
-    if (input) {
-      setTimeout(() => {
-        input.focus();
-      }, 300);
-    }
 
     console.log(`Scrolled to question: ${linkId}`);
   } else {

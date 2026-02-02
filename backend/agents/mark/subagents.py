@@ -7,6 +7,7 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import cast
+from urllib.parse import quote
 
 from pydantic import BaseModel, Field, create_model
 
@@ -347,24 +348,34 @@ async def repeating_coding_strategy(
     for field_name, code in field_to_code.items():
         labels = getattr(result.output, field_name, [])
         if labels:
-            option_location = f"{location}.option-{code}"
             # Extract scoped HTML for this option
             option_html = extract_html_for_labels(html, labels)
 
+            # The mark for the option itself goes to the parent question's .answer
+            # e.g., "Metformin" -> emergency-assessment.medications.answer
             marks.append(
                 MarkResult(
-                    location_string=f"{option_location}.answer",
+                    location_string=f"{location}.answer",
                     labels=labels,
                 )
             )
-            # Each option instance has its own children
-            for child in item.item or []:
-                children.append(
-                    ChildInput(
-                        q_item=child,
-                        location_string=f"{option_location}.{child.linkId}",
-                        html=option_html,  # Scoped to this option
+
+            # Children get an option-specific path
+            # e.g., dosage -> emergency-assessment.medications.option-xxx.medication-dosage.answer
+            if item.item:
+                # Encode the code to match tiro-form-filler's ID encoding:
+                # 1. URL-encode special chars (:, /, |, etc.)
+                # 2. Replace . with - (quote() doesn't encode dots)
+                encoded_code = quote(code, safe="").replace(".", "-")
+                option_location = f"{location}.option-{encoded_code}"
+
+                for child in item.item:
+                    children.append(
+                        ChildInput(
+                            q_item=child,
+                            location_string=f"{option_location}.{child.linkId}",
+                            html=option_html,  # Scoped to this option
+                        )
                     )
-                )
 
     return marks, children
