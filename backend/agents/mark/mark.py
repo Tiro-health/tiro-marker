@@ -6,11 +6,18 @@ Takes HTML + questionnaire items, outputs marked HTML.
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+import logfire
 from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
 from pydantic_graph.beta.join import reduce_null
 
 from backend.agents.mark.labeling import apply_marks as apply_marks_to_html
-from backend.agents.mark.labeling import label_html
+from backend.agents.mark.labeling import (
+    get_text_content,
+    label_html,
+    strip_labels,
+    strip_marks,
+    validate_marking,
+)
 from backend.agents.mark.subagents import process_item
 from backend.agents.protocols import QuestionnaireItemProtocol
 
@@ -39,7 +46,9 @@ class MarkInput:
     html: str
     q_item: QuestionnaireItemProtocol
     location_string: str
-    sibling_questions: list[str] = field(default_factory=list)  # Other questions at same level
+    sibling_questions: list[str] = field(
+        default_factory=list
+    )  # Other questions at same level
 
 
 @dataclass
@@ -146,7 +155,37 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
         ctx: StepContext[MarkerState, None, None],
     ) -> str:
         # Apply marks to labeled HTML and clean up
-        return apply_marks_to_html(ctx.state.html, ctx.state.marks)
+        marked_html = apply_marks_to_html(ctx.state.html, ctx.state.marks)
+
+        # Validate that marking didn't change text content
+        original_clean = strip_labels(ctx.state.html)
+        original_text = get_text_content(original_clean)
+        marked_text = get_text_content(strip_marks(marked_html))
+        is_valid = validate_marking(original_clean, marked_html)
+
+        logfire.info(
+            "Mark validation {result}",
+            result="passed" if is_valid else "FAILED",
+            original_length=len(original_text),
+            marked_length=len(marked_text),
+            marks_count=len(ctx.state.marks),
+            marked_html=marked_html,
+        )
+
+        if not is_valid:
+            logfire.error(
+                "Marking validation failed: text content changed",
+                original_text_preview=original_text[:500],
+                marked_text_preview=marked_text[:500],
+            )
+            raise ValueError(
+                f"Marking validation failed: text content changed.\n"
+                f"Original length: {len(original_text)}, Marked length: {len(marked_text)}\n"
+                f"Original (first 200): {original_text[:200]!r}\n"
+                f"Marked (first 200): {marked_text[:200]!r}"
+            )
+
+        return marked_html
 
     g.add(
         g.edge_from(g.start_node).to(fan_out),

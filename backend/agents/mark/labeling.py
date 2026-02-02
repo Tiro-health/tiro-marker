@@ -7,21 +7,26 @@ Prepares HTML for AI marking by:
 """
 
 import copy
+import re
 from collections.abc import Sequence
 from typing import Protocol, cast
 
 from lxml import etree
-from lxml.html import HtmlElement, tostring
-from lxml.html import document_fromstring  # type: ignore[reportUnknownVariableType]
+from lxml.html import (
+    HtmlElement,
+    document_fromstring,  # type: ignore[reportUnknownVariableType]
+    tostring,
+)
 from sentencex import segment  # type: ignore[import-untyped]
 
 
 def _segment_sentences(text: str) -> list[str]:
     """Split text into sentences using sentencex.
 
-    Wrapper to provide type annotations for untyped sentencex library.
+    Simply runs sentencex on the text to detect sentence boundaries.
     """
-    return list(segment("en", text))  # type: ignore[reportUnknownArgumentType]
+    sentences = list(segment("en", text))  # type: ignore[reportUnknownArgumentType]
+    return sentences if sentences else [text]
 
 
 def _parse_html(html: str) -> HtmlElement:
@@ -41,6 +46,7 @@ class MarkProtocol(Protocol):
 
     @property
     def labels(self) -> Sequence[int]: ...
+
 
 # Form input controls
 INPUT_TAGS = frozenset(
@@ -382,3 +388,55 @@ def _unwrap_element(element: HtmlElement) -> None:
             parent.text = (parent.text or "") + element.tail
 
     parent.remove(element)
+
+
+def strip_marks(html: str) -> str:
+    """Remove all <mark> tags from HTML, preserving content.
+
+    Args:
+        html: HTML string potentially containing <mark> tags.
+
+    Returns:
+        HTML string with mark tags removed but content preserved.
+    """
+    # Remove opening mark tags (with any attributes)
+    result = re.sub(r"<mark[^>]*>", "", html)
+    # Remove closing mark tags
+    result = re.sub(r"</mark>", "", result)
+    return result
+
+
+def get_text_content(html: str) -> str:
+    """Extract plain text content from HTML.
+
+    Args:
+        html: HTML string.
+
+    Returns:
+        Plain text content with whitespace normalized.
+    """
+    doc = _parse_html(html)
+    body = doc.body
+    if body is None:
+        return ""
+    return (body.text_content() or "").strip()
+
+
+def validate_marking(original_html: str, marked_html: str) -> bool:
+    """Validate that marking didn't change the text content.
+
+    Strips marks from the marked HTML and compares text content
+    with the original. They should be identical.
+
+    Args:
+        original_html: Original HTML before marking.
+        marked_html: HTML after marks were applied.
+
+    Returns:
+        True if text content is unchanged, False otherwise.
+    """
+    original_text = get_text_content(original_html)
+    stripped_html = strip_marks(marked_html)
+    stripped_text = get_text_content(stripped_html)
+
+    return original_text == stripped_text

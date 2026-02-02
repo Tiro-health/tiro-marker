@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Marking Tests</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f14c4c; }
+        h1 { color: #569cd6; }
+        h2 { color: #9cdcfe; margin-top: 30px; }
+        .summary { margin-top: 20px; padding: 10px; border: 1px solid #555; }
+        .summary.pass { border-color: #4ec9b0; }
+        .summary.fail { border-color: #f14c4c; }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "lexical": "https://esm.sh/lexical@0.21.0",
+            "@lexical/rich-text": "https://esm.sh/@lexical/rich-text@0.21.0?deps=lexical@0.21.0",
+            "@lexical/history": "https://esm.sh/@lexical/history@0.21.0?deps=lexical@0.21.0",
+            "@lexical/html": "https://esm.sh/@lexical/html@0.21.0?deps=lexical@0.21.0",
+            "@lexical/mark": "https://esm.sh/@lexical/mark@0.21.0?deps=lexical@0.21.0",
+            "@lexical/selection": "https://esm.sh/@lexical/selection@0.21.0?deps=lexical@0.21.0",
+            "@lexical/utils": "https://esm.sh/@lexical/utils@0.21.0?deps=lexical@0.21.0",
+            "@lexical/list": "https://esm.sh/@lexical/list@0.21.0?deps=lexical@0.21.0"
+        }
+    }
+    </script>
+</head>
+<body>
+    <h1>Marking System Tests</h1>
+
+    <h2>diffEdit Tests</h2>
+    <pre id="diffEdit-output"></pre>
+
+    <h2>extractMarks Tests</h2>
+    <pre id="extractMarks-output"></pre>
+
+    <h2>offsetTransform Tests</h2>
+    <pre id="offsetTransform-output"></pre>
+
+    <h2>Integration Tests</h2>
+    <pre id="integration-output"></pre>
+
+    <div id="summary" class="summary"></div>
+
+    <script type="module">
+        // Store original console methods
+        const originalLog = console.log.bind(console);
+        const originalError = console.error.bind(console);
+
+        // Helper to create output writer for a specific output element
+        function createOutputWriter(outputId) {
+            const output = document.getElementById(outputId);
+            return {
+                log: (...args) => {
+                    originalLog(...args);
+                    const line = document.createElement('div');
+                    line.textContent = args.join(' ');
+                    if (args[0]?.includes('✓')) line.className = 'pass';
+                    output.appendChild(line);
+                },
+                error: (...args) => {
+                    originalError(...args);
+                    const line = document.createElement('div');
+                    line.textContent = args.join(' ');
+                    line.className = 'fail';
+                    output.appendChild(line);
+                }
+            };
+        }
+
+        // Run all test suites
+        let totalPassed = 0;
+        let totalFailed = 0;
+
+        async function runTests() {
+            // Cache-busting version
+            const v = Date.now();
+
+            // Run diffEdit tests
+            {
+                const out = createOutputWriter('diffEdit-output');
+                console.log = out.log;
+                console.error = out.error;
+
+                try {
+                    const { passed, failed } = await import(`./diffEdit.test.js?v=${v}`);
+                    totalPassed += passed;
+                    totalFailed += failed;
+                } catch (err) {
+                    out.error('Failed to load diffEdit tests:', err.message);
+                    totalFailed++;
+                }
+            }
+
+            // Run extractMarks tests
+            {
+                const out = createOutputWriter('extractMarks-output');
+                console.log = out.log;
+                console.error = out.error;
+
+                try {
+                    const { passed, failed } = await import(`./extractMarks.test.js?v=${v}`);
+                    totalPassed += passed;
+                    totalFailed += failed;
+                } catch (err) {
+                    out.error('Failed to load extractMarks tests:', err.message);
+                    totalFailed++;
+                }
+            }
+
+            // Run offsetTransform tests
+            {
+                const out = createOutputWriter('offsetTransform-output');
+                console.log = out.log;
+                console.error = out.error;
+
+                try {
+                    const { passed, failed } = await import(`./offsetTransform.test.js?v=${v}`);
+                    totalPassed += passed;
+                    totalFailed += failed;
+                } catch (err) {
+                    out.error('Failed to load offsetTransform tests:', err.message);
+                    totalFailed++;
+                }
+            }
+
+            // Run integration tests
+            {
+                const out = createOutputWriter('integration-output');
+                console.log = out.log;
+                console.error = out.error;
+
+                try {
+                    const { passed, failed } = await import(`./integration.test.js?v=${v}`);
+                    totalPassed += passed;
+                    totalFailed += failed;
+                } catch (err) {
+                    out.error('Failed to load integration tests:', err.message);
+                    totalFailed++;
+                }
+            }
+
+            // Restore console
+            console.log = originalLog;
+            console.error = originalError;
+
+            // Update summary
+            const summary = document.getElementById('summary');
+            summary.innerHTML = `<strong>Total: ${totalPassed} passed, ${totalFailed} failed</strong>`;
+            summary.className = totalFailed > 0 ? 'summary fail' : 'summary pass';
+            document.title = totalFailed > 0 ? `FAIL (${totalFailed})` : `PASS (${totalPassed})`;
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

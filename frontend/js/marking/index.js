@@ -1,26 +1,18 @@
 /**
  * Marking Orchestration
- * Smart marking triggers based on sentence stability and timing.
- *
- * Rules:
- * - Only mark if at least 2 sentences (1 stable sentence)
- * - Only mark if content changed since last mark
- * - Only mark if at least 4 seconds since last mark
- * - Mark immediately if sentence count changed
- * - Mark after 10 seconds if content changed but sentence count stable
+ * Triggers marking when user is idle and content ends with punctuation.
  */
 
 import { markDocument } from '../api/mark.js';
 import { extractHtmlFromDocumentReference } from '../utils/documentReference.js';
-import { detectSentences, initSentenceDetector, getStableSentences } from './sentenceDetector.js';
+import { createEditTracker } from './editTracker.js';
+import { transformAndValidateMarks } from './offsetTransform.js';
+import { extractMarksFromHTML, validateMarksAgainstText } from './extractMarks.js';
 
 let editorAPI = null;
 let questionnaire = null; // Store questionnaire for linkId mapping
 let lastMarkedContent = ''; // Track content at last mark
-let lastMarkedEndPosition = 0; // Track end position of content that was actually sent to backend
-let lastSentenceCount = 0; // Track sentence count at last mark
 let lastMarkTime = 0; // Track when we last marked
-let lastContentChangeTime = 0; // Track when content last changed
 let lastCheckedContent = ''; // Track content at last check (for idle detection)
 let lastTypingTime = 0; // Track when user last typed
 let isMarking = false;
@@ -28,10 +20,10 @@ let markInterval = null;
 let spinnerEl = null;
 let markingEnabled = true; // Whether live marking is enabled
 let onMarkingStatusChange = null; // Callback for marking status changes
+let editTracker = null; // Tracks edits during backend processing
 
 const CHECK_INTERVAL_MS = 1000; // Check every 1 second
 const MIN_MARK_INTERVAL_MS = 4000; // At least 4 seconds between marks
-const STABLE_CONTENT_MARK_MS = 10000; // Mark after 10 seconds if content stable
 const IDLE_MARK_MS = 2000; // Mark after 2 seconds idle if content changed
 
 // Store question text for tooltips (linkId -> question text)
@@ -56,8 +48,8 @@ export async function initMarking(editor, q = null, callbacks = {}) {
   questionnaire = q;
   onMarkingStatusChange = callbacks.onStatusChange || null;
 
-  // Initialize sentence detector (WASM module)
-  await initSentenceDetector();
+  // Create edit tracker for concurrent edit handling
+  editTracker = createEditTracker(editor.editor);
 
   // Create spinner element
   createSpinner();
@@ -68,7 +60,7 @@ export async function initMarking(editor, q = null, callbacks = {}) {
   // Start polling interval (checks every 1 second, marks based on rules)
   markInterval = setInterval(checkAndMark, CHECK_INTERVAL_MS);
 
-  console.log('Marking system initialized (smart triggers)');
+  console.log('Marking system initialized (smart triggers with edit tracking)');
   if (questionnaire) {
     console.log(`Questionnaire loaded with ${questionnaire.item?.length || 0} items`);
   }
@@ -438,84 +430,39 @@ function checkAndMark() {
     lastCheckedContent = currentContent;
   }
 
-  // Rule 2: Check if content changed since last MARK
-  // Content is considered "changed" if:
-  // - The text is different from lastMarkedContent
-  // - OR there's unmarked content beyond lastMarkedEndPosition
-  const textChanged = currentContent !== lastMarkedContent;
-  const hasUnmarkedContent = currentContent.length > lastMarkedEndPosition;
-  const contentChanged = textChanged || hasUnmarkedContent;
-
-  // Track when content last changed (for 10s timeout)
-  if (contentChanged) {
-    lastContentChangeTime = now;
-  }
+  // Check if content changed since last mark
+  const contentChanged = currentContent !== lastMarkedContent;
 
   // No content or no change since last mark, nothing to do
   if (!currentContent.trim() || !contentChanged) {
     return;
   }
 
-  // Detect sentences
-  const sentences = detectSentences(currentContent);
-  const sentenceCount = sentences.length;
-
-  // Rule 3: At least 4 seconds since last mark
+  // At least 4 seconds since last mark
   const timeSinceLastMark = now - lastMarkTime;
   if (timeSinceLastMark < MIN_MARK_INTERVAL_MS) {
     return; // Too soon
   }
 
-  // Rule 4: Sentence count changed - mark immediately (after min interval)
-  const sentenceCountChanged = sentenceCount !== lastSentenceCount && sentenceCount >= 2;
-
-  // Rule 5: 10 seconds since last mark and content changed - include last sentence (user done typing)
+  // User idle for 2 seconds and content changed
   const timeSinceLastTyping = now - lastTypingTime;
-  const longTimeout = timeSinceLastMark >= STABLE_CONTENT_MARK_MS && contentChanged && timeSinceLastTyping >= STABLE_CONTENT_MARK_MS;
-
-  // Rule 6: User idle for 2 seconds and content changed since last mark
-  const idleTimeout = timeSinceLastTyping >= IDLE_MARK_MS && contentChanged && sentenceCount >= 2;
-
-  // Decide whether to mark
-  const shouldMark = sentenceCountChanged || longTimeout || idleTimeout;
-
-
-  if (!shouldMark) {
-    return;
+  if (timeSinceLastTyping < IDLE_MARK_MS) {
+    return; // Still typing
   }
 
-  // Get stable sentences
-  // If user has been idle for 10+ seconds, include ALL sentences (user is done typing)
-  // Otherwise, exclude the last sentence (user might still be typing it)
-  const includeLastSentence = timeSinceLastTyping >= STABLE_CONTENT_MARK_MS;
-  const stableSentences = getStableSentences(currentContent, includeLastSentence);
-  if (stableSentences.length === 0) {
-    return; // No stable content to mark
-  }
-
-  // Calculate end position of stable content
-  const lastStableSentence = stableSentences[stableSentences.length - 1];
-  const stableEndPosition = lastStableSentence.end;
-
-  // When including all sentences, use full content length to prevent re-marking
-  // (sentence end position might not match content length due to trailing whitespace)
-  const markedEndPosition = includeLastSentence ? currentContent.length : stableEndPosition;
-
-  console.log(
-    `Marking triggered: sentences=${sentenceCount} (was ${lastSentenceCount}), ` +
-      `stable=${stableSentences.length}, stableEnd=${stableEndPosition}, includeAll=${includeLastSentence}`
-  );
-
-  // Update tracking
-  lastSentenceCount = sentenceCount;
-
-  // Get HTML, strip existing marks, and truncate to stable content only
+  // Get HTML and strip existing marks
   const rawHtml = editorAPI.getHtmlContent();
   const cleanHtml = stripMarksFromHtml(rawHtml);
-  const stableHtml = truncateHtmlToTextLength(cleanHtml, stableEndPosition);
 
-  console.log(`[Mark] Sending stable HTML (${stableEndPosition} chars of text)`);
-  triggerMarking(stableHtml, markedEndPosition);
+  // Work directly with HTML - truncate to complete paragraphs ending with punctuation
+  const stableHtml = truncateHtmlToStableParagraphs(cleanHtml);
+
+  if (!stableHtml) {
+    return; // No complete paragraphs yet
+  }
+
+  console.log(`[Mark] Sending stable HTML`);
+  triggerMarking(stableHtml);
 }
 
 /**
@@ -533,52 +480,51 @@ function stripMarksFromHtml(html) {
 }
 
 /**
- * Truncate HTML to only include content up to a certain text character position
- * This ensures we only send stable/complete sentences to the backend
+ * Truncate HTML to only include complete paragraphs ending with punctuation.
+ * Works entirely with HTML structure - no text content position mixing.
+ *
  * @param {string} html - HTML content
- * @param {number} textLength - Maximum text character position to include
- * @returns {string} Truncated HTML with proper closing tags
+ * @returns {string|null} HTML with only stable paragraphs, or null if none
  */
-function truncateHtmlToTextLength(html, textLength) {
+function truncateHtmlToStableParagraphs(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const body = doc.body;
 
-  let currentTextPos = 0;
-  let truncateNode = null;
-  let truncateOffset = 0;
+  // Get all paragraph elements
+  const paragraphs = Array.from(body.querySelectorAll('p'));
 
-  // Walk through all text nodes to find where to truncate
-  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
-
-  while (walker.nextNode()) {
-    const textNode = walker.currentNode;
-    const nodeText = textNode.textContent || '';
-    const nodeLength = nodeText.length;
-
-    if (currentTextPos + nodeLength >= textLength) {
-      // This node contains the truncation point
-      truncateNode = textNode;
-      truncateOffset = textLength - currentTextPos;
-      break;
-    }
-
-    currentTextPos += nodeLength;
+  if (paragraphs.length === 0) {
+    return null;
   }
 
-  if (truncateNode) {
-    // Truncate the text node
-    truncateNode.textContent = truncateNode.textContent.slice(0, truncateOffset);
+  // Check if last paragraph ends with punctuation
+  const lastParagraph = paragraphs[paragraphs.length - 1];
+  const lastText = (lastParagraph.textContent || '').trim();
+  const endsWithPunctuation = /[.!?]$/.test(lastText);
 
-    // Remove all siblings after truncation point and their parent's siblings
-    let node = truncateNode;
-    while (node && node !== body) {
-      // Remove all next siblings
-      while (node.nextSibling) {
-        node.nextSibling.remove();
-      }
-      node = node.parentNode;
+  if (endsWithPunctuation) {
+    // All content is stable, send everything
+    return body.innerHTML;
+  }
+
+  // Find the last paragraph that ends with punctuation
+  let lastStableIndex = -1;
+  for (let i = paragraphs.length - 2; i >= 0; i--) {
+    const text = (paragraphs[i].textContent || '').trim();
+    if (/[.!?]$/.test(text)) {
+      lastStableIndex = i;
+      break;
     }
+  }
+
+  if (lastStableIndex === -1) {
+    return null; // No complete sentences yet
+  }
+
+  // Remove all paragraphs after the last stable one
+  for (let i = paragraphs.length - 1; i > lastStableIndex; i--) {
+    paragraphs[i].remove();
   }
 
   return body.innerHTML;
@@ -588,86 +534,134 @@ function truncateHtmlToTextLength(html, textLength) {
  * Trigger the marking process
  * Sends HTML to backend AI marker, receives marked HTML, applies marks to editor.
  *
- * IMPORTANT: The backend is slow (can take seconds), so the user may edit during that time.
- * We use text-based matching to apply marks from old content to potentially changed content.
+ * Uses offset-based marking with edit tracking to handle concurrent user edits:
+ * 1. Start tracking edits before backend call
+ * 2. Backend returns marked HTML with marks at specific positions
+ * 3. Transform mark positions through accumulated edits
+ * 4. Apply marks at transformed positions (skip if text changed)
  */
-async function triggerMarking(html, markedEndPosition = null) {
+async function triggerMarking(html) {
   isMarking = true;
   setSpinnerVisible(true);
   if (onMarkingStatusChange) onMarkingStatusChange(true);
 
-  console.log('Sending content to backend for AI marking...');
+  // Start tracking edits while backend processes
+  editTracker.startTracking();
+  console.log('Sending content to backend for AI marking (tracking edits)...');
 
   try {
     // Call the real backend API
     const response = await markDocument(html, questionnaire);
 
+    // Get accumulated edits during backend processing
+    const edits = editTracker.getEdits();
+    console.log(`[Mark] ${edits.length} edits occurred during backend processing`);
+
     // Extract marked HTML from response
     const markedHtml = extractMarkedHtmlFromResponse(response);
     if (!markedHtml) {
       console.warn('No marked HTML in response');
+      editTracker.reset();
       setSpinnerVisible(false);
       isMarking = false;
       return;
     }
 
-    // Parse marks from the marked HTML
-    const marks = parseMarksFromHtml(markedHtml);
-    console.log(`Backend returned ${marks.length} marks`);
+    // Extract marks from the marked HTML using the new extraction module
+    // This produces offsets that match Lexical's text coordinate system
+    const { marks: extractedMarks, plainText: htmlPlainText } = extractMarksFromHTML(markedHtml);
+
+    // Deduplicate marks (same linkId + start + end = duplicate)
+    const seen = new Set();
+    let marks = extractedMarks.filter((m) => {
+      const key = `${m.linkId}|${m.start}|${m.end}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    console.log(`Backend returned ${marks.length} marks with offsets (after dedup)`);
+
+    // Get current text for validation
+    const currentText = editorAPI.getTextContent();
+
+    // Sanity check: validate that extracted offsets match the HTML plain text
+    // This catches any bugs in our offset calculation
+    const sanityValidated = validateMarksAgainstText(marks, htmlPlainText);
+    const sanityFailed = sanityValidated.filter((m) => !m.valid);
+    if (sanityFailed.length > 0) {
+      console.error(`[Mark] ${sanityFailed.length} marks failed sanity check (offset mismatch with HTML):`,
+        sanityFailed.map((m) => `${m.linkId}: "${m.text.substring(0, 20)}..." at ${m.start}-${m.end}`));
+    }
+
+    // Transform and validate marks through accumulated edits
+    const transformedMarks = transformAndValidateMarks(marks, edits, currentText);
+    const validMarks = transformedMarks.filter((m) => m.valid);
+    const invalidMarks = transformedMarks.filter((m) => !m.valid);
+
+    if (invalidMarks.length > 0) {
+      console.warn(`[Mark] ${invalidMarks.length} marks invalidated by edits:`,
+        invalidMarks.map((m) => `${m.linkId}: "${m.text.substring(0, 20)}..."`));
+    }
 
     // Clear existing color styles
     clearMarkColorStyles();
 
-    // Prepare marks for application
-    const marksToApply = marks.map((mark) => {
-      // Store question text for tooltip (look up from questionnaire)
+    // Prepare marks for application with question text
+    const marksToApply = validMarks.map((mark) => {
       const questionText = findQuestionText(mark.linkId) || mark.linkId;
       window._markQuestionText[mark.linkId] = questionText;
 
       return {
-        text: mark.text,
-        markId: mark.linkId,
-        color: MARK_COLOR,
+        ...mark,
         questionText: questionText,
       };
     });
 
-    // Clear all existing marks and apply fresh ones atomically (preserves cursor position)
+    // Apply marks by offset position (handles duplicate text correctly)
     if (marksToApply.length > 0) {
-      const appliedMarks = editorAPI.replaceAllMarksAtomically(
-        marksToApply.map(({ text, markId }) => ({ text, markId }))
-      );
+      const appliedMarks = editorAPI.replaceAllMarksByOffset(marksToApply);
 
       // Apply colors for successfully applied marks
       for (const applied of appliedMarks) {
-        const markInfo = marksToApply.find((m) => m.markId === applied.markId);
+        const markInfo = marksToApply.find((m) => m.linkId === applied.linkId);
         if (markInfo) {
           console.log(
-            `%c MARKED [${markInfo.markId}]: "${markInfo.text.substring(0, 40)}..."`,
-            `background: ${markInfo.color}; padding: 2px 4px;`
+            `%c MARKED [${markInfo.linkId}]: "${markInfo.text.substring(0, 40)}..."`,
+            `background: ${MARK_COLOR}; padding: 2px 4px;`
           );
 
           // Store color mapping
           if (!window._markColors) window._markColors = {};
-          window._markColors[markInfo.markId] = markInfo.color;
+          window._markColors[markInfo.linkId] = MARK_COLOR;
 
           // Apply color via CSS
-          applyMarkColor(markInfo.markId, markInfo.color);
+          applyMarkColor(markInfo.linkId, MARK_COLOR);
         }
       }
 
       // Apply data attributes to DOM elements after Lexical renders
-      applyMarkAttributesToDOM(appliedMarks, marksToApply);
+      // appliedMarks has {start, end, linkId}, marksToApply has full info including text
+      const appliedMarksForDOM = appliedMarks.map((m) => {
+        const fullMark = marksToApply.find((mark) => mark.linkId === m.linkId);
+        return {
+          text: fullMark?.text || '',
+          linkId: m.linkId,
+        };
+      });
+      applyMarkAttributesToDOM(appliedMarksForDOM, marksToApply);
 
-      console.log(`Applied ${appliedMarks.length} marks from backend`);
+      console.log(`Applied ${appliedMarks.length}/${marks.length} marks`);
     }
   } catch (error) {
     console.error('Marking failed:', error);
   }
 
+  // Reset edit tracker for next cycle
+  editTracker.reset();
+
   // Update tracking state
   lastMarkedContent = editorAPI.getTextContent();
-  lastMarkedEndPosition = markedEndPosition || lastMarkedContent.length;
   lastMarkTime = Date.now();
 
   setSpinnerVisible(false);
@@ -704,47 +698,6 @@ function extractMarkedHtmlFromResponse(response) {
   // Fallback: use extractHtmlFromDocumentReference for first HTML content
   return extractHtmlFromDocumentReference(response);
 }
-
-/**
- * Parse marks from marked HTML
- * Extracts text content and linkId from <mark data-location="..."> tags
- * Only extracts marks ending in ".answer" (actual answers, not container groups)
- */
-function parseMarksFromHtml(html) {
-  const marks = [];
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-
-  // Find all mark elements with data-location
-  const markElements = doc.querySelectorAll('mark[data-location]');
-
-  for (const el of markElements) {
-    const linkId = el.getAttribute('data-location');
-
-    // Only include .answer marks (skip container group marks)
-    if (!linkId.endsWith('.answer')) {
-      continue;
-    }
-
-    // Get the full text content (including nested marks)
-    const text = el.textContent || '';
-    if (text.trim()) {
-      marks.push({
-        linkId: linkId,
-        text: text.trim(),
-      });
-    }
-  }
-
-  // Deduplicate by linkId (keep first occurrence)
-  const seen = new Set();
-  return marks.filter((mark) => {
-    if (seen.has(mark.linkId)) return false;
-    seen.add(mark.linkId);
-    return true;
-  });
-}
-
 
 /**
  * Find question text from questionnaire by linkId
@@ -842,42 +795,56 @@ function applyMarkColor(linkId, color) {
  * Since Lexical's MarkNode doesn't expose IDs in DOM by default,
  * we add them manually after marks are applied.
  *
- * Matches marks by text content (not index) to handle overlapping marks correctly.
+ * Matches marks by offset position to correctly handle elements with identical text.
  *
- * @param {Array} appliedMarks - Marks that were successfully applied
+ * @param {Array} appliedMarks - Marks that were successfully applied (with start/end offsets)
  * @param {Array} markInfos - Full mark info including questionText
  */
 function applyMarkAttributesToDOM(appliedMarks, markInfos) {
   // Use setTimeout to let Lexical finish DOM updates
   setTimeout(() => {
     const markElements = document.querySelectorAll('.editor-mark');
+    const editorEl = document.getElementById('lexical-editor');
+    if (!editorEl) return;
 
     console.log(`[DOM] Found ${markElements.length} mark elements, ${markInfos.length} mark infos`);
-    console.log(`[DOM] Mark infos:`, markInfos.map(m => ({ text: m.text.substring(0, 30), markId: m.markId })));
 
-    // Match marks by text content instead of index
-    for (const markEl of markElements) {
+    // Calculate offset for each mark element by walking the editor DOM
+    const elementOffsets = calculateMarkElementOffsets(editorEl, markElements);
+
+    for (let i = 0; i < markElements.length; i++) {
+      const markEl = markElements[i];
+      const elOffset = elementOffsets.get(markEl);
       const elText = markEl.textContent.trim();
 
-      // Find all marks whose text matches this element's text
-      // Use exact match first, then fall back to contains match
-      let matchingMarks = markInfos.filter((m) => m.text.trim() === elText);
-
-      // If no exact match, try contains match (for nested marks)
-      if (matchingMarks.length === 0) {
-        matchingMarks = markInfos.filter((m) => {
-          const markText = m.text.trim();
-          return elText.includes(markText) || markText.includes(elText);
-        });
-      }
-
-      if (matchingMarks.length === 0) {
-        console.warn(`[DOM] No matching marks for element text: "${elText.substring(0, 30)}..."`);
+      if (elOffset === undefined) {
+        console.warn(`[DOM] Could not calculate offset for element: "${elText.substring(0, 30)}..."`);
         continue;
       }
 
+      // Find marks that match this element's offset range
+      // Allow some tolerance for whitespace differences
+      const matchingMarks = markInfos.filter((m) => {
+        // Check if offsets overlap (with small tolerance)
+        const tolerance = 2;
+        return Math.abs(m.start - elOffset.start) <= tolerance &&
+               Math.abs(m.end - elOffset.end) <= tolerance;
+      });
+
+      if (matchingMarks.length === 0) {
+        // Fallback: try text match but only for this specific position
+        const textMatchMarks = markInfos.filter((m) => m.text.trim() === elText);
+        if (textMatchMarks.length === 1) {
+          // Only use text match if there's exactly one match (unambiguous)
+          matchingMarks.push(textMatchMarks[0]);
+        } else {
+          console.warn(`[DOM] No matching marks for element at offset ${elOffset.start}-${elOffset.end}: "${elText.substring(0, 30)}..."`);
+          continue;
+        }
+      }
+
       // Collect all mark IDs and question texts for this element
-      const markIds = matchingMarks.map((m) => m.markId);
+      const markIds = matchingMarks.map((m) => m.linkId);
       const questionTexts = matchingMarks.map((m) => m.questionText).filter(Boolean);
 
       // Set ALL matching mark IDs (space-separated for CSS selector compatibility)
@@ -892,9 +859,59 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
         markEl.removeAttribute('title');
       }
 
-      console.log(`[DOM] Element "${elText.substring(0, 20)}..." -> ${markIds.length} IDs: [${markIds.join(', ')}], ${questionTexts.length} questions`);
+      console.log(`[DOM] Element "${elText.substring(0, 20)}..." at ${elOffset.start}-${elOffset.end} -> ${markIds.length} IDs: [${markIds.join(', ')}], ${questionTexts.length} questions`);
     }
   }, 50); // Small delay to ensure Lexical DOM is ready
+}
+
+/**
+ * Calculate text offsets for mark elements in the editor DOM.
+ * Walks the DOM tree and tracks character positions.
+ *
+ * @param {HTMLElement} editorEl - The editor container element
+ * @param {NodeList} markElements - Mark elements to calculate offsets for
+ * @returns {Map<Element, {start: number, end: number}>} Map of element to offset range
+ */
+function calculateMarkElementOffsets(editorEl, markElements) {
+  const offsets = new Map();
+  const markSet = new Set(markElements);
+  let currentOffset = 0;
+
+  function walkNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      currentOffset += text.length;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node;
+
+      // If this is a mark element we're tracking, record its start offset
+      const isTrackedMark = markSet.has(el);
+      const startOffset = currentOffset;
+
+      // Process children
+      for (const child of el.childNodes) {
+        walkNode(child);
+      }
+
+      // If this was a tracked mark, record its offset range
+      if (isTrackedMark) {
+        offsets.set(el, { start: startOffset, end: currentOffset });
+      }
+
+      // Add double newline after block elements to match Lexical's $getRoot().getTextContent()
+      // Lexical adds \n\n between consecutive paragraphs
+      if (el.tagName === 'P' || el.tagName === 'DIV') {
+        currentOffset += 2;
+      }
+      // BR tags add a single newline
+      if (el.tagName === 'BR') {
+        currentOffset += 1;
+      }
+    }
+  }
+
+  walkNode(editorEl);
+  return offsets;
 }
 
 /**
@@ -912,10 +929,7 @@ export function stopMarking() {
  */
 export function reset() {
   lastMarkedContent = '';
-  lastMarkedEndPosition = 0;
-  lastSentenceCount = 0;
   lastMarkTime = 0;
-  lastContentChangeTime = 0;
   lastCheckedContent = '';
   lastTypingTime = 0;
   setSpinnerVisible(false);
@@ -960,27 +974,8 @@ export async function triggerManualMark() {
     return;
   }
 
-  // For manual mark, include ALL sentences (user explicitly wants to mark now)
-  const allSentences = getStableSentences(currentContent, true);
-  if (allSentences.length === 0) {
-    // No sentences detected, mark all content as-is
-    console.log('[Manual Mark] No sentences detected, marking all content');
-    const rawHtml = editorAPI.getHtmlContent();
-    const cleanHtml = stripMarksFromHtml(rawHtml);
-    triggerMarking(cleanHtml, currentContent.length);
-    return;
-  }
-
-  // Calculate end position of all content
-  const lastSentence = allSentences[allSentences.length - 1];
-  const endPosition = lastSentence.end;
-
-  console.log(`[Manual Mark] Marking all ${allSentences.length} sentences`);
-
-  // Get HTML, strip existing marks, and truncate to sentence boundaries
+  console.log('[Manual Mark] Marking all content');
   const rawHtml = editorAPI.getHtmlContent();
   const cleanHtml = stripMarksFromHtml(rawHtml);
-  const stableHtml = truncateHtmlToTextLength(cleanHtml, endPosition);
-
-  triggerMarking(stableHtml, endPosition);
+  triggerMarking(cleanHtml);
 }
