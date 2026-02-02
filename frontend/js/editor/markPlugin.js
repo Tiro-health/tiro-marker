@@ -180,9 +180,9 @@ function $getSelectionOffset() {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n\n BEFORE block elements (except the first one)
+      // Add \n BEFORE block elements (except the first one)
       if (isBlock && !isFirstBlock) {
-        currentOffset += 2;
+        currentOffset += 1;
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -226,9 +226,9 @@ function $setSelectionByOffset(offset) {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n\n BEFORE block elements (except the first one)
+      // Add \n BEFORE block elements (except the first one)
       if (isBlock && !isFirstBlock) {
-        currentOffset += 2;
+        currentOffset += 1;
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -286,9 +286,9 @@ function findTextPosition(root, searchText) {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n\n BEFORE block elements (except the first one)
+      // Add \n BEFORE block elements (except the first one)
       if (isBlock && !isFirstBlock) {
-        fullText += '\n\n';
+        fullText += '\n';
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -365,9 +365,9 @@ function findPositionByOffset(root, startCharOffset, endCharOffset) {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n\n BEFORE block elements (except the first one)
+      // Add \n BEFORE block elements (except the first one)
       if (isBlock && !isFirstBlock) {
-        fullText += '\n\n';
+        fullText += '\n';
       }
       if (isBlock) {
         isFirstBlock = false;
