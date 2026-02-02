@@ -19,7 +19,7 @@ import { registerRichText } from '@lexical/rich-text';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
 import { editorConfig } from './config.js';
-import { applyMark, applyMarksAtomically, replaceAllMarksAtomically, removeMark, getAllMarkIDs, isTextMarked, registerMarkClickHandler } from './markPlugin.js';
+import { applyMark, applyMarksAtomically, replaceAllMarksAtomically, replaceAllMarksByOffset, removeMark, getAllMarkIDs, isTextMarked, registerMarkClickHandler } from './markPlugin.js';
 
 let editorInstance = null;
 
@@ -71,6 +71,7 @@ export function initializeEditor(containerElement, initialContent = '') {
     applyMark: (text, markId) => applyMark(editor, text, markId),
     applyMarksAtomically: (marks) => applyMarksAtomically(editor, marks),
     replaceAllMarksAtomically: (marks) => replaceAllMarksAtomically(editor, marks),
+    replaceAllMarksByOffset: (marks) => replaceAllMarksByOffset(editor, marks),
     removeMark: (markId) => removeMark(editor, markId),
     getAllMarkIDs: () => getAllMarkIDs(editor),
     isTextMarked: (text) => isTextMarked(editor, text),

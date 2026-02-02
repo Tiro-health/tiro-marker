@@ -29,6 +29,7 @@ export async function initSentenceDetector() {
 
 /**
  * Detect sentences in text
+ * Handles newlines as sentence boundaries (important for clinical notes)
  * @param {string} text - Text to analyze
  * @returns {Array<{text: string, start: number, end: number}>} Array of sentences with positions
  */
@@ -43,17 +44,39 @@ export function detectSentences(text) {
   }
 
   try {
-    // sentencex returns array of {text, start_index, end_index}
-    const boundaries = get_sentence_boundaries('en', text);
+    const allSentences = [];
 
-    // Filter out whitespace-only sentences
-    return boundaries
-      .map((b) => ({
-        text: b.text,
-        start: b.start_index,
-        end: b.end_index,
-      }))
-      .filter((s) => s.text.trim().length > 0);
+    // Split text into lines first (newlines are sentence boundaries in clinical notes)
+    // Keep track of position in original text
+    let currentOffset = 0;
+    const lines = text.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.trim()) {
+        // Run sentencex on each line to handle multiple sentences per line
+        const boundaries = get_sentence_boundaries('en', line);
+
+        for (const b of boundaries) {
+          if (b.text.trim()) {
+            allSentences.push({
+              text: b.text,
+              start: currentOffset + b.start_index,
+              end: currentOffset + b.end_index,
+            });
+          }
+        }
+      }
+
+      // Move offset past this line and the newline character
+      currentOffset += line.length;
+      if (i < lines.length - 1) {
+        currentOffset += 1; // Account for the \n
+      }
+    }
+
+    return allSentences;
   } catch (error) {
     console.error('Sentence detection error:', error);
     return [];
