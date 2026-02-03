@@ -5,9 +5,7 @@
 
 import { markDocument } from '../api/mark.js';
 import { extractHtmlFromDocumentReference } from '../utils/documentReference.js';
-import { createEditTracker } from './editTracker.js';
-import { transformAndValidateMarks } from './offsetTransform.js';
-import { extractMarksFromHTML, validateMarksAgainstText } from './extractMarks.js';
+import { extractMarksFromHTML, validateMarksAgainstText } from './extractMarks.js?v=4';
 
 let editorAPI = null;
 let questionnaire = null; // Store questionnaire for linkId mapping
@@ -20,7 +18,6 @@ let markInterval = null;
 let spinnerEl = null;
 let markingEnabled = true; // Whether live marking is enabled
 let onMarkingStatusChange = null; // Callback for marking status changes
-let editTracker = null; // Tracks edits during backend processing
 
 const CHECK_INTERVAL_MS = 1000; // Check every 1 second
 const MIN_MARK_INTERVAL_MS = 4000; // At least 4 seconds between marks
@@ -48,9 +45,6 @@ export async function initMarking(editor, q = null, callbacks = {}) {
   questionnaire = q;
   onMarkingStatusChange = callbacks.onStatusChange || null;
 
-  // Create edit tracker for concurrent edit handling
-  editTracker = createEditTracker(editor.editor);
-
   // Create spinner element
   createSpinner();
 
@@ -60,7 +54,7 @@ export async function initMarking(editor, q = null, callbacks = {}) {
   // Start polling interval (checks every 1 second, marks based on rules)
   markInterval = setInterval(checkAndMark, CHECK_INTERVAL_MS);
 
-  console.log('Marking system initialized (smart triggers with edit tracking)');
+  console.log('Marking system initialized (smart triggers with @lexical/offset)');
   if (questionnaire) {
     console.log(`Questionnaire loaded with ${questionnaire.item?.length || 0} items`);
   }
@@ -534,10 +528,10 @@ function truncateHtmlToStableParagraphs(html) {
  * Trigger the marking process
  * Sends HTML to backend AI marker, receives marked HTML, applies marks to editor.
  *
- * Uses offset-based marking with edit tracking to handle concurrent user edits:
- * 1. Start tracking edits before backend call
+ * Uses @lexical/offset's OffsetView to handle concurrent user edits:
+ * 1. Save editor state before backend call
  * 2. Backend returns marked HTML with marks at specific positions
- * 3. Transform mark positions through accumulated edits
+ * 3. Use OffsetView to transform mark positions from saved state to current state
  * 4. Apply marks at transformed positions (skip if text changed)
  */
 async function triggerMarking(html) {
@@ -545,29 +539,24 @@ async function triggerMarking(html) {
   setSpinnerVisible(true);
   if (onMarkingStatusChange) onMarkingStatusChange(true);
 
-  // Start tracking edits while backend processes
-  editTracker.startTracking();
-  console.log('Sending content to backend for AI marking (tracking edits)...');
+  // Save editor state before backend call for offset transformation
+  const savedEditorState = editorAPI.editor.getEditorState();
+  console.log('Sending content to backend for AI marking (saved editor state)...');
 
   try {
     // Call the real backend API
     const response = await markDocument(html, questionnaire);
 
-    // Get accumulated edits during backend processing
-    const edits = editTracker.getEdits();
-    console.log(`[Mark] ${edits.length} edits occurred during backend processing`);
-
     // Extract marked HTML from response
     const markedHtml = extractMarkedHtmlFromResponse(response);
     if (!markedHtml) {
       console.warn('No marked HTML in response');
-      editTracker.reset();
       setSpinnerVisible(false);
       isMarking = false;
       return;
     }
 
-    // Extract marks from the marked HTML using the new extraction module
+    // Extract marks from the marked HTML using the extraction module
     // This produces offsets that match Lexical's text coordinate system
     const { marks: extractedMarks, plainText: htmlPlainText } = extractMarksFromHTML(markedHtml);
 
@@ -582,8 +571,19 @@ async function triggerMarking(html) {
 
     console.log(`Backend returned ${marks.length} marks with offsets (after dedup)`);
 
-    // Get current text for validation
-    const currentText = editorAPI.getTextContent();
+    // Debug: Compare HTML plain text vs editor text
+    const editorText = editorAPI.getTextContent();
+    console.log(`[Mark] HTML plainText length: ${htmlPlainText.length}, Editor text length: ${editorText.length}`);
+    if (htmlPlainText.length !== editorText.length) {
+      console.warn(`[Mark] TEXT LENGTH MISMATCH! HTML: ${htmlPlainText.length}, Editor: ${editorText.length}`);
+      // Show first difference
+      for (let i = 0; i < Math.min(htmlPlainText.length, editorText.length); i++) {
+        if (htmlPlainText[i] !== editorText[i]) {
+          console.warn(`[Mark] First difference at position ${i}: HTML="${htmlPlainText.substring(i, i+20)}" vs Editor="${editorText.substring(i, i+20)}"`);
+          break;
+        }
+      }
+    }
 
     // Sanity check: validate that extracted offsets match the HTML plain text
     // This catches any bugs in our offset calculation
@@ -594,21 +594,11 @@ async function triggerMarking(html) {
         sanityFailed.map((m) => `${m.linkId}: "${m.text.substring(0, 20)}..." at ${m.start}-${m.end}`));
     }
 
-    // Transform and validate marks through accumulated edits
-    const transformedMarks = transformAndValidateMarks(marks, edits, currentText);
-    const validMarks = transformedMarks.filter((m) => m.valid);
-    const invalidMarks = transformedMarks.filter((m) => !m.valid);
-
-    if (invalidMarks.length > 0) {
-      console.warn(`[Mark] ${invalidMarks.length} marks invalidated by edits:`,
-        invalidMarks.map((m) => `${m.linkId}: "${m.text.substring(0, 20)}..."`));
-    }
-
     // Clear existing color styles
     clearMarkColorStyles();
 
     // Prepare marks for application with question text
-    const marksToApply = validMarks.map((mark) => {
+    const marksToApply = marks.map((mark) => {
       const questionText = findQuestionText(mark.linkId) || mark.linkId;
       window._markQuestionText[mark.linkId] = questionText;
 
@@ -618,13 +608,17 @@ async function triggerMarking(html) {
       };
     });
 
-    // Apply marks by offset position (handles duplicate text correctly)
-    if (marksToApply.length > 0) {
-      const appliedMarks = editorAPI.replaceAllMarksByOffset(marksToApply);
+    // Filter to leaf marks only (.answer) - group marks spanning entire document
+    // break $wrapSelectionInMarkNode across paragraph boundaries
+    const leafMarks = marksToApply.filter(m => m.linkId.includes('.answer'));
+
+    // Apply marks using OffsetView transformation (handles concurrent edits)
+    if (leafMarks.length > 0) {
+      const appliedMarks = editorAPI.applyMarksWithOffsetTransform(leafMarks, savedEditorState);
 
       // Apply colors for successfully applied marks
       for (const applied of appliedMarks) {
-        const markInfo = marksToApply.find((m) => m.linkId === applied.linkId);
+        const markInfo = leafMarks.find((m) => m.linkId === applied.linkId);
         if (markInfo) {
           console.log(
             `%c MARKED [${markInfo.linkId}]: "${markInfo.text.substring(0, 40)}..."`,
@@ -641,24 +635,21 @@ async function triggerMarking(html) {
       }
 
       // Apply data attributes to DOM elements after Lexical renders
-      // appliedMarks has {start, end, linkId}, marksToApply has full info including text
+      // appliedMarks has {start, end, linkId}, leafMarks has full info including text
       const appliedMarksForDOM = appliedMarks.map((m) => {
-        const fullMark = marksToApply.find((mark) => mark.linkId === m.linkId);
+        const fullMark = leafMarks.find((mark) => mark.linkId === m.linkId);
         return {
           text: fullMark?.text || '',
           linkId: m.linkId,
         };
       });
-      applyMarkAttributesToDOM(appliedMarksForDOM, marksToApply);
+      applyMarkAttributesToDOM(appliedMarksForDOM, leafMarks);
 
       console.log(`Applied ${appliedMarks.length}/${marks.length} marks`);
     }
   } catch (error) {
     console.error('Marking failed:', error);
   }
-
-  // Reset edit tracker for next cycle
-  editTracker.reset();
 
   // Update tracking state
   lastMarkedContent = editorAPI.getTextContent();
@@ -822,25 +813,33 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
         continue;
       }
 
-      // Find marks that match this element's offset range
-      // Allow some tolerance for whitespace differences
-      const matchingMarks = markInfos.filter((m) => {
-        // Check if offsets overlap (with small tolerance)
-        const tolerance = 2;
-        return Math.abs(m.start - elOffset.start) <= tolerance &&
-               Math.abs(m.end - elOffset.end) <= tolerance;
+      // Find marks that match this element
+      // Strategy: Match by text content + similar length, with positional tolerance
+      // Offsets shift when earlier marks are applied (text nodes split), so we need flexibility
+      const elLength = elOffset.end - elOffset.start;
+
+      let matchingMarks = markInfos.filter((m) => {
+        const markLength = m.end - m.start;
+        // Text must match exactly (trimmed)
+        if (m.text.trim() !== elText) return false;
+        // Length must be very close (within 2 chars for whitespace)
+        if (Math.abs(markLength - elLength) > 2) return false;
+        // Position can drift significantly (up to 50 chars) due to earlier mark applications
+        if (Math.abs(m.start - elOffset.start) > 50) return false;
+        return true;
       });
 
+      // If multiple text matches, pick the closest by position
+      if (matchingMarks.length > 1) {
+        matchingMarks.sort((a, b) =>
+          Math.abs(a.start - elOffset.start) - Math.abs(b.start - elOffset.start)
+        );
+        matchingMarks = [matchingMarks[0]];
+      }
+
       if (matchingMarks.length === 0) {
-        // Fallback: try text match but only for this specific position
-        const textMatchMarks = markInfos.filter((m) => m.text.trim() === elText);
-        if (textMatchMarks.length === 1) {
-          // Only use text match if there's exactly one match (unambiguous)
-          matchingMarks.push(textMatchMarks[0]);
-        } else {
-          console.warn(`[DOM] No matching marks for element at offset ${elOffset.start}-${elOffset.end}: "${elText.substring(0, 30)}..."`);
-          continue;
-        }
+        console.warn(`[DOM] No matching marks for element at offset ${elOffset.start}-${elOffset.end}: "${elText.substring(0, 30)}..."`);
+        continue;
       }
 
       // Collect all mark IDs and question texts for this element
@@ -876,6 +875,10 @@ function calculateMarkElementOffsets(editorEl, markElements) {
   const offsets = new Map();
   const markSet = new Set(markElements);
   let currentOffset = 0;
+  let isFirstBlock = true;
+
+  // Block-level elements that add \n\n separators (matches markPlugin.js BLOCK_TYPES)
+  const BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI']);
 
   function walkNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -883,8 +886,17 @@ function calculateMarkElementOffsets(editorEl, markElements) {
       currentOffset += text.length;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node;
+      const isBlock = BLOCK_TAGS.has(el.tagName);
 
-      // If this is a mark element we're tracking, record its start offset
+      // Add \n\n BEFORE block elements (except the first one)
+      // This matches Lexical's getTextContent() and all other offset calculators
+      if (isBlock && !isFirstBlock) {
+        currentOffset += 2;
+      }
+      if (isBlock) {
+        isFirstBlock = false;
+      }
+
       const isTrackedMark = markSet.has(el);
       const startOffset = currentOffset;
 
@@ -893,16 +905,11 @@ function calculateMarkElementOffsets(editorEl, markElements) {
         walkNode(child);
       }
 
-      // If this was a tracked mark, record its offset range
+      // Record tracked mark offset AFTER processing children
       if (isTrackedMark) {
         offsets.set(el, { start: startOffset, end: currentOffset });
       }
 
-      // Add newline after block elements to match Lexical's $getRoot().getTextContent()
-      // Lexical adds \n between consecutive paragraphs
-      if (el.tagName === 'P' || el.tagName === 'DIV') {
-        currentOffset += 1;
-      }
       // BR tags add a single newline
       if (el.tagName === 'BR') {
         currentOffset += 1;

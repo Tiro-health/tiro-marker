@@ -19,7 +19,7 @@ import { registerRichText } from '@lexical/rich-text';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
 import { editorConfig } from './config.js';
-import { applyMark, applyMarksAtomically, replaceAllMarksAtomically, replaceAllMarksByOffset, removeMark, getAllMarkIDs, isTextMarked, registerMarkClickHandler } from './markPlugin.js';
+import { applyMark, applyMarksAtomically, replaceAllMarksAtomically, replaceAllMarksByOffset, applyMarksWithOffsetTransform, removeMark, getAllMarkIDs, isTextMarked, registerMarkClickHandler } from './markPlugin.js?v=3';
 
 let editorInstance = null;
 
@@ -72,6 +72,7 @@ export function initializeEditor(containerElement, initialContent = '') {
     applyMarksAtomically: (marks) => applyMarksAtomically(editor, marks),
     replaceAllMarksAtomically: (marks) => replaceAllMarksAtomically(editor, marks),
     replaceAllMarksByOffset: (marks) => replaceAllMarksByOffset(editor, marks),
+    applyMarksWithOffsetTransform: (marks, savedEditorState) => applyMarksWithOffsetTransform(editor, marks, savedEditorState),
     removeMark: (markId) => removeMark(editor, markId),
     getAllMarkIDs: () => getAllMarkIDs(editor),
     isTextMarked: (text) => isTextMarked(editor, text),
@@ -210,10 +211,10 @@ export function getCursorOffset() {
           for (const child of children) {
             if (walkNodes(child)) return true;
           }
-          // Only add newline for block-level elements (paragraphs), not inline elements (marks)
+          // Add \n\n for block-level elements (matches Lexical's getTextContent())
           const nodeType = node.getType();
           if (nodeType === 'paragraph' || nodeType === 'root') {
-            currentOffset += 1;
+            currentOffset += 2;
           }
         }
         return false;
@@ -255,10 +256,10 @@ export function setCursorOffset(offset) {
         for (const child of children) {
           if (findPosition(child)) return true;
         }
-        // Only add newline for block-level elements (paragraphs), not inline elements (marks)
+        // Add \n\n for block-level elements (matches Lexical's getTextContent())
         const nodeType = node.getType();
         if (nodeType === 'paragraph' || nodeType === 'root') {
-          currentOffset += 1;
+          currentOffset += 2;
         }
       }
       return false;

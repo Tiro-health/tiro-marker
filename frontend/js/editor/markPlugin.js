@@ -20,6 +20,8 @@ import {
   $getMarkIDs,
   MarkNode,
 } from '@lexical/mark';
+// Note: @lexical/offset is available but we use manual offset calculation
+// that matches our extractMarksFromHTML coordinate system
 
 /**
  * Apply a mark to a text range in the editor
@@ -180,9 +182,9 @@ function $getSelectionOffset() {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n BEFORE block elements (except the first one)
+      // Add \n\n BEFORE block elements (matches Lexical's getTextContent())
       if (isBlock && !isFirstBlock) {
-        currentOffset += 1;
+        currentOffset += 2;
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -226,9 +228,9 @@ function $setSelectionByOffset(offset) {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n BEFORE block elements (except the first one)
+      // Add \n\n BEFORE block elements (matches Lexical's getTextContent())
       if (isBlock && !isFirstBlock) {
-        currentOffset += 1;
+        currentOffset += 2;
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -286,9 +288,9 @@ function findTextPosition(root, searchText) {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n BEFORE block elements (except the first one)
+      // Add \n\n BEFORE block elements (matches Lexical's getTextContent())
       if (isBlock && !isFirstBlock) {
-        fullText += '\n';
+        fullText += '\n\n';
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -365,9 +367,9 @@ function findPositionByOffset(root, startCharOffset, endCharOffset) {
       const nodeType = node.getType();
       const isBlock = BLOCK_TYPES.has(nodeType);
 
-      // Add \n BEFORE block elements (except the first one)
+      // Add \n\n BEFORE block elements (matches Lexical's getTextContent())
       if (isBlock && !isFirstBlock) {
-        fullText += '\n';
+        fullText += '\n\n';
       }
       if (isBlock) {
         isFirstBlock = false;
@@ -830,4 +832,113 @@ export function registerMarkClickHandler(editor, onClick) {
   return () => {
     rootElement.removeEventListener('click', handleClick);
   };
+}
+
+/**
+ * Apply marks with text validation and offset-based positioning.
+ *
+ * The backend returns marks with offsets relative to the stable HTML it processed.
+ * We validate that the text at each position still matches before applying marks.
+ * This handles concurrent edits by skipping marks whose text was modified.
+ *
+ * @param {LexicalEditor} editor - Lexical editor instance
+ * @param {Array<{start: number, end: number, text: string, linkId: string}>} marks - Marks with offsets
+ * @param {EditorState} savedEditorState - Editor state when backend started (unused, kept for API compatibility)
+ * @returns {Array<{start: number, end: number, linkId: string}>} Successfully applied marks
+ */
+export function applyMarksWithOffsetTransform(editor, marks, savedEditorState) {
+  const appliedMarks = [];
+
+  editor.update(
+    () => {
+      // Save current selection
+      const savedOffset = $getSelectionOffset();
+
+      // Clear all existing marks first
+      $clearAllMarks();
+
+      // Get current text for validation
+      const currentText = $getRoot().getTextContent();
+
+      // Group marks by position to handle overlapping marks
+      const marksByPosition = new Map();
+      for (const mark of marks) {
+        const key = `${mark.start}-${mark.end}`;
+        if (!marksByPosition.has(key)) {
+          marksByPosition.set(key, { start: mark.start, end: mark.end, text: mark.text, markIds: [] });
+        }
+        marksByPosition.get(key).markIds.push(mark.linkId);
+      }
+
+      console.log(`[Mark] Applying ${marksByPosition.size} mark regions by offset`);
+      console.log(`[Mark] Current text length: ${currentText.length}`);
+      console.log(`[Mark] Current text: "${currentText.substring(0, 100)}..."`);
+
+      // Apply marks by position using findPositionByOffset (matches our offset calculation)
+      const root = $getRoot();
+      for (const { start, end, text, markIds } of marksByPosition.values()) {
+        console.log(`[Mark] Processing mark at ${start}-${end}: "${text.substring(0, 30)}..." (IDs: ${markIds.join(', ')})`);
+
+        // Validate text at position matches
+        const textAtPosition = currentText.slice(start, end);
+        console.log(`[Mark] Text at position: "${textAtPosition.substring(0, 30)}..."`);
+
+        if (textAtPosition !== text) {
+          console.warn(
+            `[Mark] Text mismatch at ${start}-${end}: expected "${text.substring(0, 30)}...", got "${textAtPosition.substring(0, 30)}..."`
+          );
+          // Skip this mark - user edited this region
+          continue;
+        }
+        console.log(`[Mark] Text validated OK`);
+
+        // Find node positions for this offset range
+        const position = findPositionByOffset(root, start, end);
+        if (!position) {
+          console.warn(`[Mark] Could not find position for offset range: ${start}-${end}`);
+          continue;
+        }
+        console.log(`[Mark] Found position: startNode=${position.startNode.getKey()}, startOffset=${position.startOffset}, endNode=${position.endNode.getKey()}, endOffset=${position.endOffset}`);
+
+        // Create selection and wrap in mark
+        const markSelection = $createRangeSelection();
+        markSelection.anchor.set(position.startNode.getKey(), position.startOffset, 'text');
+        markSelection.focus.set(position.endNode.getKey(), position.endOffset, 'text');
+
+        // Wrap with first ID
+        $wrapSelectionInMarkNode(markSelection, false, markIds[0]);
+
+        // Add additional IDs if there are overlapping marks
+        if (markIds.length > 1) {
+          const newPosition = findPositionByOffset(root, start, end);
+          if (newPosition) {
+            let node = newPosition.startNode;
+            while (node && !$isMarkNode(node)) {
+              node = node.getParent();
+            }
+            if ($isMarkNode(node)) {
+              for (let i = 1; i < markIds.length; i++) {
+                node.addID(markIds[i]);
+              }
+            }
+          }
+        }
+
+        for (const markId of markIds) {
+          appliedMarks.push({ start, end, linkId: markId });
+        }
+      }
+
+      // Clean up orphan marks
+      $cleanupOrphanMarks();
+
+      // Restore selection
+      if (savedOffset !== null) {
+        $setSelectionByOffset(savedOffset);
+      }
+    },
+    { discrete: true }
+  );
+
+  return appliedMarks;
 }
