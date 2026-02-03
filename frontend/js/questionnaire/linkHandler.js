@@ -199,58 +199,6 @@ function pulseHighlight(element) {
 }
 
 /**
- * Highlight the container of a question (for multi-question highlighting)
- * Uses inline styles for shadow DOM compatibility
- * Finds the grey box container (bg-gray-50) to highlight
- * Highlight stays until clicking elsewhere or blur
- * @param {string} linkId - The linkId to highlight
- */
-function highlightQuestionContainer(linkId) {
-  const result = findQuestionElement(linkId);
-
-  if (result) {
-    const { input } = result;
-
-    // Find the grey box container - walk up to find element with grey background
-    let questionContainer = input.parentElement;
-    while (questionContainer) {
-      const bgColor = window.getComputedStyle(questionContainer).backgroundColor;
-      const hasGreyBg = questionContainer.classList?.contains('bg-gray-50') ||
-                       questionContainer.classList?.contains('bg-gray-100') ||
-                       bgColor.includes('246') || bgColor.includes('243');
-      if (hasGreyBg) break;
-      questionContainer = questionContainer.parentElement;
-    }
-    if (!questionContainer) questionContainer = input.closest('div');
-
-    if (questionContainer) {
-      // Store original styles for restoration
-      const originalBg = questionContainer.style.backgroundColor;
-      const originalTransition = questionContainer.style.transition;
-
-      // Apply highlight
-      questionContainer.style.transition = 'background-color 0.3s ease';
-      questionContainer.style.backgroundColor = HIGHLIGHT_COLOR; // Lighter yellow
-      questionContainer.style.borderRadius = '4px';
-
-      // Track for clearing later
-      highlightedContainers.push({ container: questionContainer, originalBg, originalTransition });
-
-      console.log(`[LinkHandler] Highlighted container for ${linkId}`);
-
-      // Add blur listener to the input to clear highlight when focus leaves
-      const blurHandler = () => {
-        setTimeout(() => {
-          clearHighlightedContainers();
-        }, 100);
-        input.removeEventListener('blur', blurHandler);
-      };
-      input.addEventListener('blur', blurHandler);
-    }
-  }
-}
-
-/**
  * Highlight a mark element temporarily
  * @param {HTMLElement} markElement
  */
@@ -262,23 +210,4 @@ function highlightMark(markElement) {
   setTimeout(() => {
     markElement.classList.remove('mark-active');
   }, 1500);
-}
-
-/**
- * Highlight marks associated with a specific linkId (bidirectional linking)
- * @param {Object} editorAPI - Editor API
- * @param {string} linkId - The linkId to highlight
- */
-export function highlightMarksForQuestion(editorAPI, linkId) {
-  // This can be called from the questionnaire side to highlight marks in the editor
-  const rootElement = editorAPI.editor?.getRootElement();
-  if (!rootElement) return;
-
-  const marks = rootElement.querySelectorAll(`.editor-mark[data-lexical-mark-ids*="${linkId}"]`);
-  marks.forEach((mark) => {
-    mark.classList.add('mark-active');
-    setTimeout(() => {
-      mark.classList.remove('mark-active');
-    }, 2000);
-  });
 }

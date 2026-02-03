@@ -12,6 +12,9 @@ from backend.models.fhir.questionnaire import (
     QuestionnaireItemAnswerOption,
     QuestionnaireItemType,
 )
+from backend.models.fhir.questionnaire_response import (
+    QuestionnaireResponseItemAnswer,
+)
 
 
 class QuestionnaireItemProtocol(Protocol):
@@ -40,3 +43,25 @@ class QuestionnaireItemProtocol(Protocol):
 
     @property
     def item(self) -> Sequence["QuestionnaireItemProtocol"]: ...
+
+
+class QuestionnaireResponseItemProtocol(Protocol):
+    """Essential fields needed from QuestionnaireResponseItem.
+
+    Uses @property to indicate read-only access, enabling covariance.
+    """
+
+    @property
+    def id(self) -> str | None: ...
+
+    @property
+    def linkId(self) -> str: ...
+
+    @property
+    def text(self) -> str | None: ...
+
+    @property
+    def item(self) -> Sequence["QuestionnaireResponseItemProtocol"] | None: ...
+
+    @property
+    def answer(self) -> Sequence[QuestionnaireResponseItemAnswer] | None: ...

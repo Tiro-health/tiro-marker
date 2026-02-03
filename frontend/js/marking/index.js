@@ -922,42 +922,12 @@ function calculateMarkElementOffsets(editorEl, markElements) {
 }
 
 /**
- * Stop the marking system
- */
-export function stopMarking() {
-  if (markInterval) {
-    clearInterval(markInterval);
-    markInterval = null;
-  }
-}
-
-/**
- * Reset the marking system state
- */
-export function reset() {
-  lastMarkedContent = '';
-  lastMarkTime = 0;
-  lastCheckedContent = '';
-  lastTypingTime = 0;
-  setSpinnerVisible(false);
-  isMarking = false;
-}
-
-/**
  * Enable or disable live marking
  * @param {boolean} enabled - Whether live marking should be enabled
  */
 export function setMarkingEnabled(enabled) {
   markingEnabled = enabled;
   console.log(`Live marking ${enabled ? 'enabled' : 'disabled'}`);
-}
-
-/**
- * Check if live marking is enabled
- * @returns {boolean}
- */
-export function isMarkingEnabled() {
-  return markingEnabled;
 }
 
 /**

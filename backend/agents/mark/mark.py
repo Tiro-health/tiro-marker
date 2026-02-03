@@ -19,7 +19,10 @@ from backend.agents.mark.labeling import (
     validate_marking,
 )
 from backend.agents.mark.subagents import process_item
-from backend.agents.protocols import QuestionnaireItemProtocol
+from backend.agents.protocols import (
+    QuestionnaireItemProtocol,
+    QuestionnaireResponseItemProtocol,
+)
 
 
 @dataclass
@@ -39,6 +42,9 @@ class Mark:
 class MarkerState:
     html: str
     marks: list[Mark] = field(default_factory=lambda: [])
+    qr_items: list[QuestionnaireResponseItemProtocol] = field(
+        default_factory=lambda: []
+    )
 
 
 @dataclass
