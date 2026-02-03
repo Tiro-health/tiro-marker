@@ -1,207 +1,146 @@
 /**
- * Extract Marks with Lexical-Compatible Offsets
+ * extractMarks.js — Pure DOM walker for extracting marks from backend HTML.
  *
- * Uses a headless Lexical editor to get the reference text (ensuring correct
- * newline handling for lists, paragraphs, etc.), then walks the DOM to extract
- * mark positions using the same offset rules.
+ * NO temp Lexical editor. NO normalization hacks. NO getLexicalText().
+ *
+ * Walks the backend's marked HTML once, producing:
+ *   - marks[]: { start, end, text, linkId } in Lexical-native offset space
+ *   - plainText: string matching $getRoot().getTextContent()
+ *
+ * Offset rules (matching Lexical's getTextContent()):
+ *   - Between block elements: +2 (\n\n) — except before the first block
+ *   - Text nodes: their textContent.length
+ *   - <br> in empty paragraphs: 0 chars
+ *   - <mark> elements: transparent (just track data-location start/end)
+ *
+ * This is a DROP-IN REPLACEMENT for the previous temp-editor version.
+ * Same exports, same return shapes.
  */
 
-import { createEditor, $getRoot, $isElementNode, $isTextNode } from 'lexical';
-import { $generateNodesFromDOM } from '@lexical/html';
-import { MarkNode } from '@lexical/mark';
-import { ListNode, ListItemNode } from '@lexical/list';
-import { editorConfig } from '../editor/config.js';
-
-/**
- * Block-level elements that add \n separators in Lexical's text output.
- * This matches how Lexical's getTextContent() works.
- */
-const BLOCK_ELEMENTS = new Set([
-  'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-  'BLOCKQUOTE', 'LI', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER',
+// Block-level elements that get \n\n separators (matches markPlugin.js)
+const BLOCK_TAGS = new Set([
+  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI',
 ]);
 
 /**
- * Strip mark tags from HTML while preserving content.
- * Handles nested marks by running replacement until no more marks found.
- * @param {string} html - HTML with mark tags
- * @returns {string} HTML without mark tags
- */
-function stripMarkTags(html) {
-  // Replace <mark ...>content</mark> with just content
-  // Run multiple times to handle nested marks
-  let result = html;
-  let prev;
-  do {
-    prev = result;
-    result = result.replace(/<mark[^>]*>([\s\S]*?)<\/mark>/gi, '$1');
-  } while (result !== prev);
-  return result;
-}
-
-/**
- * Get plain text from HTML using Lexical's exact text generation.
- * This ensures we get the correct newlines for lists, paragraphs, etc.
+ * Extract marks and plain text from backend marked HTML.
  *
- * @param {string} html - HTML content (marks already stripped)
- * @returns {string} Plain text matching Lexical's $getRoot().getTextContent()
- */
-function getLexicalText(html) {
-  // Create editor with list support for proper list handling
-  const tempEditor = createEditor({
-    ...editorConfig,
-    namespace: 'TempTextExtractor',
-    nodes: [MarkNode, ListNode, ListItemNode],
-  });
-
-  let plainText = '';
-
-  tempEditor.update(() => {
-    const dom = new DOMParser().parseFromString(html, 'text/html');
-    const nodes = $generateNodesFromDOM(tempEditor, dom);
-    const root = $getRoot();
-    root.clear();
-    nodes.forEach(node => {
-      if ($isElementNode(node) || $isTextNode(node)) {
-        root.append(node);
-      }
-    });
-  }, { discrete: true });
-
-  tempEditor.getEditorState().read(() => {
-    plainText = $getRoot().getTextContent();
-  });
-
-  // Normalize double newlines to single newlines to match our offset calculation
-  // Lexical's getTextContent() returns \n\n between paragraphs, but our offset
-  // counting uses single \n for consistency with the marking system
-  return plainText.replace(/\n\n+/g, '\n');
-}
-
-/**
- * Walk DOM and extract marks with offsets that match Lexical's text output.
- *
- * @param {string} html - Original HTML with mark tags
- * @returns {{marks: Array, plainText: string}}
+ * @param {string} html - Backend marked HTML with <mark data-location="..."> tags
+ * @returns {{ marks: Array<{start: number, end: number, text: string, linkId: string}>, plainText: string }}
  */
 export function extractMarksFromHTML(html) {
-  // Get the reference text from Lexical (using stripped HTML)
-  const strippedHTML = stripMarkTags(html);
-  const plainText = getLexicalText(strippedHTML);
-
-  // Now walk the original DOM to find marks and calculate offsets
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const body = doc.body;
 
-  if (!body) return { marks: [], plainText };
+  if (!body) return { marks: [], plainText: '' };
 
   const marks = [];
-  let currentOffset = 0;
+  const seen = new Set(); // dedup: "linkId:start:end"
+  let offset = 0;
   let isFirstBlock = true;
-  const markStack = []; // Stack of {linkId, startOffset} for nested marks
+  let plainText = '';
 
-  function walkNode(node) {
+  function walk(node) {
+    // --- Text node: accumulate text and advance offset ---
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent || '';
-      // Skip whitespace-only text nodes between block elements
-      // (HTML formatting whitespace that Lexical ignores)
-      const parent = node.parentNode;
-      if (parent && parent.nodeType === Node.ELEMENT_NODE) {
-        const parentTag = parent.tagName;
-        // If parent is a block container and text is only whitespace, skip it
-        if ((parentTag === 'UL' || parentTag === 'OL' || parentTag === 'BODY' ||
-             parentTag === 'DIV' || parentTag === 'SECTION' || parentTag === 'ARTICLE') &&
-            text.trim() === '') {
-          return; // Skip this whitespace
+      plainText += text;
+      offset += text.length;
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const el = node;
+    const tagName = el.tagName;
+
+    // --- BR: empty paragraph filler — contributes 0 chars ---
+    // Lexical's real editor has no LineBreakNode in empty paragraphs,
+    // so <br> from HTML export should not add to offset.
+    if (tagName === 'BR') return;
+
+    // --- Block separator: \n\n before blocks (except first) ---
+    // This matches Lexical's $getRoot().getTextContent() behavior.
+    // Root containers (BODY, HTML) are NOT blocks.
+    const isBlock = BLOCK_TAGS.has(tagName);
+    if (isBlock) {
+      if (!isFirstBlock) {
+        plainText += '\n\n';
+        offset += 2;
+      }
+      isFirstBlock = false;
+    }
+
+    // --- Mark tracking: record start offset if this is a data-location mark ---
+    const isMark = tagName === 'MARK';
+    const locationId = isMark ? el.getAttribute('data-location') : null;
+    const markStart = locationId ? offset : null;
+
+    // --- Recurse into children ---
+    for (const child of el.childNodes) {
+      walk(child);
+    }
+
+    // --- Mark close: emit mark entry ---
+    if (locationId && markStart !== null) {
+      // Trim leading/trailing whitespace from mark boundaries
+      let trimmedStart = markStart;
+      let trimmedEnd = offset;
+      const rawText = plainText.slice(markStart, offset);
+
+      // Trim leading whitespace
+      const leadingMatch = rawText.match(/^(\s*)/);
+      if (leadingMatch && leadingMatch[1].length > 0) {
+        trimmedStart += leadingMatch[1].length;
+      }
+
+      // Trim trailing whitespace
+      const trailingMatch = rawText.match(/(\s*)$/);
+      if (trailingMatch && trailingMatch[1].length > 0) {
+        trimmedEnd -= trailingMatch[1].length;
+      }
+
+      // Only emit if there's actual content after trimming
+      if (trimmedStart < trimmedEnd) {
+        const key = `${locationId}:${trimmedStart}:${trimmedEnd}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          marks.push({
+            start: trimmedStart,
+            end: trimmedEnd,
+            text: plainText.slice(trimmedStart, trimmedEnd),
+            linkId: locationId,
+          });
         }
-      }
-      currentOffset += text.length;
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node;
-      const tagName = el.tagName;
-
-      // Handle block elements - add \n between them
-      // Note: Must match the backend's offset calculation (single newline)
-      const isBlock = BLOCK_ELEMENTS.has(tagName);
-
-      if (isBlock && !isFirstBlock) {
-        currentOffset += 1; // \n
-      }
-
-      if (isBlock) {
-        isFirstBlock = false;
-      }
-
-      // Check if this is a mark element
-      if (tagName === 'MARK' && el.hasAttribute('data-location')) {
-        const linkId = el.getAttribute('data-location');
-        markStack.push({ linkId, startOffset: currentOffset });
-      }
-
-      // Process children
-      for (const child of el.childNodes) {
-        walkNode(child);
-      }
-
-      // If this was a mark, pop and record
-      if (tagName === 'MARK' && el.hasAttribute('data-location')) {
-        const markInfo = markStack.pop();
-        if (markInfo) {
-          const linkId = markInfo.linkId;
-
-          // Only include .answer marks (skip container group marks)
-          if (linkId.endsWith('.answer')) {
-            // Check if the mark's DOM content is whitespace-only
-            // (Lexical collapses whitespace differently, so skip these)
-            const domText = el.textContent || '';
-            if (domText.trim() !== '') {
-              const rawText = plainText.slice(markInfo.startOffset, currentOffset);
-              const trimmedText = rawText.trim();
-
-              if (trimmedText) {
-                // Adjust offsets to exclude leading/trailing whitespace
-                const leadingWhitespace = rawText.length - rawText.trimStart().length;
-                const trailingWhitespace = rawText.length - rawText.trimEnd().length;
-                const adjustedStart = markInfo.startOffset + leadingWhitespace;
-                const adjustedEnd = currentOffset - trailingWhitespace;
-
-                // Only add if we still have valid range after trimming
-                if (adjustedEnd > adjustedStart) {
-                  marks.push({
-                    linkId,
-                    text: trimmedText,
-                    start: adjustedStart,
-                    end: adjustedEnd,
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Handle BR tags
-      if (tagName === 'BR') {
-        currentOffset += 1; // \n
       }
     }
   }
 
-  walkNode(body);
+  walk(body);
 
   return { marks, plainText };
 }
 
 /**
- * Rebuild plain text from HTML using Lexical's exact text generation.
+ * Rebuild plain text from HTML, matching Lexical's $getRoot().getTextContent().
  *
- * @param {string} html - HTML content (may contain <mark> tags)
- * @returns {string} Plain text matching Lexical's $getRoot().getTextContent()
+ * @param {string} html - HTML string (with or without mark tags)
+ * @returns {string}
  */
 export function rebuildTextFromHTML(html) {
-  const strippedHTML = stripMarkTags(html);
-  return getLexicalText(strippedHTML);
+  return extractMarksFromHTML(html).plainText;
+}
+
+/**
+ * Strip <mark> tags from HTML, preserving inner content.
+ * Kept for backward compatibility.
+ *
+ * @param {string} html - HTML string with <mark> tags
+ * @returns {string} HTML string with <mark> tags removed
+ */
+export function stripMarkTags(html) {
+  return html.replace(/<\/?mark[^>]*>/gi, '');
 }
 
 /**

@@ -3,8 +3,8 @@
  * Main entry point - modular architecture with Lexical editor
  */
 
-import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js';
-import { initMarking, setMarkingEnabled, triggerManualMark } from './marking/index.js';
+import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
+import { initMarking, setMarkingEnabled, triggerManualMark } from './marking/index.js?v=6';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js';
 
