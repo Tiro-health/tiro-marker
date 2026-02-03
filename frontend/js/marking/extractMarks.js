@@ -123,27 +123,6 @@ export function extractMarksFromHTML(html) {
 }
 
 /**
- * Rebuild plain text from HTML, matching Lexical's $getRoot().getTextContent().
- *
- * @param {string} html - HTML string (with or without mark tags)
- * @returns {string}
- */
-export function rebuildTextFromHTML(html) {
-  return extractMarksFromHTML(html).plainText;
-}
-
-/**
- * Strip <mark> tags from HTML, preserving inner content.
- * Kept for backward compatibility.
- *
- * @param {string} html - HTML string with <mark> tags
- * @returns {string} HTML string with <mark> tags removed
- */
-export function stripMarkTags(html) {
-  return html.replace(/<\/?mark[^>]*>/gi, '');
-}
-
-/**
  * Validate that extracted marks match the expected text in Lexical.
  * Returns marks with a `valid` flag.
  *

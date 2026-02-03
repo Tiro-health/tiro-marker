@@ -2,8 +2,17 @@
 
 from pydantic import Field
 
-from backend.models.fhir.primitives import Code, Id, LinkId, Uri, DateTime, Date, Time, Canonical
 from backend.models.fhir.common import Coding, FHIRBaseModel, Reference
+from backend.models.fhir.primitives import (
+    Canonical,
+    Code,
+    Date,
+    DateTime,
+    Id,
+    LinkId,
+    Time,
+    Uri,
+)
 
 
 class QuestionnaireResponseItemAnswer(FHIRBaseModel):
@@ -25,6 +34,7 @@ class QuestionnaireResponseItemAnswer(FHIRBaseModel):
 class QuestionnaireResponseItem(FHIRBaseModel):
     """FHIR QuestionnaireResponse.item element."""
 
+    id: Id | None = None
     linkId: LinkId
     definition: Uri | None = None
     text: str | None = None

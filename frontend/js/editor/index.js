@@ -64,7 +64,6 @@ export function initializeEditor(containerElement, initialContent = '') {
     getHtmlContent: () => getHtmlContent(),
     setHtmlContent: (html) => setHtmlContent(html),
     getTextContent: () => getTextContent(),
-    registerUpdateListener: (callback) => registerUpdateListener(callback),
     getCursorOffset: () => getCursorOffset(),
     setCursorOffset: (offset) => setCursorOffset(offset),
     // Mark functions
@@ -155,27 +154,6 @@ export function getTextContent() {
     text = $getRoot().getTextContent();
   });
   return text;
-}
-
-/**
- * Register an update listener
- * @param {Function} callback - Called on editor updates with { editorState, editor }
- * @returns {Function} Unsubscribe function
- */
-export function registerUpdateListener(callback) {
-  if (!editorInstance) return () => {};
-
-  return editorInstance.registerUpdateListener(({ editorState }) => {
-    callback({ editorState, editor: editorInstance });
-  });
-}
-
-/**
- * Get the editor instance
- * @returns {LexicalEditor|null}
- */
-export function getEditor() {
-  return editorInstance;
 }
 
 /**

@@ -119,19 +119,3 @@ export function setPopulateWorking(working) {
   populateWorking = working;
   updatePopulateUI();
 }
-
-/**
- * Check if marker agent is in live mode
- * @returns {boolean}
- */
-export function isMarkerLive() {
-  return markerLive;
-}
-
-/**
- * Check if populate agent is in live mode
- * @returns {boolean}
- */
-export function isPopulateLive() {
-  return populateLive;
-}
