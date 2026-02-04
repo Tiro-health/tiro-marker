@@ -1,6 +1,6 @@
 /**
  * Agent Controls UI
- * Manages the interactive agent avatars with speech bubbles
+ * Manages action buttons with live toggles for marker and populate agents
  */
 
 // State
@@ -26,9 +26,9 @@ export function initAgentControls(callbacks = {}) {
   onPopulateLiveChange = callbacks.onPopulateLiveChange;
 
   // Get elements
-  const markerAvatar = document.getElementById('marker-avatar');
+  const markerBtn = document.getElementById('marker-avatar');
   const markerToggle = document.getElementById('marker-live-toggle');
-  const populateAvatar = document.getElementById('populate-avatar');
+  const populateBtn = document.getElementById('populate-avatar');
   const populateToggle = document.getElementById('populate-live-toggle');
 
   // Initialize toggles
@@ -39,8 +39,8 @@ export function initAgentControls(callbacks = {}) {
   updateMarkerUI();
   updatePopulateUI();
 
-  // Marker avatar click - trigger marking (only if not live and not working)
-  markerAvatar.addEventListener('click', () => {
+  // Marker button click - trigger marking (only if not live and not working)
+  markerBtn.addEventListener('click', () => {
     if (markerWorking) return;
     if (markerLive) return;
 
@@ -58,8 +58,8 @@ export function initAgentControls(callbacks = {}) {
     }
   });
 
-  // Populate avatar click - trigger populate (only if not live and not working)
-  populateAvatar.addEventListener('click', () => {
+  // Populate button click - trigger populate (only if not live and not working)
+  populateBtn.addEventListener('click', () => {
     if (populateWorking) return;
     if (populateLive) return;
 
@@ -85,10 +85,18 @@ export function initAgentControls(callbacks = {}) {
  */
 function updateMarkerUI() {
   const container = document.getElementById('marker-agent');
+  const label = document.getElementById('marker-action-label');
 
-  // Update container classes
   container.classList.toggle('working', markerWorking);
-  container.classList.toggle('live', markerLive); // Keep live class even when working
+  container.classList.toggle('live', markerLive);
+
+  if (markerWorking) {
+    label.textContent = 'Marking\u2026';
+  } else if (markerLive) {
+    label.textContent = 'Marker';
+  } else {
+    label.textContent = 'Mark Now';
+  }
 }
 
 /**
@@ -96,10 +104,18 @@ function updateMarkerUI() {
  */
 function updatePopulateUI() {
   const container = document.getElementById('populate-agent');
+  const label = document.getElementById('populate-action-label');
 
-  // Update container classes
   container.classList.toggle('working', populateWorking);
-  container.classList.toggle('live', populateLive); // Keep live class even when working
+  container.classList.toggle('live', populateLive);
+
+  if (populateWorking) {
+    label.textContent = 'Populating\u2026';
+  } else if (populateLive) {
+    label.textContent = 'Populate';
+  } else {
+    label.textContent = 'Populate';
+  }
 }
 
 /**
