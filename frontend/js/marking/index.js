@@ -28,9 +28,50 @@ const IDLE_MARK_MS = 2000; // Mark after 2 seconds idle if content changed
 // Store question text for tooltips (linkId -> question text)
 window._markQuestionText = {};
 
-// Single color for all marks
-const MARK_COLOR = 'hsl(45, 90%, 80%)'; // Yellow highlight for marks
-const HIGHLIGHT_COLOR = 'hsl(45, 85%, 92%)'; // Lighter yellow for form field highlights
+// Mark color categories for dark theme
+const MARK_CATEGORIES = {
+  patient: ['patient-name', 'admission-datetime', 'patient-conscious'],
+  diagnosis: ['chief-complaint', 'diagnosis', 'triage-level', 'pain-present', 'pain-severity'],
+  misc: [], // fallback for everything else
+};
+
+/**
+ * Determine the mark category for a given linkId
+ * @param {string} linkId - The full linkId path
+ * @returns {'patient'|'diagnosis'|'misc'}
+ */
+function getMarkCategory(linkId) {
+  // Extract the last segment of the linkId path
+  const lastDotIndex = linkId.lastIndexOf('.');
+  const segment = lastDotIndex >= 0 ? linkId.slice(lastDotIndex + 1) : linkId;
+  const base = segment.replace(/\.answer$/, '');
+
+  for (const [category, ids] of Object.entries(MARK_CATEGORIES)) {
+    if (category === 'misc') continue;
+    if (ids.some((id) => base === id || base.startsWith(id))) {
+      return category;
+    }
+  }
+  return 'misc';
+}
+
+/**
+ * Get CSS color for a mark category
+ * @param {'patient'|'diagnosis'|'misc'} category
+ * @returns {string} CSS color value
+ */
+function getMarkColor(category) {
+  switch (category) {
+    case 'patient': return 'var(--mark-cyan)';
+    case 'diagnosis': return 'var(--mark-rose)';
+    case 'misc':
+    default: return 'var(--mark-amber)';
+  }
+}
+
+// Fallback single color (for dynamic CSS rules)
+const MARK_COLOR = 'var(--mark-amber)';
+const HIGHLIGHT_COLOR = 'var(--highlight-color)';
 
 // Track currently highlighted elements for clearing on next click
 let highlightedContainers = [];
@@ -64,22 +105,10 @@ export async function initMarking(editor, q = null, callbacks = {}) {
 
 /**
  * Create the loading spinner element
+ * Disabled — the agent action button now shows working state inline
  */
 function createSpinner() {
-  spinnerEl = document.createElement('div');
-  spinnerEl.id = 'marking-spinner';
-  spinnerEl.innerHTML = `
-    <div class="spinner-overlay">
-      <div class="spinner"></div>
-      <span>Marking...</span>
-    </div>
-  `;
-  spinnerEl.style.display = 'none';
-
-  const editorContainer = document.getElementById('editor-container');
-  if (editorContainer) {
-    editorContainer.parentNode.insertBefore(spinnerEl, editorContainer.nextSibling);
-  }
+  // No-op: spinner replaced by agent button working state
 }
 
 /**
@@ -778,9 +807,12 @@ function clearMarkColorStyles() {
 }
 
 /**
- * Apply color to a mark via dynamic CSS
+ * Apply color to a mark via dynamic CSS (category-based)
  */
 function applyMarkColor(linkId, color) {
+  const category = getMarkCategory(linkId);
+  const categoryColor = getMarkColor(category);
+
   // Add CSS rule for this specific mark
   let styleEl = document.getElementById('mark-colors-style');
   if (!styleEl) {
@@ -791,7 +823,7 @@ function applyMarkColor(linkId, color) {
 
   styleEl.textContent += `
     .editor-mark[data-lexical-mark-ids*="${linkId}"] {
-      background-color: ${color};
+      background-color: ${categoryColor};
     }
   `;
 }
@@ -864,6 +896,11 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
 
       // Set ALL matching mark IDs (space-separated for CSS selector compatibility)
       markEl.setAttribute('data-lexical-mark-ids', markIds.join(' '));
+
+      // Set mark category for CSS-based coloring
+      const primaryCategory = getMarkCategory(markIds[0] || '');
+      markEl.setAttribute('data-mark-category', primaryCategory);
+
       // Set frontend locations for form field linking (space-separated)
       if (frontendLocations.length > 0) {
         markEl.setAttribute('data-frontend-locations', frontendLocations.join(' '));

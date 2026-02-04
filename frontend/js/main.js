@@ -4,9 +4,9 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
-import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete } from './marking/index.js?v=8';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete } from './marking/index.js?v=9';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
-import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js';
+import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js?v=2';
 import { populateFromMarkedHtml } from './api/populate.js';
 
 // DOM Elements
@@ -23,15 +23,212 @@ let editorAPI = null;
 let populateLive = false;
 
 /**
+ * Start the live clock in the header
+ */
+function startClock() {
+  const clockEl = document.getElementById('header-clock');
+  const dateEl = document.getElementById('header-date');
+  if (!clockEl || !dateEl) return;
+
+  function update() {
+    const now = new Date();
+    clockEl.textContent = now.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    dateEl.textContent = now.toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  update();
+  setInterval(update, 1000);
+}
+
+/**
+ * Show a toast notification
+ * @param {string} message - Toast message
+ * @param {'info'|'warning'|'success'|'error'} type - Toast type
+ * @param {number} duration - Duration in ms (default 3000)
+ */
+function showToast(message, type = 'info', duration = 3000) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    toast.addEventListener('animationend', () => toast.remove());
+  }, duration);
+}
+
+/**
+ * Apply dark theme to tiro-form-filler shadow DOM
+ * The component has built-in :root.dark variables but they can't be activated
+ * from outside shadow DOM. We inject an adopted stylesheet with :host targeting.
+ */
+function applyFormDarkTheme(formEl) {
+  if (!formEl) return;
+
+  // The component may not have its shadow root immediately — observe until ready
+  function inject() {
+    if (!formEl.shadowRoot) return false;
+
+    const darkSheet = new CSSStyleSheet();
+    darkSheet.replaceSync(`
+      :host {
+        /* Tailwind slate palette matching mockup exactly */
+        --background: 222.2 47.4% 11.2%;   /* slate-900 #0f172a */
+        --foreground: 210 40% 98%;          /* slate-50 */
+        --card: 217.2 32.6% 17.5%;          /* slate-800 — block cards */
+        --card-foreground: 210 40% 98%;
+        --popover: 217.2 32.6% 17.5%;      /* slate-800 #1e293b */
+        --popover-foreground: 210 40% 98%;
+        --primary: 187 92% 53%;             /* cyan-400 */
+        --primary-foreground: 222.2 47.4% 11.2%;
+        --secondary: 217.2 32.6% 17.5%;    /* slate-800 */
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217.2 32.6% 17.5%;
+        --muted-foreground: 215 20.2% 65.1%; /* slate-400 */
+        --accent: 217.2 32.6% 17.5%;
+        --accent-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 215 19.3% 26.5%;         /* ~slate-700 #334155 */
+        --input: 215 19.3% 26.5%;
+        --ring: 187 92% 53%;
+
+        /* Tailwind slate grays */
+        --gray-50: #1e293b;   /* slate-800 — form row bg */
+        --gray-100: #1e293b;
+        --gray-200: #334155;  /* slate-700 — borders */
+        --gray-300: #475569;  /* slate-600 */
+        --gray-400: #94a3b8;  /* slate-400 — muted text */
+        --gray-500: #64748b;  /* slate-500 */
+        --gray-600: #cbd5e1;  /* slate-300 */
+        --gray-700: #e2e8f0;  /* slate-200 */
+        --gray-800: #f1f5f9;  /* slate-100 */
+        --gray-900: #f8fafc;  /* slate-50 */
+
+        --dropdown-bg: #1e293b;
+        --dropdown-text: #f1f5f9;
+        --dropdown-text-muted: #94a3b8;
+        --dropdown-border: #334155;
+        --dropdown-border-hover: #475569;
+        --dropdown-hover: #334155;
+        --dropdown-disabled-bg: #334155;
+        --dropdown-disabled-text: #64748b;
+        --dropdown-disabled-border: #334155;
+        --dropdown-multi-value-bg: #334155;
+        --dropdown-multi-value-hover: #475569;
+        --dropdown-focus-ring: #22d3ee;
+        --dropdown-indicator-color: #f1f5f9;
+
+        color-scheme: dark;
+        font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+
+      /* Block group cards — rounded, lighter grey, padded */
+      .border-0[data-state] {
+        background: rgba(30, 41, 59, 0.5) !important;
+        border: none !important;
+        border-radius: 16px !important;
+        padding: 0.75rem !important;
+        margin-bottom: 1rem !important;
+      }
+
+      /* Remove outer block border */
+      [data-block-id] {
+        border: none !important;
+      }
+
+      /* Remove border-bottom under accordion title */
+      .border-b-gray-100,
+      .dark\\:border-b-gray-700 {
+        border-bottom-color: transparent !important;
+      }
+
+      /* Field rows inside blocks — rounder, more padding, no border */
+      .rounded-md.bg-gray-50,
+      .dark\\:bg-gray-800 {
+        border-radius: 12px !important;
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+      }
+
+      /* Accordion region content — add spacing */
+      [role="region"] > .pt-0 {
+        padding: 0.5rem 0.25rem !important;
+      }
+
+      /* Populated field indicator — neon cyan */
+      .populated-indicator-blue-500 {
+        border-right-color: #22d3ee !important;
+      }
+
+      /* Chip/button selected state — neon cyan */
+      .border-blue-500 {
+        border-color: #22d3ee !important;
+      }
+      .bg-blue-50 {
+        background-color: rgba(34, 211, 238, 0.15) !important;
+      }
+      .text-blue-500 {
+        color: #22d3ee !important;
+      }
+      .hover\\:border-blue-600:hover,
+      .hover\\:border-blue:hover {
+        border-color: #06b6d4 !important;
+      }
+      .focus-visible\\:ring-blue-500:focus-visible {
+        --tw-ring-color: #22d3ee !important;
+      }
+      .dark\\:focus-visible\\:ring-blue-300:focus-visible {
+        --tw-ring-color: #22d3ee !important;
+      }
+    `);
+
+    formEl.shadowRoot.adoptedStyleSheets = [
+      ...formEl.shadowRoot.adoptedStyleSheets,
+      darkSheet,
+    ];
+    console.log('Form dark theme applied');
+    return true;
+  }
+
+  // Try immediately, then observe if not ready
+  if (!inject()) {
+    const observer = new MutationObserver(() => {
+      if (inject()) observer.disconnect();
+    });
+    observer.observe(formEl, { childList: true, subtree: true });
+  }
+}
+
+/**
  * Initialize the application
  */
 async function init() {
+  // Start header clock
+  startClock();
+
   // Get DOM elements
   clinicalForm = document.getElementById('clinical-form');
   submitFormBtn = document.getElementById('submit-form-btn');
   populateBtn = document.getElementById('populate-btn');
   formResponseEl = document.getElementById('form-response');
   editorContainer = document.getElementById('editor-container');
+
+  // Apply dark theme to tiro-form-filler shadow DOM
+  applyFormDarkTheme(clinicalForm);
 
   // Initialize agent controls (marker and populate agent UI)
   initAgentControls({
@@ -106,10 +303,36 @@ async function init() {
  * Set up event listeners
  */
 function setupEventListeners() {
-  // Note: Populate is now handled by agent controls (populate-manual-btn)
-
   if (submitFormBtn && clinicalForm) {
     submitFormBtn.addEventListener('click', handleFormSubmit);
+  }
+
+  // Mic button
+  const micBtn = document.getElementById('mic-btn');
+  if (micBtn) {
+    micBtn.addEventListener('click', () => {
+      showToast('Voice input coming soon', 'warning');
+    });
+  }
+
+  // Discard button
+  const discardBtn = document.getElementById('discard-btn');
+  if (discardBtn) {
+    discardBtn.addEventListener('click', () => {
+      if (confirm('Discard all changes? This cannot be undone.')) {
+        window.location.reload();
+      }
+    });
+  }
+
+  // Complete Assessment button
+  const completeBtn = document.getElementById('complete-btn');
+  if (completeBtn) {
+    completeBtn.addEventListener('click', () => {
+      if (submitFormBtn) {
+        submitFormBtn.click();
+      }
+    });
   }
 
   if (clinicalForm) {
@@ -180,13 +403,13 @@ async function handlePopulate() {
   const markResult = getLastMarkResult();
   if (!markResult) {
     console.warn('No marking result available - run mark first');
-    alert('Please mark the document first before populating.');
+    showToast('Please mark the document first before populating.', 'warning');
     return;
   }
 
   const questionnaire = getQuestionnaire();
   if (!questionnaire) {
-    alert('No questionnaire found.');
+    showToast('No questionnaire found.', 'error');
     return;
   }
 
@@ -197,7 +420,7 @@ async function handlePopulate() {
     await handlePopulateWithResult(markResult, questionnaire);
   } catch (error) {
     console.error('Populate error:', error);
-    alert(`Failed to populate: ${error.message}`);
+    showToast(`Failed to populate: ${error.message}`, 'error');
   } finally {
     setPopulateWorking(false);
   }
@@ -260,4 +483,5 @@ document.addEventListener('DOMContentLoaded', init);
 window.tiroMarker = {
   getEditorHTML: () => editorAPI?.getHtmlContent(),
   getEditorText: () => editorAPI?.getTextContent(),
+  showToast,
 };
