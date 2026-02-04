@@ -45,11 +45,22 @@ def test_mark_endpoint(
     assert response.status_code == 200
 
     result = response.json()
-    assert result["resourceType"] == "DocumentReference"
+
+    # Response now contains both document_reference and blueprint
+    doc_ref = result["document_reference"]
+    blueprint = result["blueprint"]
+
+    assert doc_ref["resourceType"] == "DocumentReference"
+    assert blueprint["resourceType"] == "QuestionnaireResponse"
 
     # Extract and save the marked HTML
-    marked_html = _extract_marked_html(result)
+    marked_html = _extract_marked_html(doc_ref)
     assert marked_html is not None, "No marked HTML content found in response"
 
     output_file = output_dir / f"{test_case['_file']}_marked.html"
     output_file.write_text(marked_html)
+
+    # Save the blueprint too for inspection
+    import json
+    blueprint_file = output_dir / f"{test_case['_file']}_blueprint.json"
+    blueprint_file.write_text(json.dumps(blueprint, indent=2))

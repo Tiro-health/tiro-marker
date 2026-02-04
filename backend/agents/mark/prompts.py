@@ -144,7 +144,7 @@ def format_default_prompt(
         siblings_list = "\n".join(f"    - {s}" for s in siblings)
         siblings_section = f"""
   <other_questions>
-    These questions are also being asked. Do NOT label content if it more specifically answers one of these:
+    These questions are also being asked. Overlapping labels are OK - the same text can be labeled by multiple questions. Only skip if another question is MORE SPECIFIC for the EXACT SAME information:
 {siblings_list}
   </other_questions>"""
 

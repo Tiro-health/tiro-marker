@@ -18,6 +18,8 @@ let markInterval = null;
 let spinnerEl = null;
 let markingEnabled = true; // Whether live marking is enabled
 let onMarkingStatusChange = null; // Callback for marking status changes
+let onMarkComplete = null; // Callback for when marking completes (used for live populate)
+let lastMarkResult = null; // Store last mark result { documentReference, blueprint }
 
 const CHECK_INTERVAL_MS = 1000; // Check every 1 second
 const MIN_MARK_INTERVAL_MS = 4000; // At least 4 seconds between marks
@@ -547,8 +549,15 @@ async function triggerMarking(html) {
     // Call the real backend API
     const response = await markDocument(html, questionnaire);
 
-    // Extract marked HTML from response
-    const markedHtml = extractMarkedHtmlFromResponse(response);
+    // Store mark result for populate to use (document_reference + blueprint)
+    // The response contains { document_reference, blueprint } from the /mark endpoint
+    lastMarkResult = {
+      documentReference: response.document_reference,
+      blueprint: response.blueprint,
+    };
+
+    // Extract marked HTML from document_reference (not the full response)
+    const markedHtml = extractMarkedHtmlFromResponse(response.document_reference);
     if (!markedHtml) {
       console.warn('No marked HTML in response');
       setSpinnerVisible(false);
@@ -608,9 +617,9 @@ async function triggerMarking(html) {
       };
     });
 
-    // Filter to leaf marks only (.answer) - group marks spanning entire document
-    // break $wrapSelectionInMarkNode across paragraph boundaries
-    const leafMarks = marksToApply.filter(m => m.linkId.includes('.answer'));
+    // Backend only returns marks for leaf items (non-group/display), so use all marks
+    // The old .answer filter is obsolete - backend now uses UUID-based IDs
+    const leafMarks = marksToApply;
 
     // Apply marks using OffsetView transformation (handles concurrent edits)
     if (leafMarks.length > 0) {
@@ -658,6 +667,11 @@ async function triggerMarking(html) {
   setSpinnerVisible(false);
   isMarking = false;
   if (onMarkingStatusChange) onMarkingStatusChange(false);
+
+  // Trigger mark complete callback (for live populate)
+  if (onMarkComplete && lastMarkResult) {
+    onMarkComplete(lastMarkResult);
+  }
 
   console.log('Marking complete');
 }
@@ -928,6 +942,23 @@ function calculateMarkElementOffsets(editorEl, markElements) {
 export function setMarkingEnabled(enabled) {
   markingEnabled = enabled;
   console.log(`Live marking ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Get the last mark result (for populate to use)
+ * @returns {{documentReference: Object, blueprint: Object}|null}
+ */
+export function getLastMarkResult() {
+  return lastMarkResult;
+}
+
+/**
+ * Set callback for when marking completes
+ * Used by main.js to trigger live populate after each mark
+ * @param {Function} callback - Called with markResult { documentReference, blueprint }
+ */
+export function setOnMarkComplete(callback) {
+  onMarkComplete = callback;
 }
 
 /**

@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.models.fhir.questionnaire_response import (
     QuestionnaireResponse,
@@ -12,28 +12,21 @@ from backend.models.fhir.questionnaire_response import (
 class MarkedItem(BaseModel):
     """Item identified by marker. Tracks position and parent answer."""
 
+    item_id: str  # UUID-based ID, matches data-location in HTML and QR item.id
     linkId: str
     text: str | None = None
     index: int | None = None  # For repeated items: 0, 1, 2...
+    location_string: str  # Full path for parent grouping
 
     # Parent context
     parent_linkId: str | None = None
     parent_index: int | None = None
-    parent_answer: QuestionnaireResponseItemAnswer | None = (
-        None  # ← KEY: contains coding for repeat items
-    )
+    parent_id: str | None = None  # Parent's item_id for grouping
 
     # For THIS item if it's a repeat coding: the answer that defines this instance
     instance_answer: QuestionnaireResponseItemAnswer | None = (
         None  # ← coding goes in blueprint
     )
-
-    @property
-    def blueprint_id(self) -> str:
-        """Unique ID for addressing this item instance."""
-        if self.index is not None:
-            return f"{self.linkId}[{self.index}]"
-        return self.linkId
 
 
 def build_questionnaire_response_blueprint(
@@ -46,29 +39,18 @@ def build_questionnaire_response_blueprint(
     - Other items: answer EMPTY (populate fills)
     - Children nested under answer[].item (not item[].item) for non-groups
     """
-
-    # Index items by their blueprint_id
-    items_by_id = {m.blueprint_id: m for m in marked_items}
-
-    # Group children by (parent_linkId, parent_index)
+    # Group children by parent_id
     children_by_parent: dict[str | None, list[MarkedItem]] = {}
     for item in marked_items:
-        if item.parent_linkId:
-            parent_key = (
-                f"{item.parent_linkId}[{item.parent_index}]"
-                if item.parent_index is not None
-                else item.parent_linkId
-            )
-        else:
-            parent_key = None
-        children_by_parent.setdefault(parent_key, []).append(item)
+        children_by_parent.setdefault(item.parent_id, []).append(item)
 
     def build_item(marked: MarkedItem) -> QuestionnaireResponseItem:
-        item_id = marked.blueprint_id
+        # Use the item_id generated during marking (matches data-location in HTML)
+        item_id = marked.item_id
         children = children_by_parent.get(item_id, [])
 
         # Build children first
-        child_qr_items = [build_item(c) for c in children] if children else None
+        child_qr_items = [build_item(c) for c in children] if children else []
 
         # Determine answer structure
         if marked.instance_answer is not None:
@@ -84,7 +66,7 @@ def build_questionnaire_response_blueprint(
                 linkId=marked.linkId,
                 text=marked.text,
                 answer=[answer],
-                item=None,  # Children are under answer, not here
+                item=[],  # Children are under answer, not here
             )
         else:
             # Non-repeat or group: answer empty, children under item

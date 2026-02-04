@@ -1,0 +1,40 @@
+name: Medical abbreviations and shorthand - Tests extraction from notes with common clinical abbreviations
+description: Medical abbreviations and shorthand - Tests extraction from notes with common clinical abbreviations
+questionnaire:
+  - linkId: chief-complaint
+    type: string
+    text: Chief complaint
+  - linkId: duration-days
+    type: integer
+    text: Duration of symptoms
+    unit: days
+  - linkId: heart-rate
+    type: integer
+    text: Heart rate
+    unit: bpm
+  - linkId: blood-pressure-systolic
+    type: integer
+    text: Systolic blood pressure
+    unit: mmHg
+  - linkId: blood-pressure-diastolic
+    type: integer
+    text: Diastolic blood pressure
+    unit: mmHg
+  - linkId: temperature
+    type: decimal
+    text: Temperature
+    unit: "°C"
+  - linkId: oxygen-saturation
+    type: integer
+    text: Oxygen saturation
+    unit: "%"
+  - linkId: respiratory-rate
+    type: integer
+    text: Respiratory rate
+    unit: /min
+  - linkId: diagnosis
+    type: string
+    text: Working diagnosis
+  - linkId: treatment-plan
+    type: string
+    text: Treatment plan

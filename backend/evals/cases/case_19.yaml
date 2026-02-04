@@ -1,0 +1,39 @@
+name: Negation and negative findings - Tests extraction of negative/absent findings and boolean values
+description: Negation and negative findings - Tests extraction of negative/absent findings and boolean values
+questionnaire:
+  - linkId: chief-complaint
+    type: string
+    text: Chief complaint
+  - linkId: fever-present
+    type: boolean
+    text: Does patient have fever?
+  - linkId: chest-pain
+    type: boolean
+    text: Chest pain present?
+  - linkId: shortness-of-breath
+    type: boolean
+    text: Shortness of breath?
+  - linkId: nausea-vomiting
+    type: boolean
+    text: Nausea or vomiting?
+  - linkId: cardiac-history
+    type: boolean
+    text: History of cardiac disease?
+  - linkId: smoking-status
+    type: coding
+    text: Smoking status
+    answerOptions:
+      - Current smoker
+      - Former smoker
+      - Never smoked
+  - linkId: alcohol-use
+    type: coding
+    text: Alcohol use
+    answerOptions:
+      - None
+      - Occasional
+      - Regular
+      - Heavy
+  - linkId: blood-pressure
+    type: string
+    text: Blood pressure
