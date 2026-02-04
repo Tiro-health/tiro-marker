@@ -1,6 +1,7 @@
 """API routes."""
 
 from fastapi import APIRouter, Body, HTTPException
+from pydantic import BaseModel
 
 from backend.agents.mark import mark_html
 from backend.agents.populate import populate_from_html
@@ -16,6 +17,13 @@ from backend.models.fhir.document_reference import (
     replace_marked_content,
 )
 from backend.models.fhir.primitives import make_canonical
+
+
+class MarkResponse(BaseModel):
+    """Response from mark endpoint containing marked document and QR blueprint."""
+
+    document_reference: DocumentReference
+    blueprint: QuestionnaireResponse
 
 
 router = APIRouter(prefix="/api")
@@ -38,7 +46,7 @@ async def health() -> dict[str, str]:
 async def mark(
     document_reference: DocumentReference = Body(...),
     questionnaire: Questionnaire = Body(...),
-) -> DocumentReference:
+) -> MarkResponse:
     """Mark document with relevant content for questionnaire items."""
     canonical = get_questionnaire_canonical(questionnaire)
 
@@ -47,26 +55,41 @@ async def mark(
     if html is None:
         raise HTTPException(status_code=400, detail="No HTML content found")
 
-    # Mark the HTML
-    marked_html = await mark_html(html, questionnaire.item)
+    # Mark the HTML and build blueprint
+    result = await mark_html(html, questionnaire.item)
 
     # Create marked content entry and replace any existing for this questionnaire
-    marked_content = create_marked_content(marked_html, canonical)
+    marked_content = create_marked_content(result.marked_html, canonical)
     new_contents = replace_marked_content(
         document_reference.content,
         canonical,
         marked_content,
     )
 
-    return document_reference.model_copy(update={"content": new_contents})
+    updated_doc_ref = document_reference.model_copy(update={"content": new_contents})
+
+    return MarkResponse(
+        document_reference=updated_doc_ref,
+        blueprint=result.blueprint,
+    )
 
 
 @router.post("/populate")
 async def populate(
     questionnaire: Questionnaire = Body(...),
     document_reference: DocumentReference = Body(...),
+    blueprint: QuestionnaireResponse = Body(...),
 ) -> QuestionnaireResponse:
-    """Populate questionnaire from marked document."""
+    """Populate questionnaire from marked document.
+
+    Args:
+        questionnaire: The questionnaire definition with item types and options
+        document_reference: Document containing marked HTML
+        blueprint: QR blueprint from /mark endpoint with item IDs
+
+    Returns:
+        QuestionnaireResponse with answers populated from marked content
+    """
     canonical = get_questionnaire_canonical(questionnaire)
 
     # Find marked content for this questionnaire
@@ -77,5 +100,5 @@ async def populate(
             detail=f"No marked content found for questionnaire: {canonical}",
         )
 
-    # Populate from marked HTML
-    return await populate_from_html(marked_html, questionnaire.item)
+    # Populate from marked HTML using blueprint structure
+    return await populate_from_html(marked_html, blueprint, questionnaire.item)

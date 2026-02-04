@@ -4,11 +4,10 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
-import { initMarking, setMarkingEnabled, triggerManualMark } from './marking/index.js?v=6';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete } from './marking/index.js?v=7';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import { populateFromMarkedHtml } from './api/populate.js';
 
 // DOM Elements
 let clinicalForm = null;
@@ -19,6 +18,9 @@ let editorContainer = null;
 
 // Editor instance
 let editorAPI = null;
+
+// Live populate mode state
+let populateLive = false;
 
 /**
  * Initialize the application
@@ -47,9 +49,24 @@ async function init() {
     },
     onPopulateLiveChange: (isLive) => {
       // Live toggle changed for populate
-      // For now, populate doesn't have live mode
+      populateLive = isLive;
       console.log(`Populate live mode: ${isLive}`);
     },
+  });
+
+  // Wire up live populate: auto-populate after each mark completes
+  setOnMarkComplete(async (markResult) => {
+    if (!populateLive) return; // Only if live mode enabled
+
+    console.log('Mark complete, triggering live populate...');
+    setPopulateWorking(true);
+    try {
+      await handlePopulateWithResult(markResult);
+    } catch (error) {
+      console.error('Live populate failed:', error);
+    } finally {
+      setPopulateWorking(false);
+    }
   });
 
   // Initialize Lexical editor
@@ -139,31 +156,6 @@ function getQuestionnaire() {
 }
 
 /**
- * Call backend to populate questionnaire from clinical notes
- * @param {string} clinicalNotes
- * @param {Object} questionnaire
- * @returns {Promise<Object>}
- */
-async function populateFromBackend(clinicalNotes, questionnaire) {
-  const response = await fetch(`${API_BASE_URL}/populate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      clinical_notes: clinicalNotes,
-      questionnaire: questionnaire,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Server error: ${response.status}`);
-  }
-
-  return response.json();
-}
-
-/**
  * Mock populate response for testing without backend
  * @param {Object} questionnaire
  * @returns {Object}
@@ -182,17 +174,17 @@ function getMockPopulateResponse(questionnaire) {
 }
 
 /**
- * Handle populate button click
+ * Handle populate button click (manual trigger)
  */
 async function handlePopulate() {
-  const clinicalNotes = getClinicalNotes();
-  const questionnaire = getQuestionnaire();
-
-  if (!clinicalNotes) {
-    alert('Please enter clinical notes first.');
+  const markResult = getLastMarkResult();
+  if (!markResult) {
+    console.warn('No marking result available - run mark first');
+    alert('Please mark the document first before populating.');
     return;
   }
 
+  const questionnaire = getQuestionnaire();
   if (!questionnaire) {
     alert('No questionnaire found.');
     return;
@@ -202,28 +194,51 @@ async function handlePopulate() {
   setPopulateWorking(true);
 
   try {
-    let questionnaireResponse;
-
-    try {
-      questionnaireResponse = await populateFromBackend(clinicalNotes, questionnaire);
-    } catch (backendError) {
-      console.warn('Backend unavailable, using mock response:', backendError);
-      questionnaireResponse = getMockPopulateResponse(questionnaire);
-    }
-
-    if (clinicalForm) {
-      if (typeof clinicalForm.setResponse === 'function') {
-        await clinicalForm.setResponse(questionnaireResponse);
-      } else {
-        clinicalForm.response = questionnaireResponse;
-      }
-      console.log('Form populated:', questionnaireResponse);
-    }
+    await handlePopulateWithResult(markResult, questionnaire);
   } catch (error) {
     console.error('Populate error:', error);
     alert(`Failed to populate: ${error.message}`);
   } finally {
     setPopulateWorking(false);
+  }
+}
+
+/**
+ * Handle populate with a specific mark result
+ * Used by both manual populate and live populate
+ * @param {Object} markResult - { documentReference, blueprint } from marking
+ * @param {Object} questionnaire - FHIR Questionnaire (optional, will fetch if not provided)
+ */
+async function handlePopulateWithResult(markResult, questionnaire = null) {
+  if (!questionnaire) {
+    questionnaire = getQuestionnaire();
+  }
+
+  if (!questionnaire) {
+    console.warn('No questionnaire available for populate');
+    return;
+  }
+
+  let questionnaireResponse;
+
+  try {
+    questionnaireResponse = await populateFromMarkedHtml(
+      questionnaire,
+      markResult.documentReference,
+      markResult.blueprint
+    );
+  } catch (backendError) {
+    console.warn('Backend unavailable, using mock response:', backendError);
+    questionnaireResponse = getMockPopulateResponse(questionnaire);
+  }
+
+  if (clinicalForm) {
+    if (typeof clinicalForm.setResponse === 'function') {
+      await clinicalForm.setResponse(questionnaireResponse);
+    } else {
+      clinicalForm.response = questionnaireResponse;
+    }
+    console.log('Form populated:', questionnaireResponse);
   }
 }
 

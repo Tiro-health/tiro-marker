@@ -18,11 +18,13 @@ from backend.agents.mark.labeling import (
     strip_marks,
     validate_marking,
 )
-from backend.agents.mark.subagents import process_item
-from backend.agents.protocols import (
-    QuestionnaireItemProtocol,
-    QuestionnaireResponseItemProtocol,
+from backend.agents.mark.qr_bluprint import (
+    MarkedItem,
+    build_questionnaire_response_blueprint,
 )
+from backend.agents.mark.subagents import ParentContext, process_item
+from backend.agents.protocols import QuestionnaireItemProtocol
+from backend.models.fhir.questionnaire_response import QuestionnaireResponse
 
 
 @dataclass
@@ -39,12 +41,18 @@ class Mark:
 
 
 @dataclass
+class MarkingResult:
+    """Result of marking HTML with questionnaire items."""
+
+    marked_html: str
+    blueprint: QuestionnaireResponse
+
+
+@dataclass
 class MarkerState:
     html: str
-    marks: list[Mark] = field(default_factory=lambda: [])
-    qr_items: list[QuestionnaireResponseItemProtocol] = field(
-        default_factory=lambda: []
-    )
+    marks: list[Mark] = field(default_factory=list)
+    marked_items: list[MarkedItem] = field(default_factory=list)
 
 
 @dataclass
@@ -52,9 +60,8 @@ class MarkInput:
     html: str
     q_item: QuestionnaireItemProtocol
     location_string: str
-    sibling_questions: list[str] = field(
-        default_factory=list
-    )  # Other questions at same level
+    sibling_questions: list[str] = field(default_factory=list)
+    parent_ctx: ParentContext | None = None
 
 
 @dataclass
@@ -66,7 +73,7 @@ class MarkRequest:
 async def mark_html(
     html: str,
     q_items: Sequence[QuestionnaireItemProtocol],
-) -> str:
+) -> MarkingResult:
     """Mark HTML with questionnaire item spans.
 
     Args:
@@ -74,7 +81,7 @@ async def mark_html(
         q_items: Questionnaire items to identify spans for.
 
     Returns:
-        HTML with <mark data-location="..."> tags around relevant spans.
+        MarkingResult with marked HTML and QR blueprint.
     """
     # First, label the HTML for AI selection
     labeled_html, _label_count = label_html(html)
@@ -88,8 +95,13 @@ async def mark_html(
     return result
 
 
-def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
-    g = GraphBuilder(state_type=MarkerState, input_type=MarkRequest, output_type=str)
+def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult]:
+    g = GraphBuilder(
+        state_type=MarkerState,
+        input_type=MarkRequest,
+        output_type=MarkingResult,
+        name="marking_graph",
+    )
 
     @g.step
     async def fan_out(
@@ -119,18 +131,25 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
         location = ctx.inputs.location_string
         html = ctx.inputs.html
         siblings = ctx.inputs.sibling_questions
+        parent_ctx = ctx.inputs.parent_ctx
+
+        # Log item being processed (trace level for filtering)
+        logfire.trace("→ {text}", text=item.text or item.linkId, linkId=item.linkId)
 
         # Process using extensible strategy system (now async with html)
-        marks, children = await process_item(item, location, html, siblings=siblings)
+        extended_marks, children = await process_item(
+            item, location, html, siblings=siblings, parent_ctx=parent_ctx
+        )
 
-        # Add marks to state
-        for mark in marks:
+        # Add marks and marked items to state
+        for ext_mark in extended_marks:
             ctx.state.marks.append(
                 Mark(
-                    location_string=mark.location_string,
-                    labels=mark.labels,
+                    location_string=ext_mark.mark.location_string,
+                    labels=ext_mark.mark.labels,
                 )
             )
+            ctx.state.marked_items.append(ext_mark.marked_item)
 
         # Collect sibling texts for children at this level
         child_items = [c.q_item for c in children]
@@ -143,13 +162,19 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
             for c in children
         }
 
-        # Return children as MarkInputs with scoped HTML and sibling context
+        # Return children as MarkInputs with scoped HTML, sibling context, and parent context
         return [
             MarkInput(
                 html=child.html,  # Use scoped HTML from child
                 q_item=child.q_item,
                 location_string=child.location_string,
                 sibling_questions=child_siblings.get(child.q_item.linkId, []),
+                parent_ctx=ParentContext(
+                    linkId=child.parent_linkId,
+                    index=child.parent_index,
+                    item_id=child.parent_id,
+                    instance_answer=child.parent_instance_answer,
+                ),
             )
             for child in children
         ]
@@ -159,7 +184,7 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
     @g.step
     async def apply_marks(
         ctx: StepContext[MarkerState, None, None],
-    ) -> str:
+    ) -> MarkingResult:
         # Apply marks to labeled HTML and clean up
         marked_html = apply_marks_to_html(ctx.state.html, ctx.state.marks)
 
@@ -175,6 +200,7 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
             original_length=len(original_text),
             marked_length=len(marked_text),
             marks_count=len(ctx.state.marks),
+            marked_items_count=len(ctx.state.marked_items),
             marked_html=marked_html,
         )
 
@@ -191,7 +217,10 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, str]:
                 f"Marked (first 200): {marked_text[:200]!r}"
             )
 
-        return marked_html
+        # Build QR blueprint from marked items
+        blueprint = build_questionnaire_response_blueprint(ctx.state.marked_items)
+
+        return MarkingResult(marked_html=marked_html, blueprint=blueprint)
 
     g.add(
         g.edge_from(g.start_node).to(fan_out),
