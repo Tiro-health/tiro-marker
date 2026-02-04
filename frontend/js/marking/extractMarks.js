@@ -25,8 +25,8 @@ const BLOCK_TAGS = new Set([
 /**
  * Extract marks and plain text from backend marked HTML.
  *
- * @param {string} html - Backend marked HTML with <mark data-location="..."> tags
- * @returns {{ marks: Array<{start: number, end: number, text: string, linkId: string}>, plainText: string }}
+ * @param {string} html - Backend marked HTML with <mark data-location="..." data-frontend-location="..."> tags
+ * @returns {{ marks: Array<{start: number, end: number, text: string, linkId: string, frontendLocation: string}>, plainText: string }}
  */
 export function extractMarksFromHTML(html) {
   const parser = new DOMParser();
@@ -75,6 +75,7 @@ export function extractMarksFromHTML(html) {
     // --- Mark tracking: record start offset if this is a data-location mark ---
     const isMark = tagName === 'MARK';
     const locationId = isMark ? el.getAttribute('data-location') : null;
+    const frontendLocation = isMark ? el.getAttribute('data-frontend-location') : null;
     const markStart = locationId ? offset : null;
 
     // --- Recurse into children ---
@@ -111,6 +112,7 @@ export function extractMarksFromHTML(html) {
             end: trimmedEnd,
             text: plainText.slice(trimmedStart, trimmedEnd),
             linkId: locationId,
+            frontendLocation: frontendLocation,  // Hierarchical path for form linking
           });
         }
       }

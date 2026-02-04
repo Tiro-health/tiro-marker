@@ -5,7 +5,7 @@
 
 import { markDocument } from '../api/mark.js';
 import { extractHtmlFromDocumentReference } from '../utils/documentReference.js';
-import { extractMarksFromHTML, validateMarksAgainstText } from './extractMarks.js?v=4';
+import { extractMarksFromHTML, validateMarksAgainstText } from './extractMarks.js?v=5';
 
 let editorAPI = null;
 let questionnaire = null; // Store questionnaire for linkId mapping
@@ -144,39 +144,40 @@ function createTooltip() {
         // Clear any previous highlights first
         clearHighlightedContainers();
 
-        // Collect ALL mark IDs from the clicked element AND its mark ancestors
+        // Collect ALL frontend locations from the clicked element AND its mark ancestors
         // This handles nested marks (e.g., "headache" inside "Patient has headache")
-        const allMarkIds = new Set();
+        // frontendLocation is the hierarchical path that matches form field IDs
+        const allFrontendLocations = new Set();
 
         let currentMark = mark;
         while (currentMark) {
-          const markIdsAttr = currentMark.getAttribute('data-lexical-mark-ids');
-          if (markIdsAttr) {
-            markIdsAttr.split(' ').filter(Boolean).forEach(id => allMarkIds.add(id));
+          const frontendLocsAttr = currentMark.getAttribute('data-frontend-locations');
+          if (frontendLocsAttr) {
+            frontendLocsAttr.split(' ').filter(Boolean).forEach(loc => allFrontendLocations.add(loc));
           }
           // Move to parent mark element (if any)
           currentMark = currentMark.parentElement?.closest('.editor-mark');
         }
 
-        const markIds = Array.from(allMarkIds);
-        console.log(`[Click] Collected ${markIds.length} mark IDs from element and ancestors:`, markIds);
+        const frontendLocations = Array.from(allFrontendLocations);
+        console.log(`[Click] Collected ${frontendLocations.length} frontend locations from element and ancestors:`, frontendLocations);
 
-        if (markIds.length === 0) return;
+        if (frontendLocations.length === 0) return;
 
-        // Find the most nested/specific mark (longest location path = most dots)
-        const mostNestedId = markIds.reduce((a, b) =>
+        // Find the most nested/specific location (longest path = most dots)
+        const mostNestedLocation = frontendLocations.reduce((a, b) =>
           a.split('.').length > b.split('.').length ? a : b
         );
 
         // Highlight ALL related form field containers
-        for (const markId of markIds) {
-          highlightFormFieldContainer(markId);
+        for (const location of frontendLocations) {
+          highlightFormFieldContainer(location);
         }
 
         // Navigate/scroll to the most nested one
         // Use scrollIntoView on the scrollable form container
         const formFiller = document.querySelector('tiro-form-filler');
-        const result = findFormField(mostNestedId);
+        const result = findFormField(mostNestedLocation);
         if (result && formFiller) {
           result.field.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -856,12 +857,17 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
         continue;
       }
 
-      // Collect all mark IDs and question texts for this element
+      // Collect all mark IDs, frontend locations, and question texts for this element
       const markIds = matchingMarks.map((m) => m.linkId);
+      const frontendLocations = matchingMarks.map((m) => m.frontendLocation).filter(Boolean);
       const questionTexts = matchingMarks.map((m) => m.questionText).filter(Boolean);
 
       // Set ALL matching mark IDs (space-separated for CSS selector compatibility)
       markEl.setAttribute('data-lexical-mark-ids', markIds.join(' '));
+      // Set frontend locations for form field linking (space-separated)
+      if (frontendLocations.length > 0) {
+        markEl.setAttribute('data-frontend-locations', frontendLocations.join(' '));
+      }
 
       // Store question texts as JSON array for hover handler
       if (questionTexts.length > 0) {
