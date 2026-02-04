@@ -43,7 +43,8 @@ def _sanitize_for_id(linkId: str) -> str:
 class MarkResult:
     """Result of marking a question."""
 
-    location_string: str
+    qr_id: str  # UUID-based ID for QR blueprint (data-location)
+    frontend_location: str  # Hierarchical path for form linking (data-frontend-location)
     labels: list[int]
 
 
@@ -279,7 +280,8 @@ async def default_strategy(
         result = await agent.run(prompt)
 
         mark = MarkResult(
-            location_string=item_id,  # UUID-linkId format for data-location
+            qr_id=item_id,  # UUID-linkId format for data-location
+            frontend_location=f"{location}.answer",  # Hierarchical path for form linking
             labels=result.output.labels,
         )
         marked_item = MarkedItem(
@@ -338,7 +340,8 @@ async def simple_container_strategy(
     root_labels = get_root_labels(html)
 
     mark = MarkResult(
-        location_string=item_id,  # UUID-linkId format for data-location
+        qr_id=item_id,  # UUID-linkId format for data-location
+        frontend_location=location,  # Hierarchical path for form linking
         labels=root_labels,
     )
     marked_item = MarkedItem(
@@ -409,7 +412,8 @@ async def repeating_group_strategy(
         )
 
         mark = MarkResult(
-            location_string=item_id,  # UUID-linkId format for data-location
+            qr_id=item_id,  # UUID-linkId format for data-location
+            frontend_location=instance_location,  # Hierarchical path for form linking
             labels=instance.labels,
         )
         marked_item = MarkedItem(
@@ -514,7 +518,8 @@ async def repeating_coding_strategy(
             )
 
             mark = MarkResult(
-                location_string=item_id,  # UUID-linkId format for data-location
+                qr_id=item_id,  # UUID-linkId format for data-location
+                frontend_location=f"{location}.answer",  # Hierarchical path for form linking
                 labels=labels,
             )
 

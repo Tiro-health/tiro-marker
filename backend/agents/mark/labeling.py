@@ -42,7 +42,10 @@ class MarkProtocol(Protocol):
     """Protocol for mark specifications."""
 
     @property
-    def location_string(self) -> str: ...
+    def qr_id(self) -> str: ...
+
+    @property
+    def frontend_location(self) -> str: ...
 
     @property
     def labels(self) -> Sequence[int]: ...
@@ -230,7 +233,9 @@ def apply_marks(html: str, marks: Sequence[MarkProtocol]) -> str:
             # Find element with this label using XPath
             elements = body.xpath(f'.//*[@data-label="{label}"]')
             if elements:
-                _wrap_content_with_mark(elements[0], mark.location_string)
+                _wrap_content_with_mark(
+                    elements[0], mark.qr_id, mark.frontend_location
+                )
 
     # Clean up: remove data-label attributes
     for el in body.iter():
@@ -245,13 +250,17 @@ def apply_marks(html: str, marks: Sequence[MarkProtocol]) -> str:
     return tostring(doc, encoding="unicode")
 
 
-def _wrap_content_with_mark(element: HtmlElement, location: str) -> None:
+def _wrap_content_with_mark(
+    element: HtmlElement, qr_id: str, frontend_location: str
+) -> None:
     """Wrap element's content with a <mark> tag.
 
     The mark is inserted inside the element, wrapping all its content.
+    Sets both data-location (for QR blueprint) and data-frontend-location (for form linking).
     """
     mark_el = etree.Element("mark")
-    mark_el.set("data-location", location)
+    mark_el.set("data-location", qr_id)
+    mark_el.set("data-frontend-location", frontend_location)
 
     # Move element's text content to mark
     mark_el.text = element.text

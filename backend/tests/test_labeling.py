@@ -9,7 +9,8 @@ from backend.agents.mark.labeling import apply_marks, label_html, strip_labels
 class Mark:
     """Test mark for apply_marks tests."""
 
-    location_string: str
+    qr_id: str
+    frontend_location: str
     labels: list[int]
 
 
@@ -127,10 +128,12 @@ def test_apply_marks_basic() -> None:
     </html>"""
 
     labeled, _ = label_html(html)
-    marks = [Mark(location_string="item1.answer", labels=[1])]
+    marks = [Mark(qr_id="item1-uuid", frontend_location="item1.answer", labels=[1])]
     result = apply_marks(labeled, marks)
 
-    assert 'data-location="item1.answer"' in result
+    # data-location has qr_id, data-frontend-location has the path
+    assert 'data-location="item1-uuid"' in result
+    assert 'data-frontend-location="item1.answer"' in result
     assert "First paragraph." in result
     # Labeling artifacts should be removed
     assert "data-label" not in result
@@ -147,15 +150,19 @@ def test_apply_marks_nested() -> None:
     labeled, _ = label_html(html)
     # Parent first, then child - parent should end up as outer wrapper
     marks = [
-        Mark(location_string="parent", labels=[1]),
-        Mark(location_string="parent.child.answer", labels=[1]),
+        Mark(qr_id="parent-uuid", frontend_location="parent", labels=[1]),
+        Mark(qr_id="child-uuid", frontend_location="parent.child.answer", labels=[1]),
     ]
     result = apply_marks(labeled, marks)
 
     # Parent should wrap child: <mark parent><mark child>...</mark></mark>
-    assert result.index('data-location="parent"') < result.index(
-        'data-location="parent.child.answer"'
+    # data-location has qr_id, check ordering using qr_ids
+    assert result.index('data-location="parent-uuid"') < result.index(
+        'data-location="child-uuid"'
     )
+    # Also verify frontend locations are present
+    assert 'data-frontend-location="parent"' in result
+    assert 'data-frontend-location="parent.child.answer"' in result
 
 
 def test_apply_marks_cleans_sentence_spans() -> None:
@@ -170,11 +177,13 @@ def test_apply_marks_cleans_sentence_spans() -> None:
     # Should have sentence spans
     assert 'ag="true"' in labeled
 
-    marks = [Mark(location_string="test.answer", labels=[3])]  # First sentence span
+    marks = [Mark(qr_id="test-uuid", frontend_location="test.answer", labels=[3])]  # First sentence span
     result = apply_marks(labeled, marks)
 
     # Sentence spans should be unwrapped
     assert 'ag="true"' not in result
     # But content and mark should remain
     assert "First sentence." in result
-    assert 'data-location="test.answer"' in result
+    # data-location has qr_id, data-frontend-location has path
+    assert 'data-location="test-uuid"' in result
+    assert 'data-frontend-location="test.answer"' in result

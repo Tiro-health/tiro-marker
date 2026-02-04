@@ -34,8 +34,10 @@ class Mark:
     Used to track where questionnaire items should be marked in the HTML document.
     """
 
-    # Location
-    location_string: str
+    # UUID-based location for QR blueprint (data-location)
+    qr_id: str
+    # Hierarchical path for form linking (data-frontend-location)
+    frontend_location: str
     # HTML labels
     labels: list[int]
 
@@ -145,7 +147,8 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
         for ext_mark in extended_marks:
             ctx.state.marks.append(
                 Mark(
-                    location_string=ext_mark.mark.location_string,
+                    qr_id=ext_mark.mark.qr_id,
+                    frontend_location=ext_mark.mark.frontend_location,
                     labels=ext_mark.mark.labels,
                 )
             )
