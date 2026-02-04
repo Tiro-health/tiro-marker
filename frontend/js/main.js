@@ -4,7 +4,7 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
-import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete } from './marking/index.js?v=7';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete } from './marking/index.js?v=8';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js';
 import { populateFromMarkedHtml } from './api/populate.js';
