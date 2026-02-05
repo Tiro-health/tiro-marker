@@ -4,8 +4,9 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
-import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete } from './marking/index.js?v=9';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=10';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
+import { initQuestionnaireSwitcher } from './questionnaire/switcher.js?v=2';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js?v=2';
 import { populateFromMarkedHtml } from './api/populate.js';
 
@@ -200,6 +201,10 @@ function applyFormDarkTheme(formEl) {
       ...formEl.shadowRoot.adoptedStyleSheets,
       darkSheet,
     ];
+    // Reveal the form now that the dark theme is in place
+    formEl.classList.add('themed');
+    const loader = document.getElementById('form-loader');
+    if (loader) loader.classList.add('hidden');
     console.log('Form dark theme applied');
     return true;
   }
@@ -211,6 +216,83 @@ function applyFormDarkTheme(formEl) {
     });
     observer.observe(formEl, { childList: true, subtree: true });
   }
+}
+
+/**
+ * Load a questionnaire into the form panel.
+ * Replaces the tiro-form-filler element with a new one containing the questionnaire,
+ * re-applies dark theme, re-attaches listeners, and updates the marking module.
+ * @param {Object} questionnaire - FHIR Questionnaire JSON
+ */
+function loadQuestionnaire(questionnaire) {
+  const formPanel = document.querySelector('#form-panel .panel-body');
+  if (!formPanel) return;
+
+  // Show loader, hide old form
+  const loader = document.getElementById('form-loader');
+  if (loader) loader.classList.remove('hidden');
+
+  const oldForm = document.getElementById('clinical-form');
+  if (oldForm) {
+    oldForm.classList.remove('themed');
+    oldForm.remove();
+  }
+
+  // Create new form element with questionnaire script
+  const newForm = document.createElement('tiro-form-filler');
+  newForm.id = 'clinical-form';
+
+  const script = document.createElement('script');
+  script.type = 'application/fhir+json';
+  script.slot = 'questionnaire';
+  script.textContent = JSON.stringify(questionnaire);
+  newForm.appendChild(script);
+
+  formPanel.appendChild(newForm);
+
+  // Update module-level reference
+  clinicalForm = newForm;
+
+  // Apply dark theme (handles shadow DOM timing)
+  applyFormDarkTheme(clinicalForm);
+
+  // Re-attach form event listeners
+  attachFormListeners(clinicalForm);
+
+  // Update marking module with new questionnaire
+  setQuestionnaire(questionnaire);
+  clearAllMarks();
+
+  // Re-initialize link handler
+  if (editorAPI && clinicalForm) {
+    initLinkHandler(editorAPI, clinicalForm);
+  }
+
+  console.log('Questionnaire loaded:', questionnaire.title || questionnaire.url);
+}
+
+/**
+ * Attach tiro-form-filler event listeners to a form element.
+ * Extracted so it can be called both on initial setup and after form replacement.
+ * @param {HTMLElement} formEl - The tiro-form-filler element
+ */
+function attachFormListeners(formEl) {
+  if (!formEl) return;
+
+  formEl.addEventListener('tiro-submit', (e) => {
+    formResponseEl.textContent = JSON.stringify(e.detail.response, null, 2);
+    formResponseEl.classList.remove('hidden');
+  });
+
+  formEl.addEventListener('tiro-ready', (e) => {
+    console.log('Form ready:', e.detail.questionnaire);
+  });
+
+  formEl.addEventListener('tiro-error', (e) => {
+    console.error('Form error:', e.detail.error);
+    formResponseEl.textContent = `Error: ${e.detail.error.message}`;
+    formResponseEl.classList.remove('hidden');
+  });
 }
 
 /**
@@ -226,9 +308,6 @@ async function init() {
   populateBtn = document.getElementById('populate-btn');
   formResponseEl = document.getElementById('form-response');
   editorContainer = document.getElementById('editor-container');
-
-  // Apply dark theme to tiro-form-filler shadow DOM
-  applyFormDarkTheme(clinicalForm);
 
   // Initialize agent controls (marker and populate agent UI)
   initAgentControls({
@@ -274,12 +353,9 @@ async function init() {
     editorAPI = initializeEditor(editorContainer, initialContent);
     console.log('Lexical editor initialized');
 
-    // Get questionnaire for marking system
-    const questionnaire = getQuestionnaire();
-
-    // Initialize marking system (sentence detection, etc.)
+    // Initialize marking system (questionnaire will be set when switcher loads)
     try {
-      await initMarking(editorAPI, questionnaire, {
+      await initMarking(editorAPI, null, {
         onStatusChange: (isWorking) => {
           // Update marker agent UI when marking starts/stops
           setMarkerWorking(isWorking);
@@ -288,22 +364,20 @@ async function init() {
     } catch (error) {
       console.warn('Marking system initialization failed:', error);
     }
-
-    // Initialize questionnaire link handler (mark click -> question navigation)
-    if (clinicalForm) {
-      initLinkHandler(editorAPI, clinicalForm);
-    }
   }
 
   // Set up event listeners
   setupEventListeners();
+
+  // Initialize questionnaire switcher — loads manifest and first questionnaire
+  await initQuestionnaireSwitcher({ onSwitch: loadQuestionnaire });
 }
 
 /**
  * Set up event listeners
  */
 function setupEventListeners() {
-  if (submitFormBtn && clinicalForm) {
+  if (submitFormBtn) {
     submitFormBtn.addEventListener('click', handleFormSubmit);
   }
 
@@ -332,23 +406,6 @@ function setupEventListeners() {
       if (submitFormBtn) {
         submitFormBtn.click();
       }
-    });
-  }
-
-  if (clinicalForm) {
-    clinicalForm.addEventListener('tiro-submit', (e) => {
-      formResponseEl.textContent = JSON.stringify(e.detail.response, null, 2);
-      formResponseEl.classList.remove('hidden');
-    });
-
-    clinicalForm.addEventListener('tiro-ready', (e) => {
-      console.log('Form ready:', e.detail.questionnaire);
-    });
-
-    clinicalForm.addEventListener('tiro-error', (e) => {
-      console.error('Form error:', e.detail.error);
-      formResponseEl.textContent = `Error: ${e.detail.error.message}`;
-      formResponseEl.classList.remove('hidden');
     });
   }
 }

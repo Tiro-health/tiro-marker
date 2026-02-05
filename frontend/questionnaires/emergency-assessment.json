@@ -1,0 +1,381 @@
+{
+    "resourceType": "Questionnaire",
+    "url": "http://example.org/Questionnaire/emergency-assessment",
+    "status": "draft",
+    "title": "Emergency Assessment",
+    "item": [
+        {
+            "linkId": "emergency-assessment",
+            "type": "group",
+            "text": "Emergency Assessment",
+            "extension": [
+                {
+                    "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                    "valueCodeableConcept": {
+                        "coding": [
+                            {
+                                "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                "code": "block"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "item": [
+                {
+                    "linkId": "patient-name",
+                    "type": "string",
+                    "text": "Patient name"
+                },
+                {
+                    "linkId": "admission-datetime",
+                    "type": "dateTime",
+                    "text": "Admission date and time"
+                },
+                {
+                    "linkId": "patient-conscious",
+                    "type": "coding",
+                    "text": "Patient conscious on arrival",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "yes",
+                                "display": "Yes"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "no",
+                                "display": "No"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "chief-complaint",
+                    "type": "string",
+                    "text": "Chief complaint"
+                },
+                {
+                    "linkId": "symptom-onset-time",
+                    "type": "time",
+                    "text": "Time of symptom onset"
+                },
+                {
+                    "linkId": "pain-present",
+                    "type": "coding",
+                    "text": "Pain present",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "yes",
+                                "display": "Yes"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "no",
+                                "display": "No"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "pain-severity",
+                    "type": "decimal",
+                    "text": "Pain severity (0-10 scale)"
+                },
+                {
+                    "linkId": "triage-level",
+                    "type": "coding",
+                    "text": "Triage level",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/triage",
+                                "code": "critical",
+                                "display": "Critical"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/triage",
+                                "code": "urgent",
+                                "display": "Urgent"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/triage",
+                                "code": "semi-urgent",
+                                "display": "Semi-urgent"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/triage",
+                                "code": "non-urgent",
+                                "display": "Non-urgent"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "vital-signs-group",
+                    "type": "group",
+                    "text": "Vital Signs",
+                    "repeats": false,
+                    "item": [
+                        {
+                            "linkId": "temperature",
+                            "type": "decimal",
+                            "text": "Temperature (Celsius)"
+                        },
+                        {
+                            "linkId": "heart-rate",
+                            "type": "decimal",
+                            "text": "Heart rate (bpm)"
+                        },
+                        {
+                            "linkId": "oxygen-saturation",
+                            "type": "decimal",
+                            "text": "Oxygen saturation (%)"
+                        }
+                    ]
+                },
+                {
+                    "linkId": "medications",
+                    "type": "coding",
+                    "text": "Current medications",
+                    "repeats": true,
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/medications",
+                                "code": "aspirin",
+                                "display": "Aspirin"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/medications",
+                                "code": "metformin",
+                                "display": "Metformin"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/medications",
+                                "code": "lisinopril",
+                                "display": "Lisinopril"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/medications",
+                                "code": "atorvastatin",
+                                "display": "Atorvastatin"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "item": [
+                        {
+                            "linkId": "medication-dosage",
+                            "type": "string",
+                            "text": "Dosage"
+                        },
+                        {
+                            "linkId": "medication-frequency",
+                            "type": "string",
+                            "text": "Frequency"
+                        },
+                        {
+                            "linkId": "medication-route",
+                            "type": "coding",
+                            "text": "Route",
+                            "answerOption": [
+                                {
+                                    "valueCoding": {
+                                        "system": "http://example.org/cs/route",
+                                        "code": "oral",
+                                        "display": "Oral"
+                                    }
+                                },
+                                {
+                                    "valueCoding": {
+                                        "system": "http://example.org/cs/route",
+                                        "code": "iv",
+                                        "display": "Intravenous"
+                                    }
+                                },
+                                {
+                                    "valueCoding": {
+                                        "system": "http://example.org/cs/route",
+                                        "code": "im",
+                                        "display": "Intramuscular"
+                                    }
+                                }
+                            ],
+                            "extension": [
+                                {
+                                    "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                                    "valueCodeableConcept": {
+                                        "coding": [
+                                            {
+                                                "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                                "code": "chips"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "linkId": "diagnosis",
+                    "type": "coding",
+                    "text": "Initial diagnosis",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/diagnosis",
+                                "code": "ami",
+                                "display": "Acute myocardial infarction"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/diagnosis",
+                                "code": "appendicitis",
+                                "display": "Appendicitis"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/diagnosis",
+                                "code": "fracture",
+                                "display": "Fracture of bone"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/diagnosis",
+                                "code": "stroke",
+                                "display": "Stroke"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "last-meal-date",
+                    "type": "date",
+                    "text": "Date of last meal"
+                },
+                {
+                    "linkId": "procedure-required",
+                    "type": "coding",
+                    "text": "Immediate procedure required",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "yes",
+                                "display": "Yes"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "no",
+                                "display": "No"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
