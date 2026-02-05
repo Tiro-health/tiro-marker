@@ -322,7 +322,7 @@ body {
 }
 
 #form-panel .panel-body {
-    padding: 1.25rem;
+    padding: 0 1.25rem;
     display: flex;
     flex-direction: column;
 }
@@ -1266,4 +1266,94 @@ body {
     .panel {
         max-height: 70vh;
     }
+}
+
+/* ========================================
+   Tiro SDK Time Picker Fix
+   SDK renders portals outside shadow DOM without Tailwind CSS
+   ======================================== */
+[role="dialog"].bg-popover {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-primary) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+    padding: 0.5rem !important;
+    max-height: 300px;
+    overflow: hidden;
+    color: var(--text-primary) !important;
+}
+
+[role="dialog"].bg-popover > div {
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+[role="dialog"].bg-popover ul {
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+
+[role="dialog"].bg-popover ul::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+[role="dialog"].bg-popover ul li {
+    list-style: none;
+}
+
+[role="dialog"].bg-popover ul button {
+    display: block;
+    width: 48px;
+    padding: 0.35rem 0.5rem;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+[role="dialog"].bg-popover ul button:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+[role="dialog"].bg-popover ul button[data-state="active"],
+[role="dialog"].bg-popover ul button.active,
+[role="dialog"].bg-popover ul button[aria-selected="true"] {
+    background-color: var(--accent-cyan);
+    color: #0f172a;
+}
+
+/* Footer buttons */
+[role="dialog"].bg-popover > div:last-child {
+    display: flex !important;
+    justify-content: space-between;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--border-primary);
+}
+
+[role="dialog"].bg-popover > div:last-child button {
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+[role="dialog"].bg-popover > div:last-child button:hover {
+    background: var(--bg-hover);
 }

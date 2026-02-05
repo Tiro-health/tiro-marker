@@ -1,4 +1,10 @@
-"""MedASR client — audio conversion and Vertex AI transcription."""
+"""MedASR client — audio conversion and Vertex AI transcription.
+
+MedASR is a medical ASR model deployed on Vertex AI Model Garden.
+It accepts base64-encoded WAV audio via rawPredict and returns text.
+
+Ref: https://github.com/google-health/medasr
+"""
 
 from __future__ import annotations
 
@@ -71,13 +77,11 @@ def _get_access_token() -> str:
     return str(credentials.token)
 
 
-async def call_medasr(
-    wav_data: bytes,
-    context: str = "",
-) -> dict[str, Any]:
+async def call_medasr(wav_data: bytes) -> dict[str, Any]:
     """Call MedASR Vertex AI endpoint with base64-encoded WAV audio.
 
-    Returns the raw prediction result from the endpoint.
+    MedASR uses rawPredict with payload: {"file": "<base64-wav>"}
+    and returns: {"text": "<transcript>"}
 
     Raises:
         httpx.HTTPStatusError: If the endpoint returns an error.
@@ -86,22 +90,15 @@ async def call_medasr(
     token = _get_access_token()
     audio_b64 = base64.b64encode(wav_data).decode("ascii")
 
-    # TODO: adapt to actual MedASR API — the instances structure and response
-    # parsing below are templates that need to match the deployed endpoint.
     payload: dict[str, Any] = {
-        "instances": [
-            {
-                "audio": {"b64": audio_b64},
-                "context": context,
-            }
-        ]
+        "file": audio_b64,
     }
 
     url = (
         f"https://{settings.medasr_endpoint_host}"
         f"/v1/projects/{settings.medasr_project_id}"
         f"/locations/{settings.medasr_region}"
-        f"/endpoints/{settings.medasr_endpoint_id}:predict"
+        f"/endpoints/{settings.medasr_endpoint_id}:rawPredict"
     )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -120,24 +117,16 @@ async def call_medasr(
 
 
 def parse_medasr_response(result: dict[str, Any]) -> TranscribeResult:
-    """Parse MedASR prediction response into TranscribeResult.
+    """Parse MedASR rawPredict response into TranscribeResult.
 
-    TODO: adapt field names to match actual MedASR API response format.
+    MedASR returns {"text": "<transcript>"}.
     """
-    predictions = result.get("predictions", [])
-    if not predictions:
-        return TranscribeResult(text="", confidence=0.0, duration_ms=0)
-
-    pred = predictions[0] if isinstance(predictions, list) else predictions
-
-    text = str(pred.get("transcript", pred.get("text", "")))
-    confidence = float(pred.get("confidence", 0.0))
-    duration_ms = int(pred.get("duration_ms", 0))
+    text = str(result.get("text", ""))
 
     return TranscribeResult(
         text=text,
-        confidence=confidence,
-        duration_ms=duration_ms,
+        confidence=1.0 if text else 0.0,
+        duration_ms=0,
     )
 
 
@@ -149,10 +138,10 @@ async def transcribe_audio(
 
     Args:
         audio_data: Raw audio bytes (webm/opus from MediaRecorder).
-        context: Optional context text to improve transcription accuracy.
+        context: Optional context text (reserved for future use).
 
     Returns:
-        TranscribeResult with text, confidence, and duration.
+        TranscribeResult with transcribed text.
 
     Raises:
         AudioConversionError: If ffmpeg conversion fails.
@@ -160,5 +149,5 @@ async def transcribe_audio(
         httpx.TimeoutException: If MedASR request times out.
     """
     wav_data = await convert_webm_to_wav(audio_data)
-    raw_result = await call_medasr(wav_data, context)
+    raw_result = await call_medasr(wav_data)
     return parse_medasr_response(raw_result)
