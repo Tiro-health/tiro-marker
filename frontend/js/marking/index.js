@@ -128,6 +128,46 @@ function createSpinner() {
 }
 
 /**
+ * Collect ALL frontend locations from a mark element AND its mark ancestors.
+ * Handles nested marks (e.g., "headache" inside "Patient has headache").
+ * @param {HTMLElement} mark - The mark element
+ * @returns {string[]} Array of frontend location strings
+ */
+function collectFrontendLocations(mark) {
+  const locations = new Set();
+  let current = mark;
+  while (current) {
+    const attr = current.getAttribute("data-frontend-locations");
+    if (attr) {
+      attr.split(" ").filter(Boolean).forEach((loc) => locations.add(loc));
+    }
+    current = current.parentElement?.closest(".editor-mark");
+  }
+  return Array.from(locations);
+}
+
+/**
+ * Collect ALL question texts from a mark element AND its mark ancestors.
+ * Deduplicates by text value.
+ * @param {HTMLElement} mark - The mark element
+ * @returns {string[]} Array of unique question text strings
+ */
+function collectQuestionTexts(mark) {
+  const texts = new Set();
+  let current = mark;
+  while (current) {
+    const json = current.getAttribute("data-question-texts");
+    if (json) {
+      try {
+        for (const t of JSON.parse(json)) texts.add(t);
+      } catch (_) { /* ignore parse errors */ }
+    }
+    current = current.parentElement?.closest(".editor-mark");
+  }
+  return Array.from(texts);
+}
+
+/**
  * Create tooltip element and set up hover handlers
  */
 function createTooltip() {
@@ -143,31 +183,21 @@ function createTooltip() {
   editorContainer.addEventListener("mouseover", (e) => {
     const mark = e.target.closest(".editor-mark");
     if (mark) {
-      // Try to get multiple question texts first (JSON array)
-      const questionTextsJson = mark.getAttribute("data-question-texts");
-      if (questionTextsJson) {
-        try {
-          const questionTexts = JSON.parse(questionTextsJson);
-          if (questionTexts.length === 1) {
-            showTooltip(tooltip, mark, `Q: ${questionTexts[0]}`);
-          } else if (questionTexts.length > 1) {
-            // Show all questions as bullet list
-            const text = questionTexts.map((q) => `• ${q}`).join("\n");
-            showTooltip(tooltip, mark, text);
-          }
-        } catch (e) {
-          // Fallback to single question text
-          const questionText = mark.getAttribute("data-question-text");
-          if (questionText) {
-            showTooltip(tooltip, mark, `Q: ${questionText}`);
-          }
-        }
-      } else {
-        // Fallback to single question text (legacy)
-        const questionText = mark.getAttribute("data-question-text");
-        if (questionText) {
-          showTooltip(tooltip, mark, `Q: ${questionText}`);
-        }
+      // Collect ALL question texts from this element and its ancestor marks
+      const allQuestionTexts = collectQuestionTexts(mark);
+
+      if (allQuestionTexts.length === 1) {
+        showTooltip(tooltip, mark, `Q: ${allQuestionTexts[0]}`);
+      } else if (allQuestionTexts.length > 1) {
+        const text = allQuestionTexts.map((q) => `• ${q}`).join("\n");
+        showTooltip(tooltip, mark, text);
+      }
+
+      // Highlight ALL linked question rows in the form on hover
+      clearHighlightedContainers();
+      const allLocations = collectFrontendLocations(mark);
+      for (const location of allLocations) {
+        highlightFormFieldContainer(location);
       }
     }
   });
@@ -176,6 +206,7 @@ function createTooltip() {
     const mark = e.target.closest(".editor-mark");
     if (mark) {
       hideTooltip(tooltip);
+      clearHighlightedContainers();
     }
   });
 
@@ -189,27 +220,7 @@ function createTooltip() {
         // Clear any previous highlights first
         clearHighlightedContainers();
 
-        // Collect ALL frontend locations from the clicked element AND its mark ancestors
-        // This handles nested marks (e.g., "headache" inside "Patient has headache")
-        // frontendLocation is the hierarchical path that matches form field IDs
-        const allFrontendLocations = new Set();
-
-        let currentMark = mark;
-        while (currentMark) {
-          const frontendLocsAttr = currentMark.getAttribute(
-            "data-frontend-locations",
-          );
-          if (frontendLocsAttr) {
-            frontendLocsAttr
-              .split(" ")
-              .filter(Boolean)
-              .forEach((loc) => allFrontendLocations.add(loc));
-          }
-          // Move to parent mark element (if any)
-          currentMark = currentMark.parentElement?.closest(".editor-mark");
-        }
-
-        const frontendLocations = Array.from(allFrontendLocations);
+        const frontendLocations = collectFrontendLocations(mark);
         console.log(
           `[Click] Collected ${frontendLocations.length} frontend locations from element and ancestors:`,
           frontendLocations,
@@ -228,7 +239,6 @@ function createTooltip() {
         }
 
         // Navigate/scroll to the most nested one
-        // Use scrollIntoView on the scrollable form container
         const formFiller = document.querySelector("tiro-form-filler");
         const result = findFormField(mostNestedLocation);
         if (result && formFiller) {
@@ -993,14 +1003,19 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
         return true;
       });
 
-      // If multiple text matches, pick the closest by position
+      // If multiple text matches, deduplicate by frontendLocation but keep all
+      // unique locations (same text can be marked for multiple questions).
+      // If duplicates share the same location, pick the closest by position.
       if (matchingMarks.length > 1) {
-        matchingMarks.sort(
-          (a, b) =>
-            Math.abs(a.start - elOffset.start) -
-            Math.abs(b.start - elOffset.start),
-        );
-        matchingMarks = [matchingMarks[0]];
+        const byLocation = new Map();
+        for (const m of matchingMarks) {
+          const key = m.frontendLocation || m.linkId;
+          const existing = byLocation.get(key);
+          if (!existing || Math.abs(m.start - elOffset.start) < Math.abs(existing.start - elOffset.start)) {
+            byLocation.set(key, m);
+          }
+        }
+        matchingMarks = Array.from(byLocation.values());
       }
 
       if (matchingMarks.length === 0) {
