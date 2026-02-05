@@ -72,7 +72,7 @@ class TestBuildProvenanceForItem:
         prov = build_provenance_for_item("item-1", recorded)
 
         assert prov.resourceType == "Provenance"
-        assert prov.id == "provenance-item-1"
+        assert prov.id == "prov-item-1"  # short IDs still work
         assert prov.recorded == recorded
 
     def test_target_reference(self) -> None:
@@ -127,8 +127,8 @@ class TestBuildProvenances:
         assert len(result) == 2
         assert all(isinstance(p, dict) for p in result)
         assert result[0]["resourceType"] == "Provenance"
-        assert result[0]["id"] == "provenance-a"
-        assert result[1]["id"] == "provenance-b"
+        assert result[0]["id"] == "prov-a"
+        assert result[1]["id"] == "prov-b"
 
     def test_target_has_extension(self) -> None:
         items = [_make_item("a", "q1")]
