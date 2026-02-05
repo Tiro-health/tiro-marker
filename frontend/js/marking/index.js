@@ -3,15 +3,18 @@
  * Triggers marking when user is idle and content ends with punctuation.
  */
 
-import { markDocument } from '../api/mark.js';
-import { extractHtmlFromDocumentReference } from '../utils/documentReference.js';
-import { extractMarksFromHTML, validateMarksAgainstText } from './extractMarks.js?v=5';
+import { markDocument } from "../api/mark.js";
+import { extractHtmlFromDocumentReference } from "../utils/documentReference.js";
+import {
+  extractMarksFromHTML,
+  validateMarksAgainstText,
+} from "./extractMarks.js?v=5";
 
 let editorAPI = null;
 let questionnaire = null; // Store questionnaire for linkId mapping
-let lastMarkedContent = ''; // Track content at last mark
+let lastMarkedContent = ""; // Track content at last mark
 let lastMarkTime = 0; // Track when we last marked
-let lastCheckedContent = ''; // Track content at last check (for idle detection)
+let lastCheckedContent = ""; // Track content at last check (for idle detection)
 let lastTypingTime = 0; // Track when user last typed
 let isMarking = false;
 let markInterval = null;
@@ -23,15 +26,21 @@ let lastMarkResult = null; // Store last mark result { documentReference, bluepr
 
 const CHECK_INTERVAL_MS = 1000; // Check every 1 second
 const MIN_MARK_INTERVAL_MS = 4000; // At least 4 seconds between marks
-const IDLE_MARK_MS = 2000; // Mark after 2 seconds idle if content changed
+const IDLE_MARK_MS = 500; // Mark after 1 seconds idle if content changed
 
 // Store question text for tooltips (linkId -> question text)
 window._markQuestionText = {};
 
 // Mark color categories for dark theme
 const MARK_CATEGORIES = {
-  patient: ['patient-name', 'admission-datetime', 'patient-conscious'],
-  diagnosis: ['chief-complaint', 'diagnosis', 'triage-level', 'pain-present', 'pain-severity'],
+  patient: ["patient-name", "admission-datetime", "patient-conscious"],
+  diagnosis: [
+    "chief-complaint",
+    "diagnosis",
+    "triage-level",
+    "pain-present",
+    "pain-severity",
+  ],
   misc: [], // fallback for everything else
 };
 
@@ -42,17 +51,17 @@ const MARK_CATEGORIES = {
  */
 function getMarkCategory(linkId) {
   // Extract the last segment of the linkId path
-  const lastDotIndex = linkId.lastIndexOf('.');
+  const lastDotIndex = linkId.lastIndexOf(".");
   const segment = lastDotIndex >= 0 ? linkId.slice(lastDotIndex + 1) : linkId;
-  const base = segment.replace(/\.answer$/, '');
+  const base = segment.replace(/\.answer$/, "");
 
   for (const [category, ids] of Object.entries(MARK_CATEGORIES)) {
-    if (category === 'misc') continue;
+    if (category === "misc") continue;
     if (ids.some((id) => base === id || base.startsWith(id))) {
       return category;
     }
   }
-  return 'misc';
+  return "misc";
 }
 
 /**
@@ -62,16 +71,19 @@ function getMarkCategory(linkId) {
  */
 function getMarkColor(category) {
   switch (category) {
-    case 'patient': return 'var(--mark-cyan)';
-    case 'diagnosis': return 'var(--mark-rose)';
-    case 'misc':
-    default: return 'var(--mark-amber)';
+    case "patient":
+      return "var(--mark-cyan)";
+    case "diagnosis":
+      return "var(--mark-rose)";
+    case "misc":
+    default:
+      return "var(--mark-amber)";
   }
 }
 
 // Fallback single color (for dynamic CSS rules)
-const MARK_COLOR = 'var(--mark-amber)';
-const HIGHLIGHT_COLOR = 'var(--highlight-color)';
+const MARK_COLOR = "var(--mark-amber)";
+const HIGHLIGHT_COLOR = "var(--highlight-color)";
 
 // Track currently highlighted elements for clearing on next click
 let highlightedContainers = [];
@@ -97,9 +109,13 @@ export async function initMarking(editor, q = null, callbacks = {}) {
   // Start polling interval (checks every 1 second, marks based on rules)
   markInterval = setInterval(checkAndMark, CHECK_INTERVAL_MS);
 
-  console.log('Marking system initialized (smart triggers with @lexical/offset)');
+  console.log(
+    "Marking system initialized (smart triggers with @lexical/offset)",
+  );
   if (questionnaire) {
-    console.log(`Questionnaire loaded with ${questionnaire.item?.length || 0} items`);
+    console.log(
+      `Questionnaire loaded with ${questionnaire.item?.length || 0} items`,
+    );
   }
 }
 
@@ -116,19 +132,19 @@ function createSpinner() {
  */
 function createTooltip() {
   // Create tooltip element appended to body (escapes all containers)
-  const tooltip = document.createElement('div');
-  tooltip.id = 'mark-tooltip';
+  const tooltip = document.createElement("div");
+  tooltip.id = "mark-tooltip";
   document.body.appendChild(tooltip);
 
   // Set up hover handlers on the editor container using event delegation
-  const editorContainer = document.getElementById('editor-container');
+  const editorContainer = document.getElementById("editor-container");
   if (!editorContainer) return;
 
-  editorContainer.addEventListener('mouseover', (e) => {
-    const mark = e.target.closest('.editor-mark');
+  editorContainer.addEventListener("mouseover", (e) => {
+    const mark = e.target.closest(".editor-mark");
     if (mark) {
       // Try to get multiple question texts first (JSON array)
-      const questionTextsJson = mark.getAttribute('data-question-texts');
+      const questionTextsJson = mark.getAttribute("data-question-texts");
       if (questionTextsJson) {
         try {
           const questionTexts = JSON.parse(questionTextsJson);
@@ -136,19 +152,19 @@ function createTooltip() {
             showTooltip(tooltip, mark, `Q: ${questionTexts[0]}`);
           } else if (questionTexts.length > 1) {
             // Show all questions as bullet list
-            const text = questionTexts.map((q) => `• ${q}`).join('\n');
+            const text = questionTexts.map((q) => `• ${q}`).join("\n");
             showTooltip(tooltip, mark, text);
           }
         } catch (e) {
           // Fallback to single question text
-          const questionText = mark.getAttribute('data-question-text');
+          const questionText = mark.getAttribute("data-question-text");
           if (questionText) {
             showTooltip(tooltip, mark, `Q: ${questionText}`);
           }
         }
       } else {
         // Fallback to single question text (legacy)
-        const questionText = mark.getAttribute('data-question-text');
+        const questionText = mark.getAttribute("data-question-text");
         if (questionText) {
           showTooltip(tooltip, mark, `Q: ${questionText}`);
         }
@@ -156,8 +172,8 @@ function createTooltip() {
     }
   });
 
-  editorContainer.addEventListener('mouseout', (e) => {
-    const mark = e.target.closest('.editor-mark');
+  editorContainer.addEventListener("mouseout", (e) => {
+    const mark = e.target.closest(".editor-mark");
     if (mark) {
       hideTooltip(tooltip);
     }
@@ -165,8 +181,8 @@ function createTooltip() {
 
   // Click handler to navigate to form field (handles multiple IDs and nested marks)
   // Deferred to let browser finish placing cursor first
-  editorContainer.addEventListener('click', (e) => {
-    const mark = e.target.closest('.editor-mark');
+  editorContainer.addEventListener("click", (e) => {
+    const mark = e.target.closest(".editor-mark");
     if (mark) {
       // Defer to next tick so browser finishes cursor placement first
       setTimeout(() => {
@@ -180,22 +196,30 @@ function createTooltip() {
 
         let currentMark = mark;
         while (currentMark) {
-          const frontendLocsAttr = currentMark.getAttribute('data-frontend-locations');
+          const frontendLocsAttr = currentMark.getAttribute(
+            "data-frontend-locations",
+          );
           if (frontendLocsAttr) {
-            frontendLocsAttr.split(' ').filter(Boolean).forEach(loc => allFrontendLocations.add(loc));
+            frontendLocsAttr
+              .split(" ")
+              .filter(Boolean)
+              .forEach((loc) => allFrontendLocations.add(loc));
           }
           // Move to parent mark element (if any)
-          currentMark = currentMark.parentElement?.closest('.editor-mark');
+          currentMark = currentMark.parentElement?.closest(".editor-mark");
         }
 
         const frontendLocations = Array.from(allFrontendLocations);
-        console.log(`[Click] Collected ${frontendLocations.length} frontend locations from element and ancestors:`, frontendLocations);
+        console.log(
+          `[Click] Collected ${frontendLocations.length} frontend locations from element and ancestors:`,
+          frontendLocations,
+        );
 
         if (frontendLocations.length === 0) return;
 
         // Find the most nested/specific location (longest path = most dots)
         const mostNestedLocation = frontendLocations.reduce((a, b) =>
-          a.split('.').length > b.split('.').length ? a : b
+          a.split(".").length > b.split(".").length ? a : b,
         );
 
         // Highlight ALL related form field containers
@@ -205,10 +229,10 @@ function createTooltip() {
 
         // Navigate/scroll to the most nested one
         // Use scrollIntoView on the scrollable form container
-        const formFiller = document.querySelector('tiro-form-filler');
+        const formFiller = document.querySelector("tiro-form-filler");
         const result = findFormField(mostNestedLocation);
         if (result && formFiller) {
-          result.field.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          result.field.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }, 0);
     }
@@ -228,17 +252,21 @@ function navigateToFormField(linkId) {
     const { field: formField, inShadowDOM } = result;
 
     // Find the scrollable form container
-    const formFiller = document.querySelector('tiro-form-filler');
+    const formFiller = document.querySelector("tiro-form-filler");
     if (formFiller) {
       // Calculate scroll position to center the element
       const fieldRect = formField.getBoundingClientRect();
       const parentRect = formFiller.getBoundingClientRect();
-      const scrollTop = formFiller.scrollTop + (fieldRect.top - parentRect.top) - (parentRect.height / 2) + (fieldRect.height / 2);
+      const scrollTop =
+        formFiller.scrollTop +
+        (fieldRect.top - parentRect.top) -
+        parentRect.height / 2 +
+        fieldRect.height / 2;
 
       // Smooth scroll (doesn't affect focus)
       formFiller.scrollTo({
         top: scrollTop,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
   } else {
@@ -255,8 +283,8 @@ function navigateToFormField(linkId) {
  */
 function findFormField(linkId) {
   // Extract the base linkId (without .answer suffix for finding the form field)
-  const baseLinkId = linkId.replace(/\.answer$/, '');
-  const fullLinkId = linkId.endsWith('.answer') ? linkId : `${linkId}.answer`;
+  const baseLinkId = linkId.replace(/\.answer$/, "");
+  const fullLinkId = linkId.endsWith(".answer") ? linkId : `${linkId}.answer`;
 
   // Build list of ID variants to try
   // tiro-form-filler encodes IDs with URL encoding + replacing . with -
@@ -270,7 +298,7 @@ function findFormField(linkId) {
   }
 
   // First, try to find in shadow DOM (tiro-form-filler)
-  const formFiller = document.querySelector('tiro-form-filler');
+  const formFiller = document.querySelector("tiro-form-filler");
   if (formFiller?.shadowRoot) {
     for (const selector of selectors) {
       try {
@@ -299,10 +327,14 @@ function findFormField(linkId) {
  * Clear all currently highlighted containers
  */
 function clearHighlightedContainers() {
-  for (const { container, originalBg, originalTransition } of highlightedContainers) {
+  for (const {
+    container,
+    originalBg,
+    originalTransition,
+  } of highlightedContainers) {
     if (container) {
-      container.style.backgroundColor = originalBg || '';
-      container.style.transition = originalTransition || '';
+      container.style.backgroundColor = originalBg || "";
+      container.style.transition = originalTransition || "";
     }
   }
   highlightedContainers = [];
@@ -326,10 +358,11 @@ function highlightFormFieldContainer(linkId) {
     let container = field.parentElement;
     while (container) {
       const bgColor = window.getComputedStyle(container).backgroundColor;
-      const hasGreyBg = container.classList?.contains('bg-gray-50') ||
-                       container.classList?.contains('bg-gray-100') ||
-                       bgColor.includes('246') || // rgb(246, 246, 247) - grey
-                       bgColor.includes('243');   // other grey shades
+      const hasGreyBg =
+        container.classList?.contains("bg-gray-50") ||
+        container.classList?.contains("bg-gray-100") ||
+        bgColor.includes("246") || // rgb(246, 246, 247) - grey
+        bgColor.includes("243"); // other grey shades
       if (hasGreyBg) {
         break;
       }
@@ -338,7 +371,7 @@ function highlightFormFieldContainer(linkId) {
 
     // Fallback to closest div if grey box not found
     if (!container) {
-      container = field.closest('div');
+      container = field.closest("div");
     }
 
     if (container) {
@@ -347,14 +380,16 @@ function highlightFormFieldContainer(linkId) {
       const originalTransition = container.style.transition;
 
       // Apply highlight
-      container.style.transition = 'background-color 0.3s ease';
+      container.style.transition = "background-color 0.3s ease";
       container.style.backgroundColor = HIGHLIGHT_COLOR; // Lighter yellow
-      container.style.borderRadius = '4px';
+      container.style.borderRadius = "4px";
 
       // Track for clearing later
       highlightedContainers.push({ container, originalBg, originalTransition });
 
-      console.log(`[Highlight] Highlighted container for ${linkId} (shadow DOM: ${inShadowDOM}, tag: ${container.tagName}, class: ${container.className?.substring(0, 50)})`);
+      console.log(
+        `[Highlight] Highlighted container for ${linkId} (shadow DOM: ${inShadowDOM}, tag: ${container.tagName}, class: ${container.className?.substring(0, 50)})`,
+      );
 
       // Add blur listener to the field to clear highlight when focus leaves
       const blurHandler = () => {
@@ -362,9 +397,9 @@ function highlightFormFieldContainer(linkId) {
         setTimeout(() => {
           clearHighlightedContainers();
         }, 100);
-        field.removeEventListener('blur', blurHandler);
+        field.removeEventListener("blur", blurHandler);
       };
-      field.addEventListener('blur', blurHandler);
+      field.addEventListener("blur", blurHandler);
     }
   } else {
     console.log(`[Highlight] Could not find form field for linkId: ${linkId}`);
@@ -377,19 +412,19 @@ function highlightFormFieldContainer(linkId) {
  */
 function showTooltip(tooltip, element, text) {
   // Convert newlines to <br> for multi-line display
-  tooltip.innerHTML = text.replace(/\n/g, '<br>');
-  tooltip.classList.add('visible');
+  tooltip.innerHTML = text.replace(/\n/g, "<br>");
+  tooltip.classList.add("visible");
 
   // Position above the element (need to measure after content is set)
   // Force layout calculation
-  tooltip.style.left = '0px';
-  tooltip.style.top = '0px';
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
 
   const rect = element.getBoundingClientRect();
   const tooltipRect = tooltip.getBoundingClientRect();
 
   // Center horizontally, position above
-  let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+  let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
   let top = rect.top - tooltipRect.height - 8;
 
   // Keep within viewport
@@ -410,7 +445,7 @@ function showTooltip(tooltip, element, text) {
  * Hide tooltip
  */
 function hideTooltip(tooltip) {
-  tooltip.classList.remove('visible');
+  tooltip.classList.remove("visible");
 }
 
 /**
@@ -418,7 +453,7 @@ function hideTooltip(tooltip) {
  */
 function setSpinnerVisible(show) {
   if (spinnerEl) {
-    spinnerEl.style.display = show ? 'block' : 'none';
+    spinnerEl.style.display = show ? "block" : "none";
   }
 }
 
@@ -500,9 +535,7 @@ function checkAndMark() {
 function stripMarksFromHtml(html) {
   // Remove <mark ...> opening tags but keep content
   // Remove </mark> closing tags
-  return html
-    .replace(/<mark[^>]*>/gi, '')
-    .replace(/<\/mark>/gi, '');
+  return html.replace(/<mark[^>]*>/gi, "").replace(/<\/mark>/gi, "");
 }
 
 /**
@@ -514,11 +547,11 @@ function stripMarksFromHtml(html) {
  */
 function truncateHtmlToStableParagraphs(html) {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
+  const doc = parser.parseFromString(html, "text/html");
   const body = doc.body;
 
   // Get all paragraph elements
-  const paragraphs = Array.from(body.querySelectorAll('p'));
+  const paragraphs = Array.from(body.querySelectorAll("p"));
 
   if (paragraphs.length === 0) {
     return null;
@@ -526,7 +559,7 @@ function truncateHtmlToStableParagraphs(html) {
 
   // Check if last paragraph ends with punctuation
   const lastParagraph = paragraphs[paragraphs.length - 1];
-  const lastText = (lastParagraph.textContent || '').trim();
+  const lastText = (lastParagraph.textContent || "").trim();
   const endsWithPunctuation = /[.!?]$/.test(lastText);
 
   if (endsWithPunctuation) {
@@ -537,7 +570,7 @@ function truncateHtmlToStableParagraphs(html) {
   // Find the last paragraph that ends with punctuation
   let lastStableIndex = -1;
   for (let i = paragraphs.length - 2; i >= 0; i--) {
-    const text = (paragraphs[i].textContent || '').trim();
+    const text = (paragraphs[i].textContent || "").trim();
     if (/[.!?]$/.test(text)) {
       lastStableIndex = i;
       break;
@@ -573,7 +606,9 @@ async function triggerMarking(html) {
 
   // Save editor state before backend call for offset transformation
   const savedEditorState = editorAPI.editor.getEditorState();
-  console.log('Sending content to backend for AI marking (saved editor state)...');
+  console.log(
+    "Sending content to backend for AI marking (saved editor state)...",
+  );
 
   try {
     // Call the real backend API
@@ -587,9 +622,11 @@ async function triggerMarking(html) {
     };
 
     // Extract marked HTML from document_reference (not the full response)
-    const markedHtml = extractMarkedHtmlFromResponse(response.document_reference);
+    const markedHtml = extractMarkedHtmlFromResponse(
+      response.document_reference,
+    );
     if (!markedHtml) {
-      console.warn('No marked HTML in response');
+      console.warn("No marked HTML in response");
       setSpinnerVisible(false);
       isMarking = false;
       return;
@@ -597,7 +634,8 @@ async function triggerMarking(html) {
 
     // Extract marks from the marked HTML using the extraction module
     // This produces offsets that match Lexical's text coordinate system
-    const { marks: extractedMarks, plainText: htmlPlainText } = extractMarksFromHTML(markedHtml);
+    const { marks: extractedMarks, plainText: htmlPlainText } =
+      extractMarksFromHTML(markedHtml);
 
     // Deduplicate marks (same linkId + start + end = duplicate)
     const seen = new Set();
@@ -608,17 +646,29 @@ async function triggerMarking(html) {
       return true;
     });
 
-    console.log(`Backend returned ${marks.length} marks with offsets (after dedup)`);
+    console.log(
+      `Backend returned ${marks.length} marks with offsets (after dedup)`,
+    );
 
     // Debug: Compare HTML plain text vs editor text
     const editorText = editorAPI.getTextContent();
-    console.log(`[Mark] HTML plainText length: ${htmlPlainText.length}, Editor text length: ${editorText.length}`);
+    console.log(
+      `[Mark] HTML plainText length: ${htmlPlainText.length}, Editor text length: ${editorText.length}`,
+    );
     if (htmlPlainText.length !== editorText.length) {
-      console.warn(`[Mark] TEXT LENGTH MISMATCH! HTML: ${htmlPlainText.length}, Editor: ${editorText.length}`);
+      console.warn(
+        `[Mark] TEXT LENGTH MISMATCH! HTML: ${htmlPlainText.length}, Editor: ${editorText.length}`,
+      );
       // Show first difference
-      for (let i = 0; i < Math.min(htmlPlainText.length, editorText.length); i++) {
+      for (
+        let i = 0;
+        i < Math.min(htmlPlainText.length, editorText.length);
+        i++
+      ) {
         if (htmlPlainText[i] !== editorText[i]) {
-          console.warn(`[Mark] First difference at position ${i}: HTML="${htmlPlainText.substring(i, i+20)}" vs Editor="${editorText.substring(i, i+20)}"`);
+          console.warn(
+            `[Mark] First difference at position ${i}: HTML="${htmlPlainText.substring(i, i + 20)}" vs Editor="${editorText.substring(i, i + 20)}"`,
+          );
           break;
         }
       }
@@ -629,16 +679,26 @@ async function triggerMarking(html) {
     const sanityValidated = validateMarksAgainstText(marks, htmlPlainText);
     const sanityFailed = sanityValidated.filter((m) => !m.valid);
     if (sanityFailed.length > 0) {
-      console.error(`[Mark] ${sanityFailed.length} marks failed sanity check (offset mismatch with HTML):`,
-        sanityFailed.map((m) => `${m.linkId}: "${m.text.substring(0, 20)}..." at ${m.start}-${m.end}`));
+      console.error(
+        `[Mark] ${sanityFailed.length} marks failed sanity check (offset mismatch with HTML):`,
+        sanityFailed.map(
+          (m) =>
+            `${m.linkId}: "${m.text.substring(0, 20)}..." at ${m.start}-${m.end}`,
+        ),
+      );
     }
 
     // Clear existing color styles
     clearMarkColorStyles();
 
     // Prepare marks for application with question text
+    // Use blueprint (qr_id -> item.text) first, fall back to questionnaire search
+    const blueprint = response.blueprint;
     const marksToApply = marks.map((mark) => {
-      const questionText = findQuestionText(mark.linkId) || mark.linkId;
+      const questionText =
+        findQuestionTextFromBlueprint(mark.linkId, blueprint) ||
+        findQuestionText(mark.linkId) ||
+        mark.linkId;
       window._markQuestionText[mark.linkId] = questionText;
 
       return {
@@ -653,7 +713,10 @@ async function triggerMarking(html) {
 
     // Apply marks using OffsetView transformation (handles concurrent edits)
     if (leafMarks.length > 0) {
-      const appliedMarks = editorAPI.applyMarksWithOffsetTransform(leafMarks, savedEditorState);
+      const appliedMarks = editorAPI.applyMarksWithOffsetTransform(
+        leafMarks,
+        savedEditorState,
+      );
 
       // Apply colors for successfully applied marks
       for (const applied of appliedMarks) {
@@ -661,7 +724,7 @@ async function triggerMarking(html) {
         if (markInfo) {
           console.log(
             `%c MARKED [${markInfo.linkId}]: "${markInfo.text.substring(0, 40)}..."`,
-            `background: ${MARK_COLOR}; padding: 2px 4px;`
+            `background: ${MARK_COLOR}; padding: 2px 4px;`,
           );
 
           // Store color mapping
@@ -678,7 +741,7 @@ async function triggerMarking(html) {
       const appliedMarksForDOM = appliedMarks.map((m) => {
         const fullMark = leafMarks.find((mark) => mark.linkId === m.linkId);
         return {
-          text: fullMark?.text || '',
+          text: fullMark?.text || "",
           linkId: m.linkId,
         };
       });
@@ -687,7 +750,7 @@ async function triggerMarking(html) {
       console.log(`Applied ${appliedMarks.length}/${marks.length} marks`);
     }
   } catch (error) {
-    console.error('Marking failed:', error);
+    console.error("Marking failed:", error);
   }
 
   // Update tracking state
@@ -703,10 +766,11 @@ async function triggerMarking(html) {
     onMarkComplete(lastMarkResult);
   }
 
-  console.log('Marking complete');
+  console.log("Marking complete");
 }
 
-const MARKED_HTML_PROFILE = 'https://tiro.health/fhir/StructureDefinition/marked-html-content';
+const MARKED_HTML_PROFILE =
+  "https://tiro.health/fhir/StructureDefinition/marked-html-content";
 
 /**
  * Extract marked HTML from DocumentReference response
@@ -718,20 +782,56 @@ function extractMarkedHtmlFromResponse(response) {
   // Find the marked content entry (has the marked HTML profile)
   for (const content of response.content) {
     const hasMarkedProfile = content.profile?.some(
-      (p) => p.valueUri === MARKED_HTML_PROFILE
+      (p) => p.valueUri === MARKED_HTML_PROFILE,
     );
 
     if (hasMarkedProfile && content.attachment?.data) {
       try {
         return decodeURIComponent(escape(atob(content.attachment.data)));
       } catch (e) {
-        console.error('Failed to decode marked HTML:', e);
+        console.error("Failed to decode marked HTML:", e);
       }
     }
   }
 
   // Fallback: use extractHtmlFromDocumentReference for first HTML content
   return extractHtmlFromDocumentReference(response);
+}
+
+/**
+ * Find question text from the blueprint by qr_id.
+ * The blueprint is a QuestionnaireResponse where each item has:
+ *   id: qr_id (matches data-location / mark.linkId), text: question text
+ *
+ * @param {string} qrId - The qr_id (from data-location attribute)
+ * @param {Object} blueprint - QuestionnaireResponse blueprint
+ * @returns {string|null}
+ */
+function findQuestionTextFromBlueprint(qrId, blueprint) {
+  if (!blueprint?.item) return null;
+
+  function searchItems(items) {
+    for (const item of items) {
+      if (item.id === qrId) {
+        return item.text || null;
+      }
+      if (item.item) {
+        const found = searchItems(item.item);
+        if (found) return found;
+      }
+      if (item.answer) {
+        for (const answer of item.answer) {
+          if (answer.item) {
+            const found = searchItems(answer.item);
+            if (found) return found;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  return searchItems(blueprint.item);
 }
 
 /**
@@ -751,12 +851,13 @@ function findQuestionText(linkId, items = questionnaire?.item) {
   if (!items) return null;
 
   // Strip .answer suffix
-  const baseLinkId = linkId.replace(/\.answer$/, '');
+  const baseLinkId = linkId.replace(/\.answer$/, "");
 
   // Extract the last segment - this is the actual question linkId
   // e.g., "emergency-assessment.medications.option-xxx.medication-dosage" -> "medication-dosage"
-  const lastDotIndex = baseLinkId.lastIndexOf('.');
-  const lastSegment = lastDotIndex >= 0 ? baseLinkId.slice(lastDotIndex + 1) : baseLinkId;
+  const lastDotIndex = baseLinkId.lastIndexOf(".");
+  const lastSegment =
+    lastDotIndex >= 0 ? baseLinkId.slice(lastDotIndex + 1) : baseLinkId;
 
   // URL-decode the segment in case it was encoded
   let decodedSegment;
@@ -767,8 +868,9 @@ function findQuestionText(linkId, items = questionnaire?.item) {
   }
 
   // Search for this segment anywhere in the questionnaire tree
-  const found = findByLinkIdInTree(decodedSegment, items) ||
-                findByLinkIdInTree(lastSegment, items);
+  const found =
+    findByLinkIdInTree(decodedSegment, items) ||
+    findByLinkIdInTree(lastSegment, items);
   if (found) return found;
 
   // Fallback: try the full baseLinkId (for simple cases)
@@ -798,9 +900,9 @@ function findByLinkIdInTree(targetLinkId, items) {
  * Clear all dynamic mark color styles
  */
 function clearMarkColorStyles() {
-  const styleEl = document.getElementById('mark-colors-style');
+  const styleEl = document.getElementById("mark-colors-style");
   if (styleEl) {
-    styleEl.textContent = '';
+    styleEl.textContent = "";
   }
   // Clear color mapping
   window._markColors = {};
@@ -814,10 +916,10 @@ function applyMarkColor(linkId, color) {
   const categoryColor = getMarkColor(category);
 
   // Add CSS rule for this specific mark
-  let styleEl = document.getElementById('mark-colors-style');
+  let styleEl = document.getElementById("mark-colors-style");
   if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'mark-colors-style';
+    styleEl = document.createElement("style");
+    styleEl.id = "mark-colors-style";
     document.head.appendChild(styleEl);
   }
 
@@ -841,11 +943,13 @@ function applyMarkColor(linkId, color) {
 function applyMarkAttributesToDOM(appliedMarks, markInfos) {
   // Use setTimeout to let Lexical finish DOM updates
   setTimeout(() => {
-    const markElements = document.querySelectorAll('.editor-mark');
-    const editorEl = document.getElementById('lexical-editor');
+    const markElements = document.querySelectorAll(".editor-mark");
+    const editorEl = document.getElementById("lexical-editor");
     if (!editorEl) return;
 
-    console.log(`[DOM] Found ${markElements.length} mark elements, ${markInfos.length} mark infos`);
+    console.log(
+      `[DOM] Found ${markElements.length} mark elements, ${markInfos.length} mark infos`,
+    );
 
     // Calculate offset for each mark element by walking the editor DOM
     const elementOffsets = calculateMarkElementOffsets(editorEl, markElements);
@@ -856,7 +960,9 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
       const elText = markEl.textContent.trim();
 
       if (elOffset === undefined) {
-        console.warn(`[DOM] Could not calculate offset for element: "${elText.substring(0, 30)}..."`);
+        console.warn(
+          `[DOM] Could not calculate offset for element: "${elText.substring(0, 30)}..."`,
+        );
         continue;
       }
 
@@ -878,44 +984,60 @@ function applyMarkAttributesToDOM(appliedMarks, markInfos) {
 
       // If multiple text matches, pick the closest by position
       if (matchingMarks.length > 1) {
-        matchingMarks.sort((a, b) =>
-          Math.abs(a.start - elOffset.start) - Math.abs(b.start - elOffset.start)
+        matchingMarks.sort(
+          (a, b) =>
+            Math.abs(a.start - elOffset.start) -
+            Math.abs(b.start - elOffset.start),
         );
         matchingMarks = [matchingMarks[0]];
       }
 
       if (matchingMarks.length === 0) {
-        console.warn(`[DOM] No matching marks for element at offset ${elOffset.start}-${elOffset.end}: "${elText.substring(0, 30)}..."`);
+        console.warn(
+          `[DOM] No matching marks for element at offset ${elOffset.start}-${elOffset.end}: "${elText.substring(0, 30)}..."`,
+        );
         continue;
       }
 
       // Collect all mark IDs, frontend locations, and question texts for this element
       const markIds = matchingMarks.map((m) => m.linkId);
-      const frontendLocations = matchingMarks.map((m) => m.frontendLocation).filter(Boolean);
-      const questionTexts = matchingMarks.map((m) => m.questionText).filter(Boolean);
+      const frontendLocations = matchingMarks
+        .map((m) => m.frontendLocation)
+        .filter(Boolean);
+      const questionTexts = matchingMarks
+        .map((m) => m.questionText)
+        .filter(Boolean);
 
       // Set ALL matching mark IDs (space-separated for CSS selector compatibility)
-      markEl.setAttribute('data-lexical-mark-ids', markIds.join(' '));
+      markEl.setAttribute("data-lexical-mark-ids", markIds.join(" "));
 
       // Set mark category for CSS-based coloring
-      const primaryCategory = getMarkCategory(markIds[0] || '');
-      markEl.setAttribute('data-mark-category', primaryCategory);
+      const primaryCategory = getMarkCategory(markIds[0] || "");
+      markEl.setAttribute("data-mark-category", primaryCategory);
 
       // Set frontend locations for form field linking (space-separated)
       if (frontendLocations.length > 0) {
-        markEl.setAttribute('data-frontend-locations', frontendLocations.join(' '));
+        markEl.setAttribute(
+          "data-frontend-locations",
+          frontendLocations.join(" "),
+        );
       }
 
       // Store question texts as JSON array for hover handler
       if (questionTexts.length > 0) {
-        markEl.setAttribute('data-question-texts', JSON.stringify(questionTexts));
+        markEl.setAttribute(
+          "data-question-texts",
+          JSON.stringify(questionTexts),
+        );
         // Keep legacy attribute for single question (first one)
-        markEl.setAttribute('data-question-text', questionTexts[0]);
+        markEl.setAttribute("data-question-text", questionTexts[0]);
         // Remove any title attribute to prevent native tooltip (we use custom tooltip)
-        markEl.removeAttribute('title');
+        markEl.removeAttribute("title");
       }
 
-      console.log(`[DOM] Element "${elText.substring(0, 20)}..." at ${elOffset.start}-${elOffset.end} -> ${markIds.length} IDs: [${markIds.join(', ')}], ${questionTexts.length} questions`);
+      console.log(
+        `[DOM] Element "${elText.substring(0, 20)}..." at ${elOffset.start}-${elOffset.end} -> ${markIds.length} IDs: [${markIds.join(", ")}], ${questionTexts.length} questions`,
+      );
     }
   }, 50); // Small delay to ensure Lexical DOM is ready
 }
@@ -935,11 +1057,11 @@ function calculateMarkElementOffsets(editorEl, markElements) {
   let isFirstBlock = true;
 
   // Block-level elements that add \n\n separators (matches markPlugin.js BLOCK_TYPES)
-  const BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI']);
+  const BLOCK_TAGS = new Set(["P", "H1", "H2", "H3", "H4", "H5", "H6", "LI"]);
 
   function walkNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
+      const text = node.textContent || "";
       currentOffset += text.length;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node;
@@ -968,7 +1090,7 @@ function calculateMarkElementOffsets(editorEl, markElements) {
       }
 
       // BR tags add a single newline
-      if (el.tagName === 'BR') {
+      if (el.tagName === "BR") {
         currentOffset += 1;
       }
     }
@@ -984,7 +1106,7 @@ function calculateMarkElementOffsets(editorEl, markElements) {
  */
 export function setMarkingEnabled(enabled) {
   markingEnabled = enabled;
-  console.log(`Live marking ${enabled ? 'enabled' : 'disabled'}`);
+  console.log(`Live marking ${enabled ? "enabled" : "disabled"}`);
 }
 
 /**
@@ -1005,27 +1127,61 @@ export function setOnMarkComplete(callback) {
 }
 
 /**
+ * Set the questionnaire and reset marking state.
+ * Called when switching questionnaires.
+ * @param {Object} q - New FHIR Questionnaire object
+ */
+export function setQuestionnaire(q) {
+  questionnaire = q;
+  lastMarkResult = null;
+  lastMarkedContent = "";
+  lastCheckedContent = "";
+  window._markQuestionText = {};
+  console.log(
+    `Questionnaire updated with ${q?.item?.length || 0} items`,
+  );
+}
+
+/**
+ * Clear all marks from the editor.
+ * Removes every mark node and resets color styles.
+ */
+export function clearAllMarks() {
+  if (!editorAPI) return;
+
+  const markIDs = editorAPI.getAllMarkIDs();
+  for (const id of markIDs) {
+    editorAPI.removeMark(id);
+  }
+
+  clearMarkColorStyles();
+  highlightedContainers = [];
+  window._markColors = {};
+  console.log(`Cleared ${markIDs.length} marks`);
+}
+
+/**
  * Trigger marking manually (regardless of live mode)
  * Used when live mode is off and user clicks "Mark Now"
  */
 export async function triggerManualMark() {
   if (isMarking) {
-    console.log('Already marking, ignoring manual trigger');
+    console.log("Already marking, ignoring manual trigger");
     return;
   }
 
   if (!questionnaire) {
-    console.warn('No questionnaire available for marking');
+    console.warn("No questionnaire available for marking");
     return;
   }
 
   const currentContent = editorAPI.getTextContent();
   if (!currentContent.trim()) {
-    console.log('No content to mark');
+    console.log("No content to mark");
     return;
   }
 
-  console.log('[Manual Mark] Marking all content');
+  console.log("[Manual Mark] Marking all content");
   const rawHtml = editorAPI.getHtmlContent();
   const cleanHtml = stripMarksFromHtml(rawHtml);
   triggerMarking(cleanHtml);
