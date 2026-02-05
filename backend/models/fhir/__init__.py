@@ -33,6 +33,10 @@ from backend.models.fhir.questionnaire import (
     QuestionnaireItem,
     QuestionnaireItemAnswerOption,
 )
+from backend.models.fhir.provenance import (
+    Provenance,
+    ProvenanceAgent,
+)
 from backend.models.fhir.questionnaire_response import (
     QuestionnaireResponse,
     QuestionnaireResponseItem,
@@ -64,6 +68,8 @@ __all__ = [
     "Extension",
     "FHIRBaseModel",
     "MARKED_HTML_EXTENSION_URL",
+    "Provenance",
+    "ProvenanceAgent",
     "Questionnaire",
     "QuestionnaireItem",
     "QuestionnaireItemAnswerOption",

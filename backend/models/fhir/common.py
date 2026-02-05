@@ -35,15 +35,6 @@ class CodeableConcept(FHIRBaseModel):
     text: str | None = None
 
 
-class Reference(FHIRBaseModel):
-    """FHIR Reference element."""
-
-    reference: str | None = None
-    type: Uri | None = None
-    identifier: dict[str, object] | None = None
-    display: str | None = None
-
-
 class Extension(FHIRBaseModel):
     """FHIR Extension element."""
 
@@ -55,6 +46,16 @@ class Extension(FHIRBaseModel):
     valueUri: Uri | None = None
     valueBoolean: bool | None = None
     valueInteger: int | None = None
+
+
+class Reference(FHIRBaseModel):
+    """FHIR Reference element."""
+
+    reference: str | None = None
+    type: Uri | None = None
+    identifier: dict[str, object] | None = None
+    display: str | None = None
+    extension: list[Extension] = Field(default=[])
 
 
 class Attachment(FHIRBaseModel):
