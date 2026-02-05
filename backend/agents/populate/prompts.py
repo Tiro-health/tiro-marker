@@ -9,8 +9,9 @@ Guidelines:
 - Extract values that are clearly present in the text, even if not literally labeled
 - Understand common clinical documentation patterns and shorthand
 - For string/text questions, extract the relevant content even if phrasing differs from the question
-- If the information is genuinely not present or truly ambiguous, indicate you cannot extract it
-- Do not be overly pedantic about exact wording - focus on semantic meaning"""
+- If the information is genuinely not present or truly ambiguous, indicate you cannot extract it — set extracted=false
+- Do not be overly pedantic about exact wording - focus on semantic meaning
+- NEVER hallucinate or infer values that are not explicitly stated in the clinical text — keyword overlap from unrelated contexts (e.g. surgical phases, instrument names) is not evidence"""
 
 
 def format_extraction_prompt(
