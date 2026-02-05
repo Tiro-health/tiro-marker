@@ -14,17 +14,15 @@ AGENT_TYPE_CODE = "population-engine"
 AGENT_TYPE_DISPLAY = "Population Engine"
 
 FORM_ACTIVITY_SYSTEM = "http://fhir.tiro.health/CodeSystem/form-activity"
-FORM_ACTIVITY_CODE = "ai-clipboard"
-FORM_ACTIVITY_DISPLAY = "AI"
 
 LIFECYCLE_SYSTEM = "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle"
 LIFECYCLE_CODE = "originate"
-LIFECYCLE_DISPLAY = "Originate/Retain"
+LIFECYCLE_DISPLAY = "Originate/Retain Record Lifecycle Event"
 
-PROVENANCE_EXTENSION_URL = (
-    "http://fhir.tiro.health/StructureDefinition/provenance-participation-type"
-)
-PROVENANCE_EXTENSION_CODE = "ai"
+TARGET_ELEMENT_URL = "http://hl7.org/fhir/StructureDefinition/targetElement"
+
+ACTIVITY_TEXT = "Populated using AI analysis of clinical artifacts"
+AGENT_WHO_DISPLAY = "Atticus AI Population Engine"
 
 
 def build_provenance_for_item(
@@ -41,32 +39,38 @@ def build_provenance_for_item(
         Provenance resource referencing the item
     """
     return Provenance(
-        id=f"prov-{item_id}",
         target=[
             Reference(
-                reference=f"#{item_id}",
+                reference="#",
                 extension=[
                     Extension(
-                        url=PROVENANCE_EXTENSION_URL,
-                        valueCode=PROVENANCE_EXTENSION_CODE,
+                        url=TARGET_ELEMENT_URL,
+                        valueUri=item_id,
                     )
                 ],
             )
         ],
         recorded=recorded,
         activity=CodeableConcept(
+            text=ACTIVITY_TEXT,
             coding=[
+                Coding(
+                    system=FORM_ACTIVITY_SYSTEM,
+                    code="ai-clipboard",
+                    display="AI Clipboard",
+                    userSelected=True,
+                ),
+                Coding(
+                    system=FORM_ACTIVITY_SYSTEM,
+                    code="ai",
+                    display="AI population",
+                ),
                 Coding(
                     system=LIFECYCLE_SYSTEM,
                     code=LIFECYCLE_CODE,
                     display=LIFECYCLE_DISPLAY,
                 ),
-                Coding(
-                    system=FORM_ACTIVITY_SYSTEM,
-                    code=FORM_ACTIVITY_CODE,
-                    display=FORM_ACTIVITY_DISPLAY,
-                ),
-            ]
+            ],
         ),
         agent=[
             ProvenanceAgent(
@@ -79,6 +83,7 @@ def build_provenance_for_item(
                         )
                     ]
                 ),
+                who=Reference(display=AGENT_WHO_DISPLAY),
             )
         ],
     )
