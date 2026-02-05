@@ -41,7 +41,7 @@ def build_provenance_for_item(
         Provenance resource referencing the item
     """
     return Provenance(
-        id=f"provenance-{item_id}",
+        id=f"prov-{item_id}",
         target=[
             Reference(
                 reference=f"#{item_id}",
