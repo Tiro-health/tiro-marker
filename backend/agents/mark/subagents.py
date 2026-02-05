@@ -26,18 +26,6 @@ from backend.models.fhir.common import Coding
 from backend.models.fhir.questionnaire_response import QuestionnaireResponseItemAnswer
 
 
-def _sanitize_for_id(linkId: str) -> str:
-    """Sanitize linkId to conform to FHIR Id pattern: ^[A-Za-z0-9\\-\\.]{1,64}$"""
-    # Replace any character not in [A-Za-z0-9-.]  with hyphen
-    sanitized = re.sub(r"[^A-Za-z0-9\-.]", "-", linkId)
-    # Collapse multiple hyphens
-    sanitized = re.sub(r"-+", "-", sanitized)
-    # Strip leading/trailing hyphens
-    sanitized = sanitized.strip("-")
-    # Truncate to fit within 64 chars when combined with UUID (36 chars + 1 hyphen = 37)
-    max_linkid_len = 64 - 37  # 27 chars
-    return sanitized[:max_linkid_len] if sanitized else "item"
-
 
 @dataclass
 class MarkResult:
@@ -271,7 +259,7 @@ async def default_strategy(
     extended_marks: list[ExtendedMarkResult] = []
 
     # Generate UUID-based ID for this item
-    item_id = f"{uuid.uuid4()}-{_sanitize_for_id(item.linkId)}"
+    item_id = str(uuid.uuid4())
 
     if item.type not in ("group", "display"):
         prompt = format_default_prompt(item, html, siblings)
@@ -334,7 +322,7 @@ async def simple_container_strategy(
     No LLM call needed - just extract all root-level labeled elements.
     """
     # Generate UUID-based ID for this item
-    item_id = f"{uuid.uuid4()}-{_sanitize_for_id(item.linkId)}"
+    item_id = str(uuid.uuid4())
 
     # Get all root-level labels from the HTML
     root_labels = get_root_labels(html)
@@ -404,7 +392,7 @@ async def repeating_group_strategy(
     for i, instance in enumerate(result.output.instances):
         instance_location = f"{location}.{i}"
         # Generate UUID-based ID for this instance
-        item_id = f"{uuid.uuid4()}-{_sanitize_for_id(item.linkId)}"
+        item_id = str(uuid.uuid4())
 
         # Extract scoped HTML for this instance
         instance_html = (
@@ -492,7 +480,7 @@ async def repeating_coding_strategy(
         labels = getattr(result.output, field_name, [])
         if labels:
             # Generate UUID-based ID for this option instance
-            item_id = f"{uuid.uuid4()}-{_sanitize_for_id(item.linkId)}"
+            item_id = str(uuid.uuid4())
 
             # Extract scoped HTML for this option
             option_html = extract_html_for_labels(html, labels)
