@@ -1,5 +1,7 @@
 """FHIR R5 QuestionnaireResponse resource."""
 
+from typing import Any
+
 from pydantic import Field
 
 from backend.models.fhir.common import Coding, FHIRBaseModel, Reference
@@ -46,6 +48,7 @@ class QuestionnaireResponse(FHIRBaseModel):
     """FHIR R5 QuestionnaireResponse resource."""
 
     resourceType: str = Field(default="QuestionnaireResponse")
+    contained: list[dict[str, Any]] = Field(default=[])
     id: Id | None = None
     identifier: list[dict[str, object]] = Field(default=[])
     basedOn: list[Reference] = Field(default=[])

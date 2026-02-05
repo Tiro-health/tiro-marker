@@ -118,8 +118,9 @@ Your task is to identify HTML elements that contain answers to questionnaire que
 The HTML has data-label="N" attributes on elements. Return the label integers for requested information.
 Guidelines:
 - Return only label integers as a list
-- Return empty list if not found
-- Include labels for the answer AND any nested question answers"""
+- Return empty list if the information is not found in the clinical note
+- Include labels for the answer AND any nested question answers
+- Only mark content that DIRECTLY answers the question — do not match on keyword overlap from unrelated clinical contexts"""
 
 
 def format_default_prompt(
@@ -172,7 +173,7 @@ def format_repeating_group_prompt(
     return f"""<prompt>
   {_format_context()}
   <section type="repeating_group">{text}</section>{nested_section}
-  <instruction>Find repeating instances. For each, return ALL labels encompassing that instance and nested content.</instruction>
+  <instruction>Find repeating instances. For each, return ALL labels encompassing that instance and nested content. If the clinical note does not contain explicit information for this section, return NO instances. Do NOT infer answers from keywords that appear in a different clinical context (e.g. surgical phase names are not tumor localizations).</instruction>
   <clinical_note>{html}</clinical_note>
 </prompt>"""
 
