@@ -10,6 +10,7 @@ import { initFormToMark } from './questionnaire/formToMark.js';
 import { initQuestionnaireSwitcher } from './questionnaire/switcher.js?v=2';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js?v=2';
 import { populateFromMarkedHtml } from './api/populate.js';
+import { createVoiceStateMachine, State as VoiceState } from './voice/stateMachine.js';
 
 // DOM Elements
 let clinicalForm = null;
@@ -23,6 +24,9 @@ let editorAPI = null;
 
 // Live populate mode state
 let populateLive = false;
+
+// Voice dictation state machine
+let voiceStateMachine = null;
 
 /**
  * Start the live clock in the header
@@ -385,11 +389,21 @@ function setupEventListeners() {
     submitFormBtn.addEventListener('click', handleFormSubmit);
   }
 
-  // Mic button
+  // Mic button — voice dictation
   const micBtn = document.getElementById('mic-btn');
   if (micBtn) {
     micBtn.addEventListener('click', () => {
-      showToast('Voice input coming soon', 'warning');
+      if (!voiceStateMachine) {
+        voiceStateMachine = createVoiceStateMachine(editorAPI, {
+          onStateChange: handleVoiceStateChange,
+          onPreviewText: handleVoicePreview,
+          onLevelUpdate: handleAudioLevel,
+          onError: (err) => {
+            console.error('Voice error:', err);
+          },
+        });
+      }
+      voiceStateMachine.toggle();
     });
   }
 
@@ -535,6 +549,105 @@ async function handleFormSubmit() {
   const response = await clinicalForm.getResponse();
   formResponseEl.textContent = JSON.stringify(response, null, 2);
   formResponseEl.classList.remove('hidden');
+}
+
+// Line-based preview state
+const LINE_WORDS = 12;
+let prevLineText = '';
+let lineWordOffset = 0; // word index where the current line starts
+let wasRecording = false; // track whether we were already recording
+
+/**
+ * Handle voice state changes — update UI accordingly
+ * @param {string} newState
+ */
+function handleVoiceStateChange(newState) {
+  const voiceBar = document.getElementById('voice-bar');
+  const prevEl = document.getElementById('voice-prev');
+  const curEl = document.getElementById('voice-cur');
+  if (!voiceBar) return;
+
+  voiceBar.classList.remove('voice-recording', 'voice-stopping');
+
+  switch (newState) {
+    case VoiceState.RECORDING:
+    case VoiceState.FINALIZING:
+      voiceBar.classList.add('voice-recording');
+      // Only reset preview on first entry, not on FINALIZING→RECORDING cycles
+      if (!wasRecording) {
+        wasRecording = true;
+        prevLineText = '';
+        lineWordOffset = 0;
+        if (prevEl) prevEl.textContent = '';
+        if (curEl) curEl.textContent = '\u00a0';
+      }
+      break;
+    case VoiceState.STOPPING:
+      voiceBar.classList.add('voice-stopping');
+      break;
+    case VoiceState.IDLE:
+    default:
+      wasRecording = false;
+      prevLineText = '';
+      lineWordOffset = 0;
+      if (prevEl) prevEl.textContent = '';
+      if (curEl) curEl.textContent = 'Tap to dictate clinical notes';
+      break;
+  }
+}
+
+/**
+ * Handle voice preview text — line-by-line display.
+ * After ~8 words the current line shifts up (faded) and a new line starts.
+ * Ignores interim revisions that shrink the text to prevent flickering.
+ * @param {string} text
+ */
+function handleVoicePreview(text) {
+  const prevEl = document.getElementById('voice-prev');
+  const curEl = document.getElementById('voice-cur');
+  if (!curEl) return;
+
+  const trimmed = text.trim();
+  if (!trimmed) return;
+
+  const words = trimmed.split(/\s+/);
+
+  // If text shrunk significantly (flush cleared accumulatedText), reset lines.
+  // Small drops (1-2 words) are interim revisions — ignore those to prevent flicker.
+  if (words.length < lineWordOffset) {
+    if (lineWordOffset - words.length > 3) {
+      // Big drop = flush happened, reset and start fresh
+      lineWordOffset = 0;
+      prevLineText = '';
+      if (prevEl) prevEl.textContent = '';
+    } else {
+      // Small drop = interim revision, keep last display
+      return;
+    }
+  }
+
+  // Advance lines while word count exceeds threshold
+  while (words.length > lineWordOffset + LINE_WORDS) {
+    prevLineText = words.slice(lineWordOffset, lineWordOffset + LINE_WORDS).join(' ');
+    lineWordOffset += LINE_WORDS;
+    if (prevEl) prevEl.textContent = prevLineText;
+  }
+
+  // Show words from current line start
+  const display = words.slice(lineWordOffset).join(' ');
+  curEl.textContent = display || '\u00a0';
+}
+
+/**
+ * Handle audio level updates — drive mic button glow intensity.
+ * @param {number} dBFS - Audio level in dBFS (typically -60 to 0)
+ */
+function handleAudioLevel(dBFS) {
+  const btn = document.getElementById('mic-btn');
+  if (!btn) return;
+  // Map dBFS (-50…-5) to 0…1 intensity (wider range, harder to max out)
+  const intensity = Math.max(0, Math.min(1, (dBFS + 50) / 45));
+  btn.style.setProperty('--audio-level', intensity);
 }
 
 // Initialize on DOMContentLoaded

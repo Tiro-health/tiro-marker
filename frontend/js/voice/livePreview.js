@@ -1,0 +1,94 @@
+/**
+ * Live Preview
+ * Web Speech API wrapper for real-time interim transcription preview.
+ * Auto-restarts on end (Chrome stops after ~60s).
+ */
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+/**
+ * Create a live preview instance using the Web Speech API.
+ * @param {{ onInterim?: (text: string) => void, onFinal?: (text: string) => void, onError?: (error: Error) => void }} callbacks
+ * @returns {{ start: () => void, stop: () => void, isSupported: boolean }}
+ */
+export function createLivePreview({ onInterim, onFinal, onError } = {}) {
+  if (!SpeechRecognition) {
+    return {
+      start() {},
+      stop() {},
+      isSupported: false,
+    };
+  }
+
+  let recognition = null;
+  let shouldRestart = false;
+
+  function createRecognition() {
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+
+    rec.onresult = (event) => {
+      let interim = '';
+      let finalText = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+
+      if (finalText) onFinal?.(finalText);
+      if (interim) onInterim?.(interim);
+    };
+
+    rec.onerror = (event) => {
+      // 'no-speech' and 'aborted' are expected during normal operation
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      onError?.(new Error(`Speech recognition error: ${event.error}`));
+    };
+
+    rec.onend = () => {
+      // Auto-restart if we haven't explicitly stopped
+      if (shouldRestart) {
+        try {
+          rec.start();
+        } catch {
+          // May fail if already started; ignore
+        }
+      }
+    };
+
+    return rec;
+  }
+
+  return {
+    isSupported: true,
+
+    start() {
+      shouldRestart = true;
+      recognition = createRecognition();
+      try {
+        recognition.start();
+      } catch {
+        // Ignore if already started
+      }
+    },
+
+    stop() {
+      shouldRestart = false;
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch {
+          // Ignore
+        }
+        recognition = null;
+      }
+    },
+  };
+}
