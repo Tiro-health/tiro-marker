@@ -1,14 +1,16 @@
 """Tests for the provenance builder."""
 
+from datetime import datetime, timezone
+
 from backend.agents.populate.provenance import (
+    ACTIVITY_TEXT,
     AGENT_TYPE_CODE,
     AGENT_TYPE_SYSTEM,
-    FORM_ACTIVITY_CODE,
+    AGENT_WHO_DISPLAY,
     FORM_ACTIVITY_SYSTEM,
     LIFECYCLE_CODE,
     LIFECYCLE_SYSTEM,
-    PROVENANCE_EXTENSION_CODE,
-    PROVENANCE_EXTENSION_URL,
+    TARGET_ELEMENT_URL,
     build_provenance_for_item,
     build_provenances,
     collect_item_ids,
@@ -17,8 +19,6 @@ from backend.models.fhir.questionnaire_response import (
     QuestionnaireResponseItem,
     QuestionnaireResponseItemAnswer,
 )
-
-from datetime import datetime, timezone
 
 
 def _make_item(
@@ -72,7 +72,7 @@ class TestBuildProvenanceForItem:
         prov = build_provenance_for_item("item-1", recorded)
 
         assert prov.resourceType == "Provenance"
-        assert prov.id == "prov-item-1"  # short IDs still work
+        assert prov.id is None
         assert prov.recorded == recorded
 
     def test_target_reference(self) -> None:
@@ -81,27 +81,35 @@ class TestBuildProvenanceForItem:
 
         assert len(prov.target) == 1
         target = prov.target[0]
-        assert target.reference == "#item-1"
+        assert target.reference == "#"
         assert len(target.extension) == 1
         ext = target.extension[0]
-        assert ext.url == PROVENANCE_EXTENSION_URL
-        assert ext.valueCode == PROVENANCE_EXTENSION_CODE
+        assert ext.url == TARGET_ELEMENT_URL
+        assert ext.valueUri == "item-1"
 
     def test_activity_codings(self) -> None:
         recorded = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
         prov = build_provenance_for_item("item-1", recorded)
 
         assert prov.activity is not None
+        assert prov.activity.text == ACTIVITY_TEXT
         codings = prov.activity.coding
-        assert len(codings) == 2
+        assert len(codings) == 3
 
-        lifecycle = codings[0]
+        ai_clipboard = codings[0]
+        assert ai_clipboard.system == FORM_ACTIVITY_SYSTEM
+        assert ai_clipboard.code == "ai-clipboard"
+        assert ai_clipboard.display == "AI Clipboard"
+        assert ai_clipboard.userSelected is True
+
+        ai = codings[1]
+        assert ai.system == FORM_ACTIVITY_SYSTEM
+        assert ai.code == "ai"
+        assert ai.display == "AI population"
+
+        lifecycle = codings[2]
         assert lifecycle.system == LIFECYCLE_SYSTEM
         assert lifecycle.code == LIFECYCLE_CODE
-
-        activity = codings[1]
-        assert activity.system == FORM_ACTIVITY_SYSTEM
-        assert activity.code == FORM_ACTIVITY_CODE
 
     def test_agent(self) -> None:
         recorded = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -114,6 +122,8 @@ class TestBuildProvenanceForItem:
         coding = agent.type.coding[0]
         assert coding.system == AGENT_TYPE_SYSTEM
         assert coding.code == AGENT_TYPE_CODE
+        assert agent.who is not None
+        assert agent.who.display == AGENT_WHO_DISPLAY
 
 
 class TestBuildProvenances:
@@ -127,18 +137,16 @@ class TestBuildProvenances:
         assert len(result) == 2
         assert all(isinstance(p, dict) for p in result)
         assert result[0]["resourceType"] == "Provenance"
-        assert result[0]["id"] == "prov-a"
-        assert result[1]["id"] == "prov-b"
 
     def test_target_has_extension(self) -> None:
         items = [_make_item("a", "q1")]
         result = build_provenances(items)
 
         target = result[0]["target"][0]
-        assert target["reference"] == "#a"
+        assert target["reference"] == "#"
         assert len(target["extension"]) == 1
-        assert target["extension"][0]["url"] == PROVENANCE_EXTENSION_URL
-        assert target["extension"][0]["valueCode"] == PROVENANCE_EXTENSION_CODE
+        assert target["extension"][0]["url"] == TARGET_ELEMENT_URL
+        assert target["extension"][0]["valueUri"] == "a"
 
     def test_empty_items(self) -> None:
         assert build_provenances([]) == []
@@ -153,11 +161,9 @@ class TestBuildProvenances:
         timestamps = [p["recorded"] for p in result]
         assert len(set(str(t) for t in timestamps)) == 1
 
-    def test_serialization_strips_empty_fields(self) -> None:
-        """Verify FHIRBaseModel serializer strips None/empty values."""
+    def test_agent_has_who_display(self) -> None:
         items = [_make_item("a", "q1")]
         result = build_provenances(items)
 
-        # agent[0].who is None so should not appear
         agent = result[0]["agent"][0]
-        assert "who" not in agent
+        assert agent["who"]["display"] == AGENT_WHO_DISPLAY
