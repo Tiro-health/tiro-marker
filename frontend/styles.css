@@ -598,8 +598,8 @@ body {
 .voice-bar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1.25rem;
+    gap: 1.1rem;
+    padding: 0.85rem 1.25rem;
     border-top: 1px solid var(--border-primary);
     background-color: rgba(30, 41, 59, 0.5);
     flex-shrink: 0;
@@ -632,9 +632,69 @@ body {
     height: 20px;
 }
 
-.voice-status {
-    font-size: 0.75rem;
+.voice-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.1rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.voice-line {
+    font-size: 0.9rem;
     color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    transition: opacity 0.3s ease;
+}
+
+.voice-line-prev {
+    opacity: 0.35;
+    font-size: 0.8rem;
+}
+
+.voice-line-cur {
+    opacity: 1;
+}
+
+/* ---- Recording state ---- */
+.voice-bar.voice-recording .mic-btn {
+    --audio-level: 0;
+    background-color: var(--accent-cyan);
+    color: #0f172a;
+    box-shadow: 0 0 0 calc(2px + 5px * var(--audio-level)) rgba(34, 211, 238, calc(0.08 + 0.18 * var(--audio-level)));
+    transition: box-shadow 0.15s ease-out, background-color 0.15s;
+}
+
+.voice-bar.voice-recording .mic-icon {
+    display: none;
+}
+
+.voice-bar.voice-recording .stop-icon {
+    display: block !important;
+}
+
+.voice-bar.voice-recording .voice-line-cur::after {
+    content: '';
+    animation: recording-dots 1.5s steps(1) infinite;
+    letter-spacing: 0.05em;
+}
+
+@keyframes recording-dots {
+    0%   { content: ' .'; }
+    25%  { content: ' ..'; }
+    50%  { content: ' ...'; }
+    75%  { content: ' ..'; }
+}
+
+.voice-bar.voice-stopping .mic-btn {
+    opacity: 0.5;
+    cursor: wait;
+    pointer-events: none;
 }
 
 /* ========================================
