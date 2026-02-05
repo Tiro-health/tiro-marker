@@ -83,7 +83,7 @@ function getMarkColor(category) {
 
 // Fallback single color (for dynamic CSS rules)
 const MARK_COLOR = "var(--mark-amber)";
-const HIGHLIGHT_COLOR = "var(--highlight-color)";
+const HIGHLIGHT_COLOR = "rgba(34, 211, 238, 0.30)";
 
 // Track currently highlighted elements for clearing on next click
 let highlightedContainers = [];
@@ -235,6 +235,17 @@ function createTooltip() {
           result.field.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }, 0);
+    } else {
+      // Clicked inside editor but NOT on a mark → clear form highlights
+      clearHighlightedContainers();
+    }
+  });
+
+  // Click anywhere outside the editor also clears form highlights
+  // (mark glow is managed by hover in formToMark.js, not cleared on click)
+  document.addEventListener("click", (e) => {
+    if (!editorContainer.contains(e.target)) {
+      clearHighlightedContainers();
     }
   });
 }
@@ -381,7 +392,7 @@ function highlightFormFieldContainer(linkId) {
 
       // Apply highlight
       container.style.transition = "background-color 0.3s ease";
-      container.style.backgroundColor = HIGHLIGHT_COLOR; // Lighter yellow
+      container.style.backgroundColor = HIGHLIGHT_COLOR;
       container.style.borderRadius = "4px";
 
       // Track for clearing later
@@ -1155,9 +1166,67 @@ export function clearAllMarks() {
   }
 
   clearMarkColorStyles();
+  clearMarkGlow();
   highlightedContainers = [];
   window._markColors = {};
   console.log(`Cleared ${markIDs.length} marks`);
+}
+
+/**
+ * Find all mark DOM elements linked to a given frontend location.
+ * Matches by exact token OR dot-segment match in the space-separated
+ * data-frontend-locations attribute.
+ *
+ * Examples:
+ *  - location "patient-name.answer" matches token "patient-name.answer" (exact)
+ *  - location "triage-level" matches token "emergency-assessment.triage-level.answer"
+ *    (segment match: "triage-level" appears as a dot-separated segment)
+ *
+ * @param {string} location - Frontend location string
+ * @returns {HTMLElement[]}
+ */
+export function findMarksByFrontendLocation(location) {
+  const all = document.querySelectorAll('.editor-mark[data-frontend-locations]');
+  const matches = [];
+  for (const el of all) {
+    const tokens = el.getAttribute('data-frontend-locations').split(' ');
+    if (tokens.some(t => t === location || t.split('.').includes(location))) {
+      matches.push(el);
+    }
+  }
+  return matches;
+}
+
+/**
+ * Add the blue neon glow class to all marks linked to a frontend location.
+ * @param {string} location - Frontend location string
+ */
+export function highlightMarksForQuestion(location) {
+  const marks = findMarksByFrontendLocation(location);
+  for (const el of marks) {
+    el.classList.add('mark-glow');
+  }
+}
+
+/**
+ * Remove the glow class from every mark in the editor.
+ */
+export function clearMarkGlow() {
+  const glowing = document.querySelectorAll('.editor-mark.mark-glow');
+  for (const el of glowing) {
+    el.classList.remove('mark-glow');
+  }
+}
+
+/**
+ * Scroll the editor to the first mark linked to a frontend location.
+ * @param {string} location - Frontend location string
+ */
+export function scrollToFirstMark(location) {
+  const marks = findMarksByFrontendLocation(location);
+  if (marks.length > 0) {
+    marks[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 /**
