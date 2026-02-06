@@ -135,6 +135,9 @@ questionnaire:
                   - Beperkt
                   - Matig
                   - Uitgesproken
+      - linkId: samenvatting
+        type: string
+        text: Samenvatting
 
 expected_marks:
   - "bevindingen-beenmerg-gewricht-9"
@@ -160,3 +163,4 @@ expected_marks:
   - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Normaal.answer"
   - "bevindingen-beenmerg-gewricht-9.achterste-kruisband.akb-pathologie.answer"
   - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.answer"
+  - "bevindingen-beenmerg-gewricht-9.samenvatting.answer"

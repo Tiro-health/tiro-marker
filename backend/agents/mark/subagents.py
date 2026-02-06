@@ -26,13 +26,14 @@ from backend.models.fhir.common import Coding
 from backend.models.fhir.questionnaire_response import QuestionnaireResponseItemAnswer
 
 
-
 @dataclass
 class MarkResult:
     """Result of marking a question."""
 
     qr_id: str  # UUID-based ID for QR blueprint (data-location)
-    frontend_location: str  # Hierarchical path for form linking (data-frontend-location)
+    frontend_location: (
+        str  # Hierarchical path for form linking (data-frontend-location)
+    )
     labels: list[int]
     is_group: bool = False  # True for group/container marks (excluded from HTML output)
 
@@ -42,9 +43,11 @@ class ParentContext:
     """Context from parent item for building MarkedItem."""
 
     linkId: str | None = None
+    text: str | None = None  # Parent's human-readable name
     index: int | None = None
     item_id: str | None = None  # Parent's UUID-based ID
     instance_answer: QuestionnaireResponseItemAnswer | None = None
+    breadcrumb: list[str] | None = None  # Full path e.g. ["Medications", "Dosage"]
 
 
 @dataclass
@@ -63,9 +66,11 @@ class ChildInput:
     location_string: str
     html: str  # Scoped HTML for this child
     parent_linkId: str | None = None
+    parent_text: str | None = None  # Parent's human-readable name
     parent_index: int | None = None
     parent_id: str | None = None  # Parent's UUID-based ID
     parent_instance_answer: QuestionnaireResponseItemAnswer | None = None
+    parent_breadcrumb: list[str] | None = None  # Full path to parent
 
 
 # =============================================================================
@@ -191,9 +196,7 @@ StrategyFn = Callable[
         list[str],
         ParentContext | None,
     ],  # (item, location, html, model_name, siblings, parent_ctx)
-    Awaitable[
-        tuple[list[ExtendedMarkResult], list[ChildInput]]
-    ],  # (extended_marks, children)
+    Awaitable[tuple[list[ExtendedMarkResult], list[ChildInput]]],
 ]
 
 # Strategy registry - extend by adding new entries
@@ -263,7 +266,7 @@ async def default_strategy(
     item_id = str(uuid.uuid4())
 
     if item.type not in ("group", "display"):
-        prompt = format_default_prompt(item, html, siblings)
+        prompt = format_default_prompt(item, html, siblings, parent_ctx)
 
         agent = create_agent(model_name, DefaultLabelsResponse, SYSTEM_PROMPT)
         result = await agent.run(prompt)
@@ -285,12 +288,19 @@ async def default_strategy(
         )
         extended_marks.append(ExtendedMarkResult(mark=mark, marked_item=marked_item))
 
+    # Build breadcrumb for children: extend parent's breadcrumb with current item text
+    current_text = item.text or item.linkId
+    parent_breadcrumb = parent_ctx.breadcrumb if parent_ctx else None
+    child_breadcrumb = (parent_breadcrumb or []) + [current_text]
+
     # Build parent context for children
     child_parent_ctx = ParentContext(
         linkId=item.linkId,
+        text=current_text,
         index=None,
         item_id=item_id,
         instance_answer=None,
+        breadcrumb=child_breadcrumb,
     )
 
     children = [
@@ -299,9 +309,11 @@ async def default_strategy(
             location_string=f"{location}.{child.linkId}",
             html=html,  # Same HTML - default has no scope reduction
             parent_linkId=child_parent_ctx.linkId,
+            parent_text=child_parent_ctx.text,
             parent_index=child_parent_ctx.index,
             parent_id=child_parent_ctx.item_id,
             parent_instance_answer=child_parent_ctx.instance_answer,
+            parent_breadcrumb=child_parent_ctx.breadcrumb,
         )
         for child in item.item or []
     ]
@@ -349,12 +361,19 @@ async def simple_container_strategy(
     # Extract scoped HTML for children
     scoped_html = extract_html_for_labels(html, root_labels) if root_labels else html
 
+    # Build breadcrumb for children: extend parent's breadcrumb with current item text
+    current_text = item.text or item.linkId
+    parent_breadcrumb = parent_ctx.breadcrumb if parent_ctx else None
+    child_breadcrumb = (parent_breadcrumb or []) + [current_text]
+
     # Build parent context for children
     child_parent_ctx = ParentContext(
         linkId=item.linkId,
+        text=current_text,
         index=None,
         item_id=item_id,
         instance_answer=None,
+        breadcrumb=child_breadcrumb,
     )
 
     children = [
@@ -363,9 +382,11 @@ async def simple_container_strategy(
             location_string=f"{location}.{child.linkId}",
             html=scoped_html,
             parent_linkId=child_parent_ctx.linkId,
+            parent_text=child_parent_ctx.text,
             parent_index=child_parent_ctx.index,
             parent_id=child_parent_ctx.item_id,
             parent_instance_answer=child_parent_ctx.instance_answer,
+            parent_breadcrumb=child_parent_ctx.breadcrumb,
         )
         for child in item.item or []
     ]
@@ -390,6 +411,11 @@ async def repeating_group_strategy(
 
     extended_marks: list[ExtendedMarkResult] = []
     children: list[ChildInput] = []
+
+    # Build breadcrumb for children: extend parent's breadcrumb with current item text
+    current_text = item.text or item.linkId
+    parent_breadcrumb = parent_ctx.breadcrumb if parent_ctx else None
+    child_breadcrumb = (parent_breadcrumb or []) + [current_text]
 
     for i, instance in enumerate(result.output.instances):
         instance_location = f"{location}.{i}"
@@ -423,9 +449,11 @@ async def repeating_group_strategy(
         # Build parent context for children of this instance
         child_parent_ctx = ParentContext(
             linkId=item.linkId,
+            text=current_text,
             index=i,
             item_id=item_id,
             instance_answer=None,
+            breadcrumb=child_breadcrumb,
         )
 
         for child in item.item or []:
@@ -435,9 +463,11 @@ async def repeating_group_strategy(
                     location_string=f"{instance_location}.{child.linkId}",
                     html=instance_html,  # Scoped to this instance
                     parent_linkId=child_parent_ctx.linkId,
+                    parent_text=child_parent_ctx.text,
                     parent_index=child_parent_ctx.index,
                     parent_id=child_parent_ctx.item_id,
                     parent_instance_answer=child_parent_ctx.instance_answer,
+                    parent_breadcrumb=child_parent_ctx.breadcrumb,
                 )
             )
 
@@ -475,6 +505,11 @@ async def repeating_coding_strategy(
 
     extended_marks: list[ExtendedMarkResult] = []
     children: list[ChildInput] = []
+
+    # Build breadcrumb for children: extend parent's breadcrumb with current item text
+    current_text = item.text or item.linkId
+    parent_breadcrumb = parent_ctx.breadcrumb if parent_ctx else None
+    child_breadcrumb = (parent_breadcrumb or []) + [current_text]
 
     # Track option index for each found option
     option_index = 0
@@ -542,9 +577,11 @@ async def repeating_coding_strategy(
                 # Build parent context for children of this option
                 child_parent_ctx = ParentContext(
                     linkId=item.linkId,
+                    text=current_text,
                     index=option_index,
                     item_id=item_id,
                     instance_answer=instance_answer,
+                    breadcrumb=child_breadcrumb,
                 )
 
                 for child in item.item:
@@ -554,9 +591,11 @@ async def repeating_coding_strategy(
                             location_string=f"{option_location}.{child.linkId}",
                             html=option_html,  # Scoped to this option
                             parent_linkId=child_parent_ctx.linkId,
+                            parent_text=child_parent_ctx.text,
                             parent_index=child_parent_ctx.index,
                             parent_id=child_parent_ctx.item_id,
                             parent_instance_answer=child_parent_ctx.instance_answer,
+                            parent_breadcrumb=child_parent_ctx.breadcrumb,
                         )
                     )
 
