@@ -1,0 +1,33 @@
+name: "Parent context for vague questions"
+description: "Tests that vague questions like 'Summary' and 'Notes' are correctly disambiguated using parent context"
+
+questionnaire:
+  - linkId: medications
+    type: group
+    text: Medications
+    item:
+      - linkId: medication-summary
+        type: string
+        text: Summary
+      - linkId: medication-notes
+        type: string
+        text: Additional notes
+  - linkId: allergies
+    type: group
+    text: Allergies
+    item:
+      - linkId: allergy-summary
+        type: string
+        text: Summary
+      - linkId: allergy-notes
+        type: string
+        text: Additional notes
+  - linkId: general-notes
+    type: string
+    text: General notes
+
+expected_marks:
+  - "medications.medication-summary.answer"
+  - "medications.medication-notes.answer"
+  - "allergies.allergy-summary.answer"
+  - "allergies.allergy-notes.answer"

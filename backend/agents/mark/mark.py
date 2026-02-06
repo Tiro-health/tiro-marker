@@ -10,6 +10,7 @@ import logfire
 from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
 from pydantic_graph.beta.join import reduce_null
 
+from backend.agents.mark.context import marking_context
 from backend.agents.mark.labeling import apply_marks as apply_marks_to_html
 from backend.agents.mark.labeling import (
     get_text_content,
@@ -77,26 +78,30 @@ class MarkRequest:
 async def mark_html(
     html: str,
     q_items: Sequence[QuestionnaireItemProtocol],
+    questionnaire_title: str | None = None,
 ) -> MarkingResult:
     """Mark HTML with questionnaire item spans.
 
     Args:
         html: Source HTML to mark.
         q_items: Questionnaire items to identify spans for.
+        questionnaire_title: Optional title for context in prompts.
 
     Returns:
         MarkingResult with marked HTML and QR blueprint.
     """
-    # First, label the HTML for AI selection
-    labeled_html, _label_count = label_html(html)
+    # Set global context for all prompts in this marking operation
+    with marking_context(questionnaire_title=questionnaire_title):
+        # First, label the HTML for AI selection
+        labeled_html, _label_count = label_html(html)
 
-    g = create_graph()
-    graph = g.build()
-    state = MarkerState(html=labeled_html)
-    request = MarkRequest(html=labeled_html, q_items=q_items)
-    result = await graph.run(state=state, inputs=request)
+        g = create_graph()
+        graph = g.build()
+        state = MarkerState(html=labeled_html)
+        request = MarkRequest(html=labeled_html, q_items=q_items)
+        result = await graph.run(state=state, inputs=request)
 
-    return result
+        return result
 
 
 def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult]:
@@ -138,11 +143,22 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
         parent_ctx = ctx.inputs.parent_ctx
 
         # Log item being processed (trace level for filtering)
-        logfire.trace("→ {text}", text=item.text or item.linkId, linkId=item.linkId)
+        breadcrumb = " > ".join(parent_ctx.breadcrumb) if parent_ctx and parent_ctx.breadcrumb else None
+        logfire.trace(
+            "→ {text}",
+            text=item.text or item.linkId,
+            linkId=item.linkId,
+            parent=parent_ctx.text if parent_ctx else None,
+            breadcrumb=breadcrumb,
+        )
 
         # Process using extensible strategy system (now async with html)
         extended_marks, children = await process_item(
-            item, location, html, siblings=siblings, parent_ctx=parent_ctx
+            item,
+            location,
+            html,
+            siblings=siblings,
+            parent_ctx=parent_ctx,
         )
 
         # Add marks and marked items to state
@@ -177,9 +193,11 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
                 sibling_questions=child_siblings.get(child.q_item.linkId, []),
                 parent_ctx=ParentContext(
                     linkId=child.parent_linkId,
+                    text=child.parent_text,
                     index=child.parent_index,
                     item_id=child.parent_id,
                     instance_answer=child.parent_instance_answer,
+                    breadcrumb=child.parent_breadcrumb,
                 ),
             )
             for child in children

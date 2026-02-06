@@ -93,7 +93,11 @@ async def mark(
         raise HTTPException(status_code=400, detail="No HTML content found")
 
     # Mark the HTML and build blueprint
-    result = await mark_html(html, questionnaire.item)
+    result = await mark_html(
+        html,
+        questionnaire.item,
+        questionnaire_title=questionnaire.title or questionnaire.name,
+    )
 
     # Create marked content entry and replace any existing for this questionnaire
     marked_content = create_marked_content(result.marked_html, canonical)
