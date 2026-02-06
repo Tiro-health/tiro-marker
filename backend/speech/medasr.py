@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import google.auth
+import google.auth.exceptions
 import google.auth.transport.requests
 import httpx
 
@@ -119,8 +120,28 @@ async def convert_webm_to_wav(audio_data: bytes) -> bytes:
 
 def _get_access_token() -> str:
     """Get a fresh Google Cloud access token using ADC."""
-    credentials, _ = google.auth.default()
-    credentials.refresh(google.auth.transport.requests.Request())
+    try:
+        credentials, project = google.auth.default()
+        logger.debug("Using ADC credentials for project: %s", project)
+    except google.auth.exceptions.DefaultCredentialsError as e:
+        logger.error(
+            "Google Cloud credentials not found. "
+            "Ensure ADC is configured (gcloud auth application-default login) "
+            "or GOOGLE_APPLICATION_CREDENTIALS is set. Error: %s",
+            e,
+        )
+        raise
+
+    try:
+        credentials.refresh(google.auth.transport.requests.Request())
+    except google.auth.exceptions.RefreshError as e:
+        logger.error(
+            "Failed to refresh Google Cloud credentials. "
+            "Token may be expired or revoked. Error: %s",
+            e,
+        )
+        raise
+
     return str(credentials.token)
 
 
@@ -141,6 +162,7 @@ async def call_medasr(wav_data: bytes) -> dict[str, Any]:
         "file": audio_b64,
     }
 
+    # MedASR uses Vertex AI rawPredict format for dedicated endpoints
     url = (
         f"https://{settings.medasr_endpoint_host}"
         f"/v1/projects/{settings.medasr_project_id}"
@@ -148,18 +170,62 @@ async def call_medasr(wav_data: bytes) -> dict[str, Any]:
         f"/endpoints/{settings.medasr_endpoint_id}:rawPredict"
     )
 
+    logger.debug(
+        "MedASR request: url=%s, audio_size=%d bytes, b64_size=%d chars",
+        url,
+        len(wav_data),
+        len(audio_b64),
+    )
+
     async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
+        try:
+            response = await client.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+        except httpx.ConnectError as e:
+            logger.error(
+                "MedASR connection failed: url=%s, error=%s",
+                url,
+                e,
+            )
+            raise
+        except httpx.TimeoutException:
+            logger.error(
+                "MedASR request timed out after 120s: url=%s",
+                url,
+            )
+            raise
+
+        logger.debug(
+            "MedASR response: status=%d, content_length=%s",
+            response.status_code,
+            response.headers.get("content-length", "unknown"),
         )
+
+        if response.status_code != 200:
+            logger.error(
+                "MedASR endpoint error: status=%d, body=%s",
+                response.status_code,
+                response.text[:500] if response.text else "(empty)",
+            )
         response.raise_for_status()
 
-    result: dict[str, Any] = response.json()
+    try:
+        result: dict[str, Any] = response.json()
+    except Exception as e:
+        logger.error(
+            "MedASR response parsing failed: error=%s, body=%s",
+            e,
+            response.text[:500] if response.text else "(empty)",
+        )
+        raise
+
+    logger.debug("MedASR result: %s", result)
     return result
 
 
