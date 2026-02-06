@@ -10,6 +10,7 @@ import { initFormToMark } from './questionnaire/formToMark.js';
 import { initQuestionnaireSwitcher } from './questionnaire/switcher.js?v=2';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js?v=2';
 import { populateFromMarkedHtml } from './api/populate.js';
+import { createVoiceStateMachine, State as VoiceState } from './voice/stateMachine.js';
 
 // DOM Elements
 let clinicalForm = null;
@@ -23,6 +24,9 @@ let editorAPI = null;
 
 // Live populate mode state
 let populateLive = false;
+
+// Voice dictation state machine
+let voiceStateMachine = null;
 
 /**
  * Start the live clock in the header
@@ -138,17 +142,34 @@ function applyFormDarkTheme(formEl) {
         font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
 
-      /* Block group cards — rounded, lighter grey, padded */
+      /* Block group cards — outer level: rounded, with background and subtle border */
       .border-0[data-state] {
-        background: rgba(30, 41, 59, 0.5) !important;
-        border: none !important;
+        background: rgba(30, 41, 59, 0.55) !important;
+        border: 1px solid rgba(148, 163, 184, 0.15) !important;
         border-radius: 16px !important;
         padding: 0.75rem !important;
         margin-bottom: 1rem !important;
+        overflow: hidden !important;
+      }
+      /* Level 2+ nesting — no background, no border, just indent */
+      .border-0[data-state] .border-0[data-state] {
+        background: transparent !important;
+        border-radius: 0 !important;
+        border: none !important;
+        padding-left: 0.5rem !important;
+      }
+      /* Remove background from nested group wrappers */
+      .border-0[data-state] .bg-background {
+        background: transparent !important;
       }
 
       /* Remove outer block border */
       [data-block-id] {
+        border: none !important;
+      }
+
+      /* Remove outer form container border (but not inputs) */
+      .bg-background.relative.mb-4.w-full.rounded-md.border {
         border: none !important;
       }
 
@@ -171,9 +192,24 @@ function applyFormDarkTheme(formEl) {
         padding: 0.5rem 0.25rem !important;
       }
 
-      /* Populated field indicator — neon cyan */
-      .populated-indicator-blue-500 {
+      /* Populated field indicator — neon cyan on the right edge (base + hover + focus) */
+      [class*="populated-indicator"],
+      [class*="populated-indicator"]:hover,
+      [class*="populated-indicator"]:focus,
+      [class*="populated-indicator"]:focus-within {
         border-right-color: #22d3ee !important;
+      }
+
+      /* Populated field inputs — white text when value is set */
+      input[class*="populated-indicator"],
+      button[class*="populated-indicator"],
+      [class*="populated-indicator"] input,
+      [class*="populated-indicator"] button {
+        color: #f8fafc !important;
+      }
+      /* Keep placeholder grey */
+      input::placeholder {
+        color: #94a3b8 !important;
       }
 
       /* Chip/button selected state — neon cyan */
@@ -195,6 +231,153 @@ function applyFormDarkTheme(formEl) {
       }
       .dark\\:focus-visible\\:ring-blue-300:focus-visible {
         --tw-ring-color: #22d3ee !important;
+      }
+
+      /* Selected/checked items — neon cyan border */
+      .border-blue-500,
+      .border-blue-400,
+      .border-blue-600,
+      [class*="border-blue"] {
+        border-color: #22d3ee !important;
+      }
+
+      /* Checkbox chips when selected */
+      label:has(input:checked),
+      [data-state="checked"],
+      [aria-checked="true"] {
+        border-color: #22d3ee !important;
+      }
+
+      /* Checkbox fill background — neon cyan only when checked (has bg-blue class) */
+      .bg-blue-500,
+      .bg-blue-400,
+      .bg-blue-600,
+      .bg-blue-300,
+      .dark\\:bg-blue-300 {
+        background-color: #22d3ee !important;
+      }
+
+      /* React DatePicker — dark theme */
+      .react-datepicker-popper {
+        z-index: 100 !important;
+      }
+      .react-datepicker {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px !important;
+        font-family: inherit !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+      }
+      .react-datepicker__header {
+        background-color: #1e293b !important;
+        border-bottom: 1px solid #334155 !important;
+        padding-top: 0.5rem !important;
+      }
+      .react-datepicker__current-month,
+      .react-datepicker__day-name,
+      .react-datepicker-time__header {
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__day-name {
+        color: #94a3b8 !important;
+      }
+      .react-datepicker__day {
+        color: #f1f5f9 !important;
+        border-radius: 6px !important;
+      }
+      .react-datepicker__day:hover {
+        background-color: #475569 !important;
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__day--selected,
+      .react-datepicker__day--keyboard-selected {
+        background-color: #22d3ee !important;
+        color: #0f172a !important;
+      }
+      .react-datepicker__day--today {
+        font-weight: 600 !important;
+        border: 1px solid #22d3ee !important;
+      }
+      .react-datepicker__day--outside-month {
+        color: #64748b !important;
+      }
+      .react-datepicker__navigation-icon::before {
+        border-color: #94a3b8 !important;
+      }
+      .react-datepicker__navigation:hover *::before {
+        border-color: #f1f5f9 !important;
+      }
+      .react-datepicker__month-dropdown-container,
+      .react-datepicker__year-dropdown-container {
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__month-read-view,
+      .react-datepicker__year-read-view {
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__month-dropdown,
+      .react-datepicker__year-dropdown {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+      }
+      .react-datepicker__month-option,
+      .react-datepicker__year-option {
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__month-option:hover,
+      .react-datepicker__year-option:hover {
+        background-color: #475569 !important;
+      }
+      .react-datepicker__time-container {
+        border-left: 1px solid #334155 !important;
+      }
+      .react-datepicker__time {
+        background-color: #1e293b !important;
+      }
+      .react-datepicker__time-list-item {
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__time-list-item:hover {
+        background-color: #475569 !important;
+      }
+      .react-datepicker__time-list-item--selected {
+        background-color: #22d3ee !important;
+        color: #0f172a !important;
+      }
+      .react-datepicker__input-time-container {
+        color: #f1f5f9 !important;
+      }
+      .react-datepicker__input-time-container input {
+        background-color: #334155 !important;
+        border: 1px solid #475569 !important;
+        color: #f1f5f9 !important;
+        border-radius: 6px !important;
+        padding: 0.25rem 0.5rem !important;
+      }
+      .react-datepicker__close-icon::after {
+        background-color: #64748b !important;
+      }
+      .react-datepicker__close-icon:hover::after {
+        background-color: #94a3b8 !important;
+      }
+
+      /* DatePicker action buttons (clear, now) */
+      .react-datepicker button[type="button"],
+      .react-datepicker__input-time-container ~ div button,
+      div[class*="react-datepicker"] button:not(.react-datepicker__navigation) {
+        background-color: #334155 !important;
+        border: 1px solid #475569 !important;
+        color: #f1f5f9 !important;
+        border-radius: 6px !important;
+        padding: 0.4rem 0.75rem !important;
+        font-size: 0.8rem !important;
+        cursor: pointer !important;
+      }
+      .react-datepicker button[type="button"]:hover,
+      .react-datepicker__input-time-container ~ div button:hover,
+      div[class*="react-datepicker"] button:not(.react-datepicker__navigation):hover {
+        background-color: #475569 !important;
+        border-color: #64748b !important;
       }
     `);
 
@@ -385,11 +568,21 @@ function setupEventListeners() {
     submitFormBtn.addEventListener('click', handleFormSubmit);
   }
 
-  // Mic button
+  // Mic button — voice dictation
   const micBtn = document.getElementById('mic-btn');
   if (micBtn) {
     micBtn.addEventListener('click', () => {
-      showToast('Voice input coming soon', 'warning');
+      if (!voiceStateMachine) {
+        voiceStateMachine = createVoiceStateMachine(editorAPI, {
+          onStateChange: handleVoiceStateChange,
+          onPreviewText: handleVoicePreview,
+          onLevelUpdate: handleAudioLevel,
+          onError: (err) => {
+            console.error('Voice error:', err);
+          },
+        });
+      }
+      voiceStateMachine.toggle();
     });
   }
 
@@ -535,6 +728,83 @@ async function handleFormSubmit() {
   const response = await clinicalForm.getResponse();
   formResponseEl.textContent = JSON.stringify(response, null, 2);
   formResponseEl.classList.remove('hidden');
+}
+
+// Line-based preview state
+const LINE_WORDS = 12;
+let lineWordOffset = 0;
+
+/**
+ * Handle voice state changes — update UI accordingly
+ * @param {string} newState
+ */
+function handleVoiceStateChange(newState) {
+  const voiceBar = document.getElementById('voice-bar');
+  const prevEl = document.getElementById('voice-prev');
+  const curEl = document.getElementById('voice-cur');
+  if (!voiceBar) return;
+
+  voiceBar.classList.remove('voice-recording', 'voice-flushing');
+
+  switch (newState) {
+    case VoiceState.RECORDING:
+      voiceBar.classList.add('voice-recording');
+      break;
+    case VoiceState.FLUSHING:
+      voiceBar.classList.add('voice-recording', 'voice-flushing');
+      break;
+    case VoiceState.IDLE:
+    default:
+      lineWordOffset = 0;
+      if (prevEl) prevEl.textContent = '';
+      if (curEl) curEl.textContent = 'Tap to dictate clinical notes';
+      break;
+  }
+}
+
+/**
+ * Handle voice preview text — line-by-line display.
+ * After ~12 words the current line shifts up (faded) and a new line starts.
+ * @param {string} text
+ */
+function handleVoicePreview(text) {
+  const prevEl = document.getElementById('voice-prev');
+  const curEl = document.getElementById('voice-cur');
+  if (!curEl) return;
+
+  const trimmed = text.trim();
+
+  // Empty = reset (flush happened or recording stopped)
+  if (!trimmed) {
+    lineWordOffset = 0;
+    if (prevEl) prevEl.textContent = '';
+    curEl.textContent = '\u00a0';
+    return;
+  }
+
+  const words = trimmed.split(/\s+/);
+
+  // Advance lines while word count exceeds threshold
+  while (words.length > lineWordOffset + LINE_WORDS) {
+    const prevLine = words.slice(lineWordOffset, lineWordOffset + LINE_WORDS).join(' ');
+    lineWordOffset += LINE_WORDS;
+    if (prevEl) prevEl.textContent = prevLine;
+  }
+
+  // Show current line
+  curEl.textContent = words.slice(lineWordOffset).join(' ') || '\u00a0';
+}
+
+/**
+ * Handle audio level updates — drive mic button glow intensity.
+ * @param {number} dBFS - Audio level in dBFS (typically -60 to 0)
+ */
+function handleAudioLevel(dBFS) {
+  const btn = document.getElementById('mic-btn');
+  if (!btn) return;
+  // Map dBFS (-50…-5) to 0…1 intensity (wider range, harder to max out)
+  const intensity = Math.max(0, Math.min(1, (dBFS + 50) / 45));
+  btn.style.setProperty('--audio-level', intensity);
 }
 
 // Initialize on DOMContentLoaded

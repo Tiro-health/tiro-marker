@@ -1,10 +1,17 @@
 """API routes."""
 
-from fastapi import APIRouter, Body, HTTPException
+import logging
+
+import httpx
+from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from backend.agents.cleanup import cleanup_transcription
 from backend.agents.mark import mark_html
 from backend.agents.populate import populate_from_html
+from backend.config import settings
+from backend.speech import transcribe_audio
+from backend.speech.medasr import AudioConversionError, TranscribeResult
 from backend.models.fhir import (
     DocumentReference,
     Questionnaire,
@@ -102,3 +109,121 @@ async def populate(
 
     # Populate from marked HTML using blueprint structure
     return await populate_from_html(marked_html, blueprint, questionnaire.item)
+
+
+class TranscribeResponse(BaseModel):
+    """Response from transcribe endpoint."""
+
+    text: str
+    confidence: float
+    duration_ms: int
+
+
+logger = logging.getLogger(__name__)
+
+
+@router.post("/transcribe")
+async def transcribe(
+    audio: UploadFile = File(...),
+    context: str = Form(""),
+    sequence_number: int = Form(0),
+) -> TranscribeResponse:
+    """Transcribe audio using MedASR on Vertex AI.
+
+    Accepts webm/opus audio, converts to WAV, sends to MedASR endpoint.
+
+    Args:
+        audio: Audio file (typically webm/opus from MediaRecorder)
+        context: Optional context text to improve transcription accuracy
+        sequence_number: Sequence number for ordering chunks on the client
+
+    Returns:
+        TranscribeResponse with transcribed text, confidence, and duration
+    """
+    # Read and validate audio data
+    audio_data = await audio.read()
+    if not audio_data:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+
+    # Validate endpoint is configured
+    if not settings.medasr_endpoint_host:
+        raise HTTPException(
+            status_code=503,
+            detail="MedASR endpoint is not configured. Set MEDASR_* environment variables.",
+        )
+
+    logger.info(
+        "Transcribe request: seq=%d, size=%d bytes, context_len=%d",
+        sequence_number,
+        len(audio_data),
+        len(context),
+    )
+
+    # Transcribe via speech module
+    try:
+        result = await transcribe_audio(audio_data, context)
+    except AudioConversionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except httpx.ConnectError as e:
+        logger.error("MedASR connection failed: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="MedASR endpoint unavailable",
+        )
+    except httpx.HTTPStatusError as e:
+        logger.error("MedASR request failed: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail=f"MedASR endpoint returned error: {e.response.status_code}",
+        )
+    except httpx.TimeoutException:
+        logger.error("MedASR request timed out")
+        raise HTTPException(
+            status_code=504,
+            detail="MedASR endpoint timed out",
+        )
+
+    return TranscribeResponse(
+        text=result.text,
+        confidence=result.confidence,
+        duration_ms=result.duration_ms,
+    )
+
+
+class CleanupRequest(BaseModel):
+    """Request to cleanup transcription text."""
+
+    text: str
+
+
+class CleanupResponse(BaseModel):
+    """Response from cleanup endpoint."""
+
+    text: str
+
+
+@router.post("/cleanup")
+async def cleanup(request: CleanupRequest) -> CleanupResponse:
+    """Clean up transcription text using LLM.
+
+    Removes filler words, fixes formatting, while preserving
+    medical terminology and dosages.
+
+    Args:
+        request: CleanupRequest with text to clean
+
+    Returns:
+        CleanupResponse with cleaned text
+    """
+    if not settings.cleanup_transcription:
+        # Cleanup disabled, return text unchanged
+        return CleanupResponse(text=request.text)
+
+    if not request.text.strip():
+        return CleanupResponse(text=request.text)
+
+    # Use the cleanup agent
+    result = TranscribeResult(text=request.text, confidence=1.0, duration_ms=0)
+    cleaned = await cleanup_transcription(result)
+
+    return CleanupResponse(text=cleaned.text)

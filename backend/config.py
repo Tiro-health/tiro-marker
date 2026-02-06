@@ -24,8 +24,17 @@ class Settings(BaseSettings):
     medgemma_region: str = ""
     medgemma_endpoint_id: str = ""
 
+    # MedASR on Vertex AI (set in .env)
+    medasr_endpoint_host: str = ""
+    medasr_project_id: str = ""
+    medasr_region: str = ""
+    medasr_endpoint_id: str = ""
+
     # Default model
     default_model: str = "gemini-2.5-flash"
+
+    # Transcription cleanup (optional LLM post-processing)
+    cleanup_transcription: bool = False
 
     # App
     debug: bool = False
