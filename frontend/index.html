@@ -77,11 +77,17 @@
                         <!-- Lexical editor will be mounted here -->
                     </div>
                     <!-- Voice Input Bar -->
-                    <div class="voice-bar">
+                    <div class="voice-bar" id="voice-bar">
                         <button class="mic-btn" id="mic-btn" title="Voice input">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                            <!-- Mic icon (shown when idle) -->
+                            <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                            <!-- Stop icon (shown when recording) -->
+                            <svg class="stop-icon hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                         </button>
-                        <span class="voice-status">Tap to dictate clinical notes</span>
+                        <div class="voice-lines" id="voice-lines">
+                            <span class="voice-line voice-line-prev" id="voice-prev"></span>
+                            <span class="voice-line voice-line-cur" id="voice-cur">Tap to dictate clinical notes</span>
+                        </div>
                     </div>
                 </section>
 

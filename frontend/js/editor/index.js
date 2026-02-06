@@ -66,6 +66,7 @@ export function initializeEditor(containerElement, initialContent = '') {
     getTextContent: () => getTextContent(),
     getCursorOffset: () => getCursorOffset(),
     setCursorOffset: (offset) => setCursorOffset(offset),
+    appendText: (text) => appendText(text),
     // Mark functions
     applyMark: (text, markId) => applyMark(editor, text, markId),
     applyMarksAtomically: (marks) => applyMarksAtomically(editor, marks),
@@ -203,6 +204,40 @@ export function getCursorOffset() {
   });
 
   return offset;
+}
+
+/**
+ * Append text to the end of the editor as new paragraphs.
+ * Used by the voice dictation system to insert transcribed text.
+ * @param {string} text - Text to append (newlines create separate paragraphs)
+ */
+export function appendText(text) {
+  if (!editorInstance || !text) return;
+
+  editorInstance.update(() => {
+    const root = $getRoot();
+    const lines = text.split('\n');
+
+    let lastNode = null;
+    for (const line of lines) {
+      const paragraph = $createParagraphNode();
+      if (line.trim()) {
+        const textNode = $createTextNode(line);
+        paragraph.append(textNode);
+        lastNode = textNode;
+      }
+      root.append(paragraph);
+    }
+
+    // Move cursor to end of last appended text
+    if (lastNode) {
+      const selection = $createRangeSelection();
+      const len = lastNode.getTextContent().length;
+      selection.anchor.set(lastNode.getKey(), len, 'text');
+      selection.focus.set(lastNode.getKey(), len, 'text');
+      $setSelection(selection);
+    }
+  });
 }
 
 /**
