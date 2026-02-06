@@ -53,12 +53,16 @@ export function createLivePreview({ onInterim, onFinal, onError } = {}) {
     };
 
     rec.onend = () => {
-      // Auto-restart if we haven't explicitly stopped
+      // Only auto-restart if this is still the current recognition instance
+      // This prevents old instances from restarting after restart() is called
+      if (rec !== recognition) return;
+
+      // Auto-restart if we haven't explicitly stopped (Chrome stops after ~60s)
       if (shouldRestart) {
         try {
           rec.start();
         } catch {
-          // May fail if already started; ignore
+          // Ignore if already started
         }
       }
     };
@@ -89,6 +93,30 @@ export function createLivePreview({ onInterim, onFinal, onError } = {}) {
         }
         recognition = null;
       }
+    },
+
+    /** Restart recognition fresh (blank slate) */
+    restart() {
+      // Temporarily disable auto-restart to prevent old recognition from restarting
+      shouldRestart = false;
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch {
+          // Ignore
+        }
+        recognition = null;
+      }
+      // Small delay before starting new recognition (browser needs time to release mic)
+      setTimeout(() => {
+        shouldRestart = true;
+        recognition = createRecognition();
+        try {
+          recognition.start();
+        } catch {
+          // Ignore if already started
+        }
+      }, 100);
     },
   };
 }

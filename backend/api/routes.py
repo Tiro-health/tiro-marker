@@ -164,6 +164,12 @@ async def transcribe(
         result = await transcribe_audio(audio_data, context)
     except AudioConversionError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except httpx.ConnectError as e:
+        logger.error("MedASR connection failed: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="MedASR endpoint unavailable",
+        )
     except httpx.HTTPStatusError as e:
         logger.error("MedASR request failed: %s", e)
         raise HTTPException(
