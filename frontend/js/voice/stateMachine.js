@@ -11,6 +11,7 @@ import { createAudioCapture } from './audioCapture.js';
 import { createSilenceDetector } from './silenceDetector.js';
 import { createLivePreview } from './livePreview.js';
 import { transcribeAudio, cleanupText } from '../api/transcribe.js';
+import { forceRefreshMedASRStatus } from '../ui/medasrStatus.js?v=9';
 
 const TICK_INTERVAL_MS = 200;
 
@@ -81,8 +82,11 @@ export function createVoiceStateMachine(editorAPI, {
       try {
         const result = await transcribeAudio(audioBlob);
         resultText = result.text;
-      } catch {
+      } catch (err) {
         // Transcribe failed, use Web Speech text as fallback
+        // Refresh MedASR status indicator to show current service state
+        forceRefreshMedASRStatus();
+        onError?.(err);
       }
     }
 
@@ -96,9 +100,9 @@ export function createVoiceStateMachine(editorAPI, {
       }
     }
 
-    // 5. Insert into editor
+    // 5. Insert into editor at cursor position
     if (cleanedText.trim()) {
-      editorAPI.appendText(cleanedText.trim());
+      editorAPI.insertTextAtCursor(cleanedText.trim());
     }
 
     // 6. Done - allow next flush

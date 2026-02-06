@@ -11,6 +11,7 @@ from backend.agents.mark import mark_html
 from backend.agents.populate import populate_from_html
 from backend.config import settings
 from backend.speech import transcribe_audio
+from backend.speech.health import check_medasr_health
 from backend.speech.medasr import AudioConversionError, TranscribeResult
 from backend.models.fhir import (
     DocumentReference,
@@ -47,6 +48,35 @@ def get_questionnaire_canonical(questionnaire: Questionnaire) -> str:
 async def health() -> dict[str, str]:
     """Health check."""
     return {"status": "ok", "version": "0.1.0"}
+
+
+class MedASRHealthResponse(BaseModel):
+    """Response from MedASR health check endpoint."""
+
+    status: str
+    message: str
+    details: str | None = None
+    latency_ms: int
+
+
+@router.get("/medasr/health")
+async def medasr_health() -> MedASRHealthResponse:
+    """Check MedASR service health.
+
+    Returns status information about MedASR configuration, authentication,
+    and endpoint connectivity. Always returns HTTP 200 with status in body
+    to distinguish "backend down" from "MedASR issue".
+
+    Returns:
+        MedASRHealthResponse with status, message, optional details, and latency
+    """
+    result = await check_medasr_health()
+    return MedASRHealthResponse(
+        status=result.status.value,
+        message=result.message,
+        details=result.details,
+        latency_ms=result.latency_ms,
+    )
 
 
 @router.post("/mark")
