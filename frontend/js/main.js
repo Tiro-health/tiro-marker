@@ -142,24 +142,25 @@ function applyFormDarkTheme(formEl) {
         font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
 
-      /* Block group cards — rounded, lighter grey, padded */
-      /* Nesting levels have progressively stronger backgrounds */
+      /* Block group cards — outer level: rounded, with background and subtle border */
       .border-0[data-state] {
         background: rgba(30, 41, 59, 0.55) !important;
-        border: none !important;
+        border: 1px solid rgba(148, 163, 184, 0.15) !important;
         border-radius: 16px !important;
         padding: 0.75rem !important;
         margin-bottom: 1rem !important;
+        overflow: hidden !important;
       }
-      /* Level 2+ nesting — subtle rounded corners */
+      /* Level 2+ nesting — no background, no border, just indent */
       .border-0[data-state] .border-0[data-state] {
-        background: rgba(40, 52, 72, 0.7) !important;
-        border-radius: 8px !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        border: none !important;
+        padding-left: 0.5rem !important;
       }
-      /* Level 3+ nesting */
-      .border-0[data-state] .border-0[data-state] .border-0[data-state] {
-        background: rgba(50, 62, 82, 0.8) !important;
-        border-radius: 6px !important;
+      /* Remove background from nested group wrappers */
+      .border-0[data-state] .bg-background {
+        background: transparent !important;
       }
 
       /* Remove outer block border */
@@ -731,9 +732,7 @@ async function handleFormSubmit() {
 
 // Line-based preview state
 const LINE_WORDS = 12;
-let prevLineText = '';
-let lineWordOffset = 0; // word index where the current line starts
-let wasRecording = false; // track whether we were already recording
+let lineWordOffset = 0;
 
 /**
  * Handle voice state changes — update UI accordingly
@@ -745,28 +744,17 @@ function handleVoiceStateChange(newState) {
   const curEl = document.getElementById('voice-cur');
   if (!voiceBar) return;
 
-  voiceBar.classList.remove('voice-recording', 'voice-stopping');
+  voiceBar.classList.remove('voice-recording', 'voice-flushing');
 
   switch (newState) {
     case VoiceState.RECORDING:
-    case VoiceState.FINALIZING:
       voiceBar.classList.add('voice-recording');
-      // Only reset preview on first entry, not on FINALIZING→RECORDING cycles
-      if (!wasRecording) {
-        wasRecording = true;
-        prevLineText = '';
-        lineWordOffset = 0;
-        if (prevEl) prevEl.textContent = '';
-        if (curEl) curEl.textContent = '\u00a0';
-      }
       break;
-    case VoiceState.STOPPING:
-      voiceBar.classList.add('voice-stopping');
+    case VoiceState.FLUSHING:
+      voiceBar.classList.add('voice-recording', 'voice-flushing');
       break;
     case VoiceState.IDLE:
     default:
-      wasRecording = false;
-      prevLineText = '';
       lineWordOffset = 0;
       if (prevEl) prevEl.textContent = '';
       if (curEl) curEl.textContent = 'Tap to dictate clinical notes';
@@ -776,8 +764,7 @@ function handleVoiceStateChange(newState) {
 
 /**
  * Handle voice preview text — line-by-line display.
- * After ~8 words the current line shifts up (faded) and a new line starts.
- * Ignores interim revisions that shrink the text to prevent flickering.
+ * After ~12 words the current line shifts up (faded) and a new line starts.
  * @param {string} text
  */
 function handleVoicePreview(text) {
@@ -786,34 +773,26 @@ function handleVoicePreview(text) {
   if (!curEl) return;
 
   const trimmed = text.trim();
-  if (!trimmed) return;
+
+  // Empty = reset (flush happened or recording stopped)
+  if (!trimmed) {
+    lineWordOffset = 0;
+    if (prevEl) prevEl.textContent = '';
+    curEl.textContent = '\u00a0';
+    return;
+  }
 
   const words = trimmed.split(/\s+/);
 
-  // If text shrunk significantly (flush cleared accumulatedText), reset lines.
-  // Small drops (1-2 words) are interim revisions — ignore those to prevent flicker.
-  if (words.length < lineWordOffset) {
-    if (lineWordOffset - words.length > 3) {
-      // Big drop = flush happened, reset and start fresh
-      lineWordOffset = 0;
-      prevLineText = '';
-      if (prevEl) prevEl.textContent = '';
-    } else {
-      // Small drop = interim revision, keep last display
-      return;
-    }
-  }
-
   // Advance lines while word count exceeds threshold
   while (words.length > lineWordOffset + LINE_WORDS) {
-    prevLineText = words.slice(lineWordOffset, lineWordOffset + LINE_WORDS).join(' ');
+    const prevLine = words.slice(lineWordOffset, lineWordOffset + LINE_WORDS).join(' ');
     lineWordOffset += LINE_WORDS;
-    if (prevEl) prevEl.textContent = prevLineText;
+    if (prevEl) prevEl.textContent = prevLine;
   }
 
-  // Show words from current line start
-  const display = words.slice(lineWordOffset).join(' ');
-  curEl.textContent = display || '\u00a0';
+  // Show current line
+  curEl.textContent = words.slice(lineWordOffset).join(' ') || '\u00a0';
 }
 
 /**
