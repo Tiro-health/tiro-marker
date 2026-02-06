@@ -40,6 +40,8 @@ class Mark:
     frontend_location: str
     # HTML labels
     labels: list[int]
+    # True for group/container marks (excluded from HTML output)
+    is_group: bool = False
 
 
 @dataclass
@@ -150,6 +152,7 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
                     qr_id=ext_mark.mark.qr_id,
                     frontend_location=ext_mark.mark.frontend_location,
                     labels=ext_mark.mark.labels,
+                    is_group=ext_mark.mark.is_group,
                 )
             )
             ctx.state.marked_items.append(ext_mark.marked_item)
@@ -188,8 +191,12 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
     async def apply_marks(
         ctx: StepContext[MarkerState, None, None],
     ) -> MarkingResult:
+        # Filter out group marks - only apply answer marks to HTML output
+        # Group marks are used internally for scoping but not rendered
+        answer_marks = [m for m in ctx.state.marks if not m.is_group]
+
         # Apply marks to labeled HTML and clean up
-        marked_html = apply_marks_to_html(ctx.state.html, ctx.state.marks)
+        marked_html = apply_marks_to_html(ctx.state.html, answer_marks)
 
         # Validate that marking didn't change text content
         original_clean = strip_labels(ctx.state.html)
@@ -202,7 +209,9 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
             result="passed" if is_valid else "FAILED",
             original_length=len(original_text),
             marked_length=len(marked_text),
-            marks_count=len(ctx.state.marks),
+            total_marks=len(ctx.state.marks),
+            answer_marks_applied=len(answer_marks),
+            group_marks_skipped=len(ctx.state.marks) - len(answer_marks),
             marked_items_count=len(ctx.state.marked_items),
             marked_html=marked_html,
         )

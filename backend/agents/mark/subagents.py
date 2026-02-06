@@ -34,6 +34,7 @@ class MarkResult:
     qr_id: str  # UUID-based ID for QR blueprint (data-location)
     frontend_location: str  # Hierarchical path for form linking (data-frontend-location)
     labels: list[int]
+    is_group: bool = False  # True for group/container marks (excluded from HTML output)
 
 
 @dataclass
@@ -331,6 +332,7 @@ async def simple_container_strategy(
         qr_id=item_id,  # UUID-linkId format for data-location
         frontend_location=location,  # Hierarchical path for form linking
         labels=root_labels,
+        is_group=True,  # Group marks are excluded from HTML output
     )
     marked_item = MarkedItem(
         item_id=item_id,
@@ -403,6 +405,7 @@ async def repeating_group_strategy(
             qr_id=item_id,  # UUID-linkId format for data-location
             frontend_location=instance_location,  # Hierarchical path for form linking
             labels=instance.labels,
+            is_group=True,  # Group marks are excluded from HTML output
         )
         marked_item = MarkedItem(
             item_id=item_id,
