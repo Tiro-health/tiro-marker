@@ -6,11 +6,12 @@ import httpx
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from backend.agents.cleanup import cleanup_transcription
 from backend.agents.mark import mark_html
 from backend.agents.populate import populate_from_html
 from backend.config import settings
-from backend.speech import TranscribeResult, transcribe_audio
-from backend.speech.medasr import AudioConversionError
+from backend.speech import transcribe_audio
+from backend.speech.medasr import AudioConversionError, TranscribeResult
 from backend.models.fhir import (
     DocumentReference,
     Questionnaire,
@@ -181,3 +182,42 @@ async def transcribe(
         confidence=result.confidence,
         duration_ms=result.duration_ms,
     )
+
+
+class CleanupRequest(BaseModel):
+    """Request to cleanup transcription text."""
+
+    text: str
+
+
+class CleanupResponse(BaseModel):
+    """Response from cleanup endpoint."""
+
+    text: str
+
+
+@router.post("/cleanup")
+async def cleanup(request: CleanupRequest) -> CleanupResponse:
+    """Clean up transcription text using LLM.
+
+    Removes filler words, fixes formatting, while preserving
+    medical terminology and dosages.
+
+    Args:
+        request: CleanupRequest with text to clean
+
+    Returns:
+        CleanupResponse with cleaned text
+    """
+    if not settings.cleanup_transcription:
+        # Cleanup disabled, return text unchanged
+        return CleanupResponse(text=request.text)
+
+    if not request.text.strip():
+        return CleanupResponse(text=request.text)
+
+    # Use the cleanup agent
+    result = TranscribeResult(text=request.text, confidence=1.0, duration_ms=0)
+    cleaned = await cleanup_transcription(result)
+
+    return CleanupResponse(text=cleaned.text)

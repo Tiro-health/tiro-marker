@@ -1,16 +1,17 @@
 /**
  * Silence Detector
  * Uses AudioContext AnalyserNode to detect speech pauses via dBFS levels.
+ * Supports dynamic silence duration threshold.
  */
 
 const SILENCE_THRESHOLD_DBFS = -45;
-const SILENCE_DURATION_MS = 1500;
+const DEFAULT_SILENCE_DURATION_MS = 1500;
 
 /**
  * Create a silence detector from a media stream.
  * @param {MediaStream} mediaStream - Active audio stream from getUserMedia
  * @param {{ onSilence?: () => void, onSpeech?: () => void }} callbacks
- * @returns {{ getLevel: () => number, destroy: () => void }}
+ * @returns {{ getLevel: () => number, setSilenceDuration: (ms: number) => void, destroy: () => void }}
  */
 export function createSilenceDetector(mediaStream, { onSilence, onSpeech } = {}) {
   const audioContext = new AudioContext();
@@ -25,6 +26,7 @@ export function createSilenceDetector(mediaStream, { onSilence, onSpeech } = {})
   let isSilent = false;
   let animFrameId = null;
   let destroyed = false;
+  let silenceDurationMs = DEFAULT_SILENCE_DURATION_MS;
 
   function computeRmsDbfs() {
     analyser.getFloatTimeDomainData(dataArray);
@@ -44,7 +46,7 @@ export function createSilenceDetector(mediaStream, { onSilence, onSpeech } = {})
     if (currentLevel < SILENCE_THRESHOLD_DBFS) {
       if (silenceStart === null) {
         silenceStart = performance.now();
-      } else if (!isSilent && performance.now() - silenceStart >= SILENCE_DURATION_MS) {
+      } else if (!isSilent && performance.now() - silenceStart >= silenceDurationMs) {
         isSilent = true;
         onSilence?.();
       }
@@ -67,6 +69,16 @@ export function createSilenceDetector(mediaStream, { onSilence, onSpeech } = {})
     /** Current audio level in dBFS (useful for waveform visualization) */
     getLevel() {
       return currentLevel;
+    },
+
+    /** Set the silence duration threshold in milliseconds */
+    setSilenceDuration(ms) {
+      silenceDurationMs = ms;
+    },
+
+    /** Reset silence duration to default (1500ms) */
+    resetSilenceDuration() {
+      silenceDurationMs = DEFAULT_SILENCE_DURATION_MS;
     },
 
     destroy() {
