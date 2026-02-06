@@ -143,12 +143,23 @@ function applyFormDarkTheme(formEl) {
       }
 
       /* Block group cards — rounded, lighter grey, padded */
+      /* Nesting levels have progressively stronger backgrounds */
       .border-0[data-state] {
-        background: rgba(30, 41, 59, 0.5) !important;
+        background: rgba(30, 41, 59, 0.55) !important;
         border: none !important;
         border-radius: 16px !important;
         padding: 0.75rem !important;
         margin-bottom: 1rem !important;
+      }
+      /* Level 2+ nesting — subtle rounded corners */
+      .border-0[data-state] .border-0[data-state] {
+        background: rgba(40, 52, 72, 0.7) !important;
+        border-radius: 8px !important;
+      }
+      /* Level 3+ nesting */
+      .border-0[data-state] .border-0[data-state] .border-0[data-state] {
+        background: rgba(50, 62, 82, 0.8) !important;
+        border-radius: 6px !important;
       }
 
       /* Remove outer block border */

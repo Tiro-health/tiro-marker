@@ -16,6 +16,8 @@ export function createAudioCapture({ onChunkReady } = {}) {
   let mediaRecorder = null;
   let chunks = [];
   let overlapChunks = [];
+  let headerChunk = null; // Store the first chunk which contains the webm header
+  let mimeType = 'audio/webm'; // Store mimeType so it's available after recorder stops
   let sequenceNumber = 0;
   let startTime = null;
   let stopped = false;
@@ -33,7 +35,7 @@ export function createAudioCapture({ onChunkReady } = {}) {
     });
 
     // Pick a supported MIME type
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
       : 'audio/webm';
 
@@ -47,6 +49,10 @@ export function createAudioCapture({ onChunkReady } = {}) {
 
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) {
+        // Store the first chunk as it contains the webm header
+        if (headerChunk === null) {
+          headerChunk = e.data;
+        }
         chunks.push(e.data);
       }
     };
@@ -57,22 +63,33 @@ export function createAudioCapture({ onChunkReady } = {}) {
   }
 
   /**
-   * Flush the current audio buffer into a Blob.
-   * Keeps the last OVERLAP_CHUNKS as prefix for the next flush.
-   * @param {boolean} isFinal - If true, flushes everything (no overlap kept)
-   * @returns {Blob|null} Audio blob or null if no data
+   * Build a blob from current chunks.
+   * @returns {Blob|null}
    */
-  function flush(isFinal = false) {
+  function buildBlob(isFinal = false) {
     if (!chunks.length && !overlapChunks.length) return null;
 
     // Combine overlap from previous flush + current chunks
-    const allChunks = [...overlapChunks, ...chunks];
+    let allChunks = [...overlapChunks, ...chunks];
 
     if (allChunks.length === 0) return null;
 
+    // Always prepend the header chunk if this isn't the first flush
+    // (first flush will have the header as part of chunks anyway)
+    if (headerChunk && overlapChunks.length > 0 && overlapChunks[0] !== headerChunk) {
+      allChunks = [headerChunk, ...allChunks];
+    }
+
     const blob = new Blob(allChunks, {
-      type: mediaRecorder?.mimeType || 'audio/webm',
+      type: mimeType,
     });
+
+    // Skip blobs that are too small to contain valid audio
+    // WebM header alone is ~200-400 bytes, need at least some audio data
+    if (blob.size < 1000) {
+      console.warn('Audio blob too small, skipping:', blob.size);
+      return null;
+    }
 
     const seqNum = sequenceNumber++;
 
@@ -87,6 +104,52 @@ export function createAudioCapture({ onChunkReady } = {}) {
     onChunkReady?.(blob, seqNum);
 
     return blob;
+  }
+
+  /**
+   * Flush the current audio buffer into a Blob.
+   * Keeps the last OVERLAP_CHUNKS as prefix for the next flush.
+   * @param {boolean} isFinal - If true, flushes everything (no overlap kept)
+   * @returns {Blob|null} Audio blob or null if no data
+   */
+  function flush(isFinal = false) {
+    // For non-final flushes, just build from what we have
+    return buildBlob(isFinal);
+  }
+
+  /**
+   * Stop recording and get final audio blob.
+   * Waits for MediaRecorder to emit final data before returning.
+   * @returns {Promise<Blob|null>}
+   */
+  function stopAndFlush() {
+    return new Promise((resolve) => {
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        resolve(buildBlob(true));
+        return;
+      }
+
+      // Listen for the final data chunk when stopping
+      const originalHandler = mediaRecorder.ondataavailable;
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          if (headerChunk === null) {
+            headerChunk = e.data;
+          }
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        // Restore original handler (though we're stopping anyway)
+        if (mediaRecorder) {
+          mediaRecorder.ondataavailable = originalHandler;
+        }
+        resolve(buildBlob(true));
+      };
+
+      mediaRecorder.stop();
+    });
   }
 
   /**
@@ -106,11 +169,13 @@ export function createAudioCapture({ onChunkReady } = {}) {
     mediaRecorder = null;
     chunks = [];
     overlapChunks = [];
+    headerChunk = null;
   }
 
   return {
     start,
     flush,
+    stopAndFlush,
     stop,
 
     getElapsedMs() {

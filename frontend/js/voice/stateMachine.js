@@ -7,19 +7,19 @@
  * States: IDLE → RECORDING → FINALIZING → RECORDING (loop) → STOPPING → IDLE
  */
 
-import initSentencex, { segment } from 'sentencex-wasm';
 import { createAudioCapture } from './audioCapture.js';
 import { createSilenceDetector } from './silenceDetector.js';
 import { createLivePreview } from './livePreview.js';
 import { transcribeAudio } from '../api/transcribe.js';
 
-const MAX_BUFFER_MS = 10_000;
-const MEDASR_TIMEOUT_MS = 5_000;
+const MEDASR_TIMEOUT_MS = 60_000; // 60s to handle cold starts
 const TICK_INTERVAL_MS = 200;
 
-// sentencex-wasm requires async init before segment() works
-let sentencexReady = false;
-initSentencex().then(() => { sentencexReady = true; }).catch(() => {});
+// Adaptive silence threshold settings
+const SILENCE_DURATION_NORMAL_MS = 1500; // Normal: 1.5s pause to flush
+const SILENCE_DURATION_MIN_MS = 800;     // Minimum: 0.8s pause after extended speech
+const ADAPTIVE_START_MS = 10_000;        // Start lowering threshold after 10s
+const ADAPTIVE_END_MS = 20_000;          // Reach minimum threshold at 20s
 
 export const State = Object.freeze({
   IDLE: 'IDLE',
@@ -52,7 +52,6 @@ export function createVoiceStateMachine(editorAPI, {
 
   // Web Speech accumulated text for fallback
   let accumulatedFinalText = '';
-  let lastSentenceCount = 0;
 
   // Sequence ordering for MedASR results
   let nextExpectedSeq = 0;
@@ -61,6 +60,9 @@ export function createVoiceStateMachine(editorAPI, {
 
   // Abort controllers for in-flight requests
   const abortControllers = new Map(); // seqNum → AbortController
+
+  // Track time since last flush for adaptive silence threshold
+  let lastFlushTime = 0;
 
   function setState(newState) {
     if (state === newState) return;
@@ -94,7 +96,6 @@ export function createVoiceStateMachine(editorAPI, {
         confidence: 0,
       });
       accumulatedFinalText = '';
-      lastSentenceCount = 0;
       processCompletedResults();
     } else {
       // Still mark as completed so sequence advances
@@ -105,8 +106,12 @@ export function createVoiceStateMachine(editorAPI, {
 
   /**
    * Send an audio chunk to MedASR with timeout and fallback.
+   * Silently falls back to Web Speech text on any error.
    */
   async function sendToMedASR(blob, seqNum) {
+    // Don't start new requests if we're stopping/stopped
+    if (state === State.STOPPING || state === State.IDLE) return;
+
     inFlightCount++;
     const controller = new AbortController();
     abortControllers.set(seqNum, controller);
@@ -119,34 +124,34 @@ export function createVoiceStateMachine(editorAPI, {
       clearTimeout(timeoutId);
       abortControllers.delete(seqNum);
 
-      completedResults.set(seqNum, {
-        text: result.text,
-        confidence: result.confidence,
-      });
+      // Only process if we're still recording (not stopped)
+      if (state !== State.IDLE) {
+        completedResults.set(seqNum, {
+          text: result.text,
+          confidence: result.confidence,
+        });
 
-      // Clear fallback text since MedASR succeeded
-      accumulatedFinalText = '';
-      lastSentenceCount = 0;
+        // Clear fallback text since MedASR succeeded
+        accumulatedFinalText = '';
 
-      processCompletedResults();
+        processCompletedResults();
+      }
     } catch (err) {
       abortControllers.delete(seqNum);
 
+      // Silently fall back - don't show errors to user
       if (err.name === 'AbortError') {
-        console.warn(`MedASR timed out for seq ${seqNum}, using fallback`);
+        console.debug(`MedASR aborted for seq ${seqNum}`);
       } else {
-        console.warn(`MedASR failed for seq ${seqNum}:`, err);
-        onError?.(err);
+        console.warn(`MedASR failed for seq ${seqNum}, using Web Speech fallback:`, err.message);
       }
 
-      useFallbackText(seqNum);
+      // Only use fallback if we're still recording (not stopped)
+      if (state !== State.IDLE) {
+        useFallbackText(seqNum);
+      }
     } finally {
       inFlightCount--;
-
-      // If we were stopping and this was the last in-flight, finish up
-      if (state === State.STOPPING && inFlightCount === 0) {
-        finishStop();
-      }
     }
   }
 
@@ -159,6 +164,10 @@ export function createVoiceStateMachine(editorAPI, {
     const blob = audioCapture.flush(isFinal);
     if (!blob) return;
 
+    // Reset flush timer and silence threshold
+    lastFlushTime = performance.now();
+    silenceDetector?.resetSilenceDuration();
+
     setState(State.FINALIZING);
     sendToMedASR(blob, nextExpectedSeq + inFlightCount + completedResults.size);
 
@@ -166,6 +175,26 @@ export function createVoiceStateMachine(editorAPI, {
       // Return to recording state after initiating the async send
       setState(State.RECORDING);
     }
+  }
+
+  /**
+   * Calculate adaptive silence duration based on time since last flush.
+   * After 10s of continuous speech, gradually lower threshold to 0.8s.
+   */
+  function getAdaptiveSilenceDuration() {
+    const timeSinceFlush = performance.now() - lastFlushTime;
+
+    if (timeSinceFlush < ADAPTIVE_START_MS) {
+      return SILENCE_DURATION_NORMAL_MS;
+    }
+
+    if (timeSinceFlush >= ADAPTIVE_END_MS) {
+      return SILENCE_DURATION_MIN_MS;
+    }
+
+    // Linear interpolation between normal and minimum
+    const progress = (timeSinceFlush - ADAPTIVE_START_MS) / (ADAPTIVE_END_MS - ADAPTIVE_START_MS);
+    return SILENCE_DURATION_NORMAL_MS - progress * (SILENCE_DURATION_NORMAL_MS - SILENCE_DURATION_MIN_MS);
   }
 
   /**
@@ -177,44 +206,10 @@ export function createVoiceStateMachine(editorAPI, {
     // Update audio level for waveform
     if (silenceDetector) {
       onLevelUpdate?.(silenceDetector.getLevel());
+
+      // Adapt silence threshold based on time since last flush
+      silenceDetector.setSilenceDuration(getAdaptiveSilenceDuration());
     }
-
-    // Max buffer duration trigger
-    if (audioCapture && audioCapture.getElapsedMs() > 0) {
-      // We track time since last flush using chunk count estimate
-      // MAX_BUFFER_MS is checked via elapsed time
-    }
-  }
-
-  /**
-   * Check for sentence boundaries in Web Speech text using sentencex-wasm.
-   */
-  function checkSentenceBoundary(text) {
-    if (!sentencexReady) return;
-    try {
-      const sents = segment('en', text);
-      if (sents.length > lastSentenceCount && lastSentenceCount > 0) {
-        lastSentenceCount = sents.length;
-        triggerFlush();
-        return;
-      }
-      lastSentenceCount = sents.length;
-    } catch {
-      // segment() failed; ignore
-    }
-  }
-
-  // Max buffer timer
-  let maxBufferTimer = null;
-
-  function resetMaxBufferTimer() {
-    if (maxBufferTimer) clearTimeout(maxBufferTimer);
-    maxBufferTimer = setTimeout(() => {
-      if (state === State.RECORDING) {
-        triggerFlush();
-        resetMaxBufferTimer();
-      }
-    }, MAX_BUFFER_MS);
   }
 
   /**
@@ -228,10 +223,10 @@ export function createVoiceStateMachine(editorAPI, {
 
       // Reset state
       accumulatedFinalText = '';
-      lastSentenceCount = 0;
       nextExpectedSeq = 0;
       completedResults.clear();
       inFlightCount = 0;
+      lastFlushTime = performance.now();
 
       // 1. Start audio capture
       audioCapture = createAudioCapture({});
@@ -242,7 +237,6 @@ export function createVoiceStateMachine(editorAPI, {
         onSilence: () => {
           if (state === State.RECORDING) {
             triggerFlush();
-            resetMaxBufferTimer();
           }
         },
         onSpeech: () => {
@@ -258,7 +252,6 @@ export function createVoiceStateMachine(editorAPI, {
         onFinal: (text) => {
           accumulatedFinalText += text;
           onPreviewText?.(accumulatedFinalText);
-          checkSentenceBoundary(accumulatedFinalText);
         },
         onError: (err) => {
           console.warn('Web Speech error:', err);
@@ -268,9 +261,6 @@ export function createVoiceStateMachine(editorAPI, {
 
       // 4. Start tick interval
       tickInterval = setInterval(onTick, TICK_INTERVAL_MS);
-
-      // 5. Start max buffer timer
-      resetMaxBufferTimer();
     } catch (err) {
       onError?.(err);
       cleanup();
@@ -286,10 +276,6 @@ export function createVoiceStateMachine(editorAPI, {
       clearInterval(tickInterval);
       tickInterval = null;
     }
-    if (maxBufferTimer) {
-      clearTimeout(maxBufferTimer);
-      maxBufferTimer = null;
-    }
     if (livePreview) {
       livePreview.stop();
       livePreview = null;
@@ -299,6 +285,7 @@ export function createVoiceStateMachine(editorAPI, {
       silenceDetector = null;
     }
     if (audioCapture) {
+      // Note: stopAndFlush already stops the recorder, but stop() is idempotent
       audioCapture.stop();
       audioCapture = null;
     }
@@ -313,30 +300,22 @@ export function createVoiceStateMachine(editorAPI, {
   }
 
   /**
-   * Final cleanup after all in-flight requests complete.
-   */
-  function finishStop() {
-    processCompletedResults();
-    cleanup();
-    setState(State.IDLE);
-  }
-
-  /**
-   * Stop recording.
+   * Stop recording immediately using Web Speech text.
+   * Does not wait for MedASR — provides instant feedback.
    */
   function stopRecording() {
     if (state === State.IDLE || state === State.STOPPING) return;
 
     setState(State.STOPPING);
 
-    // Final flush
-    triggerFlush(true);
-
-    // If no in-flight requests, finish immediately
-    if (inFlightCount === 0) {
-      finishStop();
+    // Use accumulated Web Speech text immediately (don't wait for MedASR)
+    if (accumulatedFinalText.trim()) {
+      editorAPI.appendText(accumulatedFinalText.trim());
     }
-    // Otherwise, finishStop will be called when last in-flight completes
+
+    // Cleanup aborts any in-flight MedASR requests
+    cleanup();
+    setState(State.IDLE);
   }
 
   return {
