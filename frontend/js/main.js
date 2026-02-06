@@ -9,6 +9,7 @@ import { initLinkHandler } from './questionnaire/linkHandler.js';
 import { initFormToMark } from './questionnaire/formToMark.js';
 import { initQuestionnaireSwitcher } from './questionnaire/switcher.js?v=2';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js?v=2';
+import { initMedASRStatus } from './ui/medasrStatus.js?v=14';
 import { populateFromMarkedHtml } from './api/populate.js';
 import { createVoiceStateMachine, State as VoiceState } from './voice/stateMachine.js';
 
@@ -488,6 +489,9 @@ function attachFormListeners(formEl) {
 async function init() {
   // Start header clock
   startClock();
+
+  // Initialize MedASR status indicator
+  initMedASRStatus();
 
   // Get DOM elements
   clinicalForm = document.getElementById('clinical-form');

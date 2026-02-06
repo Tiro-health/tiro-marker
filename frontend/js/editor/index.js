@@ -67,6 +67,7 @@ export function initializeEditor(containerElement, initialContent = '') {
     getCursorOffset: () => getCursorOffset(),
     setCursorOffset: (offset) => setCursorOffset(offset),
     appendText: (text) => appendText(text),
+    insertTextAtCursor: (text) => insertTextAtCursor(text),
     // Mark functions
     applyMark: (text, markId) => applyMark(editor, text, markId),
     applyMarksAtomically: (marks) => applyMarksAtomically(editor, marks),
@@ -236,6 +237,62 @@ export function appendText(text) {
       selection.anchor.set(lastNode.getKey(), len, 'text');
       selection.focus.set(lastNode.getKey(), len, 'text');
       $setSelection(selection);
+    }
+  });
+}
+
+/**
+ * Insert text at the current cursor position.
+ * If no selection exists, appends to the end.
+ * Used by voice dictation to insert at cursor instead of always appending.
+ * @param {string} text - Text to insert (newlines create separate paragraphs)
+ */
+export function insertTextAtCursor(text) {
+  if (!editorInstance || !text) return;
+
+  editorInstance.update(() => {
+    const selection = $getSelection();
+
+    // If no selection or not a range selection, fall back to appending at end
+    if (!$isRangeSelection(selection)) {
+      // Fall back to append behavior
+      const root = $getRoot();
+      const lines = text.split('\n');
+
+      let lastNode = null;
+      for (const line of lines) {
+        const paragraph = $createParagraphNode();
+        if (line.trim()) {
+          const textNode = $createTextNode(line);
+          paragraph.append(textNode);
+          lastNode = textNode;
+        }
+        root.append(paragraph);
+      }
+
+      if (lastNode) {
+        const newSelection = $createRangeSelection();
+        const len = lastNode.getTextContent().length;
+        newSelection.anchor.set(lastNode.getKey(), len, 'text');
+        newSelection.focus.set(lastNode.getKey(), len, 'text');
+        $setSelection(newSelection);
+      }
+      return;
+    }
+
+    // We have a valid selection - insert at cursor position
+    // Start on a new line from cursor
+    selection.insertParagraph();
+
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) {
+        // Insert a paragraph break before subsequent lines
+        selection.insertParagraph();
+      }
+      if (lines[i]) {
+        selection.insertText(lines[i]);
+      }
     }
   });
 }
