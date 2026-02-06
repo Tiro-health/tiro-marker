@@ -318,15 +318,15 @@ def create_mark_task(
 
     async def mark_task(inputs: MarkInput) -> MarkOutput:
         # Run mark agent
-        marked_html = await mark_html(
+        result = await mark_html(
             html=inputs.html,
             q_items=inputs.questionnaire.item or [],
         )
 
         # Extract marks from output
-        marks = extract_marks_from_html(marked_html)
+        marks = extract_marks_from_html(result.marked_html)
 
-        return MarkOutput(marked_html=marked_html, marks=marks)
+        return MarkOutput(marked_html=result.marked_html, marks=marks)
 
     return mark_task
 

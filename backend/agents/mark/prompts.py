@@ -1,22 +1,17 @@
 """Prompt templates for HTML marking strategies."""
 
-from collections.abc import Sequence
-from datetime import datetime, timezone
+from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+from backend.agents.mark.context import format_global_context, get_context
 from backend.agents.protocols import QuestionnaireItemProtocol
 from backend.models.fhir.extensions import QUESTIONNAIRE_UNIT_URL
 
+if TYPE_CHECKING:
+    from backend.agents.mark.subagents import ParentContext
 
-def _format_context() -> str:
-    """Format context section with current date/time and other metadata.
-
-    This section can be extended to include:
-    - Patient name/demographics
-    - Previous FHIR observations
-    - Other relevant clinical context
-    """
-    now = datetime.now(timezone.utc)
-    return f'<context date="{now.strftime("%Y-%m-%d")}" time="{now.strftime("%H:%M:%S")}"/>'
 
 # Date/time format hints for different types
 _TYPE_FORMAT_HINTS: dict[str, str] = {
@@ -59,7 +54,7 @@ def _format_question_tag(item: QuestionnaireItemProtocol) -> str:
     if item.type in _TYPE_FORMAT_HINTS:
         attrs.append(f'format="{_TYPE_FORMAT_HINTS[item.type]}"')
 
-    return f'<question {" ".join(attrs)}>{text}</question>'
+    return f"<question {' '.join(attrs)}>{text}</question>"
 
 
 def _format_child_hint(item: QuestionnaireItemProtocol) -> str:
@@ -114,30 +109,46 @@ def _format_nested_questions(
 
 
 SYSTEM_PROMPT = """You are a medical document annotation assistant.
-Your task is to identify HTML elements that contain answers to questionnaire questions.
+Your task is to identify HTML elements that contain answers to medical questionnaire questions.
 The HTML has data-label="N" attributes on elements. Return the label integers for requested information.
 Guidelines:
 - Return only label integers as a list
 - Return empty list if the information is not found in the clinical note
 - Include labels for the answer AND any nested question answers
-- Only mark content that DIRECTLY answers the question — do not match on keyword overlap from unrelated clinical contexts"""
+- Only mark content that DIRECTLY answers the question — do not match on keyword overlap from unrelated clinical contexts
+- ONLY mark content that is MEDICAL or CLINICAL in nature (diagnoses, symptoms, medications, treatments, observations, measurements, etc.)
+- Return empty list for non-medical content such as personal remarks, administrative notes, or casual conversation
+- Mark ALL occurrences that answer the question, including summaries or conclusions, as long as they are relevant to the questionnaire context"""
 
 
 def format_default_prompt(
     item: QuestionnaireItemProtocol,
     html: str,
     siblings: list[str] | None = None,
+    parent_ctx: "ParentContext | None" = None,
 ) -> str:
     """Format prompt for default strategy (single answer value)."""
     question_tag = _format_question_tag(item)
+    ctx = get_context()
 
     if item.item:
         nested = _format_nested_questions(item.item)
         nested_section = f"\n  <nested>\n{nested}\n  </nested>"
-        instruction = "Return ALL labels containing the answer AND nested question answers."
+        instruction = (
+            "Return ALL labels containing the answer AND nested question answers."
+        )
     else:
         nested_section = ""
         instruction = "Return labels containing the answer value."
+
+    # Add questionnaire context from global context
+    questionnaire_section = ""
+    if ctx.questionnaire_title:
+        questionnaire_section = f"""
+  <questionnaire_context>
+    This question is part of a "{ctx.questionnaire_title}" questionnaire.
+    Only mark content relevant to this medical form.
+  </questionnaire_context>"""
 
     # Add sibling context to prevent marking content that belongs to another question
     siblings_section = ""
@@ -149,9 +160,19 @@ def format_default_prompt(
 {siblings_list}
   </other_questions>"""
 
+    # Add parent context section for disambiguation (especially for vague questions like "Summary", "Notes")
+    parent_section = ""
+    if parent_ctx and parent_ctx.breadcrumb:
+        breadcrumb_str = " > ".join(parent_ctx.breadcrumb)
+        parent_section = f"""
+  <parent_context breadcrumb="{breadcrumb_str}">
+    This question appears under: {breadcrumb_str}
+    For vague questions (e.g. "Summary", "Notes", "Comments") only mark content explicitly related to "{parent_ctx.text}".
+  </parent_context>"""
+
     return f"""<prompt>
-  {_format_context()}
-  {question_tag}{nested_section}{siblings_section}
+  {format_global_context()}{questionnaire_section}
+  {question_tag}{nested_section}{parent_section}{siblings_section}
   <instruction>{instruction} Empty list if not found.</instruction>
   <clinical_note>{html}</clinical_note>
 </prompt>"""
@@ -171,7 +192,7 @@ def format_repeating_group_prompt(
         nested_section = ""
 
     return f"""<prompt>
-  {_format_context()}
+  {format_global_context()}
   <section type="repeating_group">{text}</section>{nested_section}
   <instruction>Find repeating instances. For each, return ALL labels encompassing that instance and nested content. If the clinical note does not contain explicit information for this section, return NO instances. Do NOT infer answers from keywords that appear in a different clinical context (e.g. surgical phase names are not tumor localizations).</instruction>
   <clinical_note>{html}</clinical_note>
@@ -196,7 +217,7 @@ def format_repeating_coding_prompt(
         instruction = "For each option, return labels where that option appears."
 
     return f"""<prompt>
-  {_format_context()}
+  {format_global_context()}
   <question type="coding">{text}</question>
   <options>{options_str}</options>{nested_section}
   <instruction>{instruction} Empty list if not found.</instruction>

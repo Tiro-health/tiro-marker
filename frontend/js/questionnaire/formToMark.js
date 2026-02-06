@@ -39,6 +39,14 @@ function linkIdFromRow(e) {
     if (id && id.includes('.')) return id;
   }
 
+  // For coding/boolean fields: check for elements with name attribute containing dots
+  // (e.g., div[name="emergency-assessment.triage-level.answer"])
+  const namedElements = row.querySelectorAll('[name]');
+  for (const el of namedElements) {
+    const name = el.getAttribute('name');
+    if (name && name.includes('.')) return name;
+  }
+
   // Fallback: walk up to the [data-question-id] wrapper
   const qContainer = row.closest('[data-question-id]');
   return qContainer?.getAttribute('data-question-id') || null;
