@@ -3,7 +3,7 @@
  * Handles clinical notes editor and FHIR Questionnaire form interactions
  */
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = "/api";
 
 // DOM Elements
 const clinicalForm = document.getElementById("clinical-form");

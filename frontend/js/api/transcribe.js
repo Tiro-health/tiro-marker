@@ -4,7 +4,7 @@
  * Also provides cleanup for transcription text.
  */
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = '/api';
 
 /**
  * Clean up transcription text using LLM.
