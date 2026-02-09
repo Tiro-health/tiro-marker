@@ -9,3 +9,4 @@ steps:
       - "--region=europe-west1"
       - "--no-allow-unauthenticated"
       - "--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest"
+      - "--set-env-vars=MEDGEMMA_ENDPOINT_HOST=europe-west4-aiplatform.googleapis.com,MEDGEMMA_PROJECT_ID=tiro-health,MEDGEMMA_REGION=europe-west4,MEDGEMMA_ENDPOINT_ID=YOUR_ENDPOINT_ID,MEDASR_ENDPOINT_HOST=europe-west4-aiplatform.googleapis.com,MEDASR_PROJECT_ID=tiro-health,MEDASR_REGION=europe-west4,MEDASR_ENDPOINT_ID=YOUR_ENDPOINT_ID"
