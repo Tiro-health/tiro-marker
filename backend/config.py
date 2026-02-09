@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     # Default model
     default_model: str = "gemini-2.5-flash"
 
-    # Transcription cleanup (optional LLM post-processing)
-    cleanup_transcription: bool = False
+    # Transcription cleanup (LLM post-processing)
+    cleanup_transcription: bool = True
 
     # App
     debug: bool = False
