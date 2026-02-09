@@ -1,0 +1,11 @@
+steps:
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "tiro-marker"
+      - "--source=."
+      - "--region=europe-west1"
+      - "--no-allow-unauthenticated"
+      - "--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest"
