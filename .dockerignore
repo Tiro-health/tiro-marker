@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Virtual environment
+.venv
+venv
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files
+.env
+.env.*
+
+# IDE and editor
+.claude/
+.zed/
+.vscode/
+.idea/
+
+# Tests
+backend/tests/
+frontend/js/marking/__tests__/
+frontend/.playwright-mcp/
+
+# Documentation
+*.md
+!frontend/index.html
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Misc
+.DS_Store
+*.log
