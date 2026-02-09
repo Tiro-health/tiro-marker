@@ -158,6 +158,7 @@ async def call_medasr(wav_data: bytes) -> dict[str, Any]:
     token = _get_access_token()
     audio_b64 = base64.b64encode(wav_data).decode("ascii")
 
+    # MedASR rawPredict format: just {"file": "<base64-wav>"}
     payload: dict[str, Any] = {
         "file": audio_b64,
     }
