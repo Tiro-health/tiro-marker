@@ -197,6 +197,7 @@ async def transcribe(
     try:
         result = await transcribe_audio(audio_data, context)
     except AudioConversionError as e:
+        logger.error("Audio conversion failed: %s", e)
         raise HTTPException(status_code=422, detail=str(e))
     except httpx.ConnectError as e:
         logger.error("MedASR connection failed: %s", e)
@@ -215,6 +216,13 @@ async def transcribe(
         raise HTTPException(
             status_code=504,
             detail="MedASR endpoint timed out",
+        )
+    except Exception as e:
+        # Catch-all for unexpected errors (e.g., ffmpeg missing, auth issues)
+        logger.exception("Unexpected transcribe error: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Transcription failed: {type(e).__name__}: {e}",
         )
 
     return TranscribeResponse(
