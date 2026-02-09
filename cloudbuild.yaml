@@ -9,3 +9,6 @@ steps:
       - "--region=europe-west1"
       - "--no-allow-unauthenticated"
       - "--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,LOGFIRE_TOKEN=LOGFIRE_TOKEN:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
