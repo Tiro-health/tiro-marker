@@ -46,6 +46,7 @@ export function createVoiceStateMachine(editorAPI, {
   // Simple state: current preview text and flush guard
   let currentText = '';           // Web Speech text for preview
   let flushInProgress = false;    // Guard: only one flush at a time
+  let pendingFlush = false;       // Flag: flush requested while one was in progress
 
   function setState(newState) {
     if (state === newState) return;
@@ -59,10 +60,16 @@ export function createVoiceStateMachine(editorAPI, {
    */
   async function triggerFlush() {
     // Guard: only one flush at a time
-    if (flushInProgress) return;
+    if (flushInProgress) {
+      // Mark that a flush was requested - will auto-trigger after current completes
+      pendingFlush = true;
+      return;
+    }
 
     // Guard: must have content
     if (!currentText.trim()) return;
+
+    pendingFlush = false;
 
     flushInProgress = true;
     setState(State.FLUSHING);
@@ -112,6 +119,12 @@ export function createVoiceStateMachine(editorAPI, {
     if (state === State.FLUSHING) {
       setState(State.RECORDING);
     }
+
+    // 7. If a flush was requested while we were busy, trigger it now
+    if (pendingFlush && currentText.trim()) {
+      pendingFlush = false;
+      triggerFlush();
+    }
   }
 
   /**
@@ -137,6 +150,7 @@ export function createVoiceStateMachine(editorAPI, {
       // Reset state
       currentText = '';
       flushInProgress = false;
+      pendingFlush = false;
 
       // 1. Start audio capture
       audioCapture = createAudioCapture({});
@@ -202,6 +216,7 @@ export function createVoiceStateMachine(editorAPI, {
     }
 
     currentText = '';
+    pendingFlush = false;
     onPreviewText?.('');
   }
 
