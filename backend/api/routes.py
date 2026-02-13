@@ -1,6 +1,7 @@
 """API routes."""
 
 import logging
+import uuid
 
 import httpx
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
@@ -21,6 +22,7 @@ from backend.models.fhir import (
 from backend.models.fhir.document_reference import (
     create_marked_content,
     get_html_content,
+    get_labeled_html_content,
     get_marked_content,
     replace_marked_content,
 )
@@ -87,16 +89,25 @@ async def mark(
     """Mark document with relevant content for questionnaire items."""
     canonical = get_questionnaire_canonical(questionnaire)
 
-    # Extract HTML from document
-    html = get_html_content(document_reference.content)
+    # Check for pre-labeled HTML first
+    labeled_html = get_labeled_html_content(document_reference.content)
+    pre_labeled = labeled_html is not None
+
+    # Fall back to regular HTML if no pre-labeled content
+    html = labeled_html or get_html_content(document_reference.content)
     if html is None:
         raise HTTPException(status_code=400, detail="No HTML content found")
+
+    # Ensure document reference has an ID for provenance tracking
+    doc_ref_id = document_reference.id or str(uuid.uuid4())
 
     # Mark the HTML and build blueprint
     result = await mark_html(
         html,
         questionnaire.item,
         questionnaire_title=questionnaire.title or questionnaire.name,
+        pre_labeled=pre_labeled,
+        document_reference_id=doc_ref_id,
     )
 
     # Create marked content entry and replace any existing for this questionnaire
@@ -107,7 +118,10 @@ async def mark(
         marked_content,
     )
 
-    updated_doc_ref = document_reference.model_copy(update={"content": new_contents})
+    # Update document reference with new content and ensure it has the ID used in provenances
+    updated_doc_ref = document_reference.model_copy(
+        update={"content": new_contents, "id": doc_ref_id}
+    )
 
     return MarkResponse(
         document_reference=updated_doc_ref,

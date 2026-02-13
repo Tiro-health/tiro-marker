@@ -5,6 +5,8 @@ Takes HTML + questionnaire items, outputs marked HTML.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
 
 import logfire
 from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
@@ -25,6 +27,9 @@ from backend.agents.mark.qr_bluprint import (
 )
 from backend.agents.mark.subagents import ParentContext, process_item
 from backend.agents.protocols import QuestionnaireItemProtocol
+from backend.models.fhir.common import CodeableConcept, Coding, Extension, Reference
+from backend.models.fhir.extensions import HTML_ELEMENT_ID_URL
+from backend.models.fhir.provenance import Provenance, ProvenanceAgent, ProvenanceEntity
 from backend.models.fhir.questionnaire_response import QuestionnaireResponse
 
 
@@ -58,6 +63,7 @@ class MarkerState:
     html: str
     marks: list[Mark] = field(default_factory=list)
     marked_items: list[MarkedItem] = field(default_factory=list)
+    document_reference_id: str | None = None
 
 
 @dataclass
@@ -75,10 +81,143 @@ class MarkRequest:
     q_items: Sequence[QuestionnaireItemProtocol]
 
 
+# --- Provenance constants (matching tiro-form frontend expectations) ---
+
+AGENT_TYPE_SYSTEM = "http://fhir.tiro.health/CodeSystem/agent-types"
+AGENT_TYPE_CODE = "marking-engine"
+AGENT_TYPE_DISPLAY = "Marking Engine"
+
+FORM_ACTIVITY_SYSTEM = "http://fhir.tiro.health/CodeSystem/form-activity"
+
+LIFECYCLE_SYSTEM = "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle"
+LIFECYCLE_CODE = "originate"
+LIFECYCLE_DISPLAY = "Originate/Retain Record Lifecycle Event"
+
+TARGET_ELEMENT_URL = "http://hl7.org/fhir/StructureDefinition/targetElement"
+
+ACTIVITY_TEXT = "AI marking of clinical document"
+AGENT_WHO_DISPLAY = "Atticus AI Marking Engine"
+
+
+def build_provenance_from_mark(
+    mark: Mark,
+    doc_ref_id: str | None,
+    recorded: datetime,
+) -> Provenance:
+    """Build a Provenance resource from a Mark.
+
+    Args:
+        mark: The Mark containing qr_id and labels.
+        doc_ref_id: DocumentReference ID (used in entity.what reference).
+        recorded: Timestamp for the provenance record.
+
+    Returns:
+        Provenance resource with entity extensions for HTML element IDs.
+    """
+    # Build extensions for each label
+    label_extensions = [
+        Extension(url=HTML_ELEMENT_ID_URL, valueString=str(label))
+        for label in mark.labels
+    ]
+
+    # Build the entity.what reference with label extensions
+    what_reference = (
+        f"DocumentReference/{doc_ref_id}" if doc_ref_id else "#"
+    )
+
+    return Provenance(
+        target=[
+            Reference(
+                reference="#",
+                extension=[
+                    Extension(
+                        url=TARGET_ELEMENT_URL,
+                        valueUri=mark.qr_id,
+                    )
+                ],
+            )
+        ],
+        recorded=recorded,
+        activity=CodeableConcept(
+            text=ACTIVITY_TEXT,
+            coding=[
+                Coding(
+                    system=FORM_ACTIVITY_SYSTEM,
+                    code="ai-clipboard",
+                    display="AI Clipboard",
+                    userSelected=True,
+                ),
+                Coding(
+                    system=FORM_ACTIVITY_SYSTEM,
+                    code="ai",
+                    display="AI marking",
+                ),
+                Coding(
+                    system=LIFECYCLE_SYSTEM,
+                    code=LIFECYCLE_CODE,
+                    display=LIFECYCLE_DISPLAY,
+                ),
+            ],
+        ),
+        agent=[
+            ProvenanceAgent(
+                type=CodeableConcept(
+                    coding=[
+                        Coding(
+                            system=AGENT_TYPE_SYSTEM,
+                            code=AGENT_TYPE_CODE,
+                            display=AGENT_TYPE_DISPLAY,
+                        )
+                    ]
+                ),
+                who=Reference(display=AGENT_WHO_DISPLAY),
+            )
+        ],
+        entity=[
+            ProvenanceEntity(
+                role=CodeableConcept(
+                    coding=[Coding(code="source")],
+                ),
+                what=Reference(
+                    reference=what_reference,
+                    extension=label_extensions,
+                ),
+            )
+        ],
+    )
+
+
+def build_provenances_from_marks(
+    marks: list[Mark],
+    doc_ref_id: str | None,
+) -> list[dict[str, Any]]:
+    """Build serialized Provenance dicts from marks.
+
+    Args:
+        marks: List of marks with qr_id and labels.
+        doc_ref_id: DocumentReference ID for entity references.
+
+    Returns:
+        List of Provenance resources serialized as dicts.
+    """
+    recorded = datetime.now(timezone.utc)
+    provenances: list[dict[str, Any]] = []
+
+    for mark in marks:
+        # Only create provenances for marks that have labels
+        if mark.labels:
+            prov = build_provenance_from_mark(mark, doc_ref_id, recorded)
+            provenances.append(prov.model_dump(by_alias=True))
+
+    return provenances
+
+
 async def mark_html(
     html: str,
     q_items: Sequence[QuestionnaireItemProtocol],
     questionnaire_title: str | None = None,
+    pre_labeled: bool = False,
+    document_reference_id: str | None = None,
 ) -> MarkingResult:
     """Mark HTML with questionnaire item spans.
 
@@ -86,18 +225,23 @@ async def mark_html(
         html: Source HTML to mark.
         q_items: Questionnaire items to identify spans for.
         questionnaire_title: Optional title for context in prompts.
+        pre_labeled: If True, skip internal labeling (HTML already has labels).
+        document_reference_id: Optional DocumentReference ID for provenance.
 
     Returns:
         MarkingResult with marked HTML and QR blueprint.
     """
     # Set global context for all prompts in this marking operation
     with marking_context(questionnaire_title=questionnaire_title):
-        # First, label the HTML for AI selection
-        labeled_html, _label_count = label_html(html)
+        # Label the HTML for AI selection (unless pre-labeled)
+        if pre_labeled:
+            labeled_html = html
+        else:
+            labeled_html, _label_count = label_html(html)
 
         g = create_graph()
         graph = g.build()
-        state = MarkerState(html=labeled_html)
+        state = MarkerState(html=labeled_html, document_reference_id=document_reference_id)
         request = MarkRequest(html=labeled_html, q_items=q_items)
         result = await graph.run(state=state, inputs=request)
 
@@ -247,8 +391,17 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
                 f"Marked (first 200): {marked_text[:200]!r}"
             )
 
-        # Build QR blueprint from marked items
-        blueprint = build_questionnaire_response_blueprint(ctx.state.marked_items)
+        # Build provenances from marks (includes label IDs as extensions)
+        provenances = build_provenances_from_marks(
+            ctx.state.marks,
+            ctx.state.document_reference_id,
+        )
+
+        # Build QR blueprint from marked items with provenances
+        blueprint = build_questionnaire_response_blueprint(
+            ctx.state.marked_items,
+            provenances=provenances,
+        )
 
         return MarkingResult(marked_html=marked_html, blueprint=blueprint)
 
