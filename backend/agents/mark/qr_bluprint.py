@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Any, Sequence
 
 from pydantic import BaseModel
 
@@ -31,9 +31,17 @@ class MarkedItem(BaseModel):
 
 def build_questionnaire_response_blueprint(
     marked_items: Sequence[MarkedItem],
+    provenances: list[dict[str, Any]] | None = None,
 ) -> QuestionnaireResponse:
     """
     Build QR structure from marked items.
+
+    Args:
+        marked_items: Items identified by the marker.
+        provenances: Optional list of Provenance resources (as dicts) to include in contained.
+
+    Returns:
+        QuestionnaireResponse blueprint with items and optional provenances.
 
     - Repeat coding items: answer WITH valueCoding (determines instance)
     - Other items: answer EMPTY (populate fills)
@@ -84,4 +92,5 @@ def build_questionnaire_response_blueprint(
     return QuestionnaireResponse(
         status="in-progress",
         item=root_items,
+        contained=provenances or [],
     )

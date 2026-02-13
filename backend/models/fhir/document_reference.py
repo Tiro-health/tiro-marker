@@ -5,7 +5,7 @@ import base64
 from pydantic import Field
 
 from backend.models.fhir.primitives import Code, Id, Instant, Markdown, Uri, Canonical
-from backend.models.fhir.extensions import MARKED_HTML_PROFILE
+from backend.models.fhir.extensions import MARKED_HTML_PROFILE, LABELED_HTML_PROFILE
 from backend.models.fhir.common import (
     Attachment,
     CodeableConcept,
@@ -50,6 +50,38 @@ class DocumentReference(FHIRBaseModel):
     securityLabel: list[CodeableConcept] = Field(default=[])
     content: list[DocumentReferenceContent] = Field(default=[])
     extension: list[Extension] = Field(default=[])
+
+
+def has_labeled_html_profile(content: DocumentReferenceContent) -> bool:
+    """Check if content has the labeled-html profile.
+
+    Args:
+        content: A DocumentReference.content entry.
+
+    Returns:
+        True if the content has the labeled-html profile.
+    """
+    return any(
+        profile.valueUri == LABELED_HTML_PROFILE for profile in content.profile
+    )
+
+
+def get_labeled_html_content(contents: list[DocumentReferenceContent]) -> str | None:
+    """Extract pre-labeled HTML content from DocumentReference contents.
+
+    Finds the first content with the labeled-html profile.
+
+    Args:
+        contents: DocumentReference.content list.
+
+    Returns:
+        Decoded HTML string if labeled content found, None otherwise.
+    """
+    for content in contents:
+        if has_labeled_html_profile(content):
+            if content.attachment.data:
+                return base64.b64decode(content.attachment.data).decode()
+    return None
 
 
 def get_html_content(contents: list[DocumentReferenceContent]) -> str | None:

@@ -12,7 +12,6 @@ from backend.agents.populate.extraction import (
     extract_marked_content,
     run_extractions,
 )
-from backend.agents.populate.provenance import build_provenances
 from backend.agents.protocols import QuestionnaireItemProtocol
 from backend.ai_models import ModelName
 from backend.models.fhir.questionnaire_response import (
@@ -320,10 +319,7 @@ async def populate_from_html(
         answers = await run_extractions(tasks, model_name)
 
     # Fill blueprint and drop empty items
+    # Note: provenances are already in blueprint.contained from the marker
     result = fill_blueprint(blueprint, answers)
-
-    # Build provenance resources for all populated items
-    provenances = build_provenances(result.item)
-    result = result.model_copy(update={"contained": result.contained + provenances})
 
     return result
