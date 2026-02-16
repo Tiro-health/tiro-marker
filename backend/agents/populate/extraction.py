@@ -11,7 +11,109 @@ from pydantic import BaseModel, Field, create_model
 from backend.agents.populate.prompts import SYSTEM_PROMPT, format_extraction_prompt
 from backend.ai_models import ModelName, create_agent
 from backend.models.fhir.common import Coding
-from backend.models.fhir.questionnaire_response import QuestionnaireResponseItemAnswer
+from backend.models.fhir.extensions import HTML_ELEMENT_ID_URL
+from backend.models.fhir.questionnaire_response import (
+    QuestionnaireResponse,
+    QuestionnaireResponseItemAnswer,
+)
+
+# Target element URL for provenance (same as in mark.py)
+TARGET_ELEMENT_URL = "http://hl7.org/fhir/StructureDefinition/targetElement"
+
+
+# =============================================================================
+# Provenance-based Label Extraction
+# =============================================================================
+
+
+def get_label_ids_from_provenance(
+    item_id: str,
+    blueprint: QuestionnaireResponse,
+) -> list[int] | None:
+    """Extract label IDs from provenance for a QR item.
+
+    Searches blueprint.contained for Provenance with target matching item_id,
+    then extracts label IDs from entity.what.extension.
+
+    Args:
+        item_id: The QuestionnaireResponseItem.id to look up.
+        blueprint: The QR blueprint containing provenances in .contained.
+
+    Returns:
+        List of integer label IDs if found, None otherwise.
+    """
+    if not blueprint.contained:
+        return None
+
+    for resource in blueprint.contained:
+        # Contained resources are raw dicts
+        if not isinstance(resource, dict) or resource.get("resourceType") != "Provenance":
+            continue
+
+        # Check if target matches item_id
+        targets = resource.get("target", [])
+        for target in targets:
+            extensions = target.get("extension", [])
+            for ext in extensions:
+                if ext.get("url") == TARGET_ELEMENT_URL and ext.get("valueUri") == item_id:
+                    # Found matching provenance, extract label IDs from entity
+                    entities = resource.get("entity", [])
+                    if entities:
+                        what = entities[0].get("what", {})
+                        what_exts = what.get("extension", [])
+                        label_ids: list[int] = []
+                        for we in what_exts:
+                            if we.get("url") == HTML_ELEMENT_ID_URL:
+                                try:
+                                    label_ids.append(int(we.get("valueString", "")))
+                                except ValueError:
+                                    pass
+                        return label_ids if label_ids else None
+
+    return None
+
+
+def extract_labeled_content(html: str, label_ids: list[int]) -> str | None:
+    """Extract text from labeled HTML using label IDs.
+
+    Finds elements with data-label attribute matching any of the label_ids
+    and extracts their text content.
+
+    Args:
+        html: Labeled HTML with data-label attributes on spans.
+        label_ids: List of label IDs to extract content for.
+
+    Returns:
+        Combined text content from matching labels, or None if not found.
+    """
+    if not label_ids:
+        return None
+
+    texts: list[str] = []
+
+    for label_id in label_ids:
+        # Find elements with data-label="<id>" using a greedy match to the closing tag
+        # Pattern matches: <span data-label="id" ...>content</span>
+        # We look for the specific closing tag type that matches the opening tag
+        pattern = rf'<(\w+)[^>]*\bdata-label=["\']?{label_id}["\']?[^>]*>(.*?)</\1>'
+        matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
+
+        for tag_name, content in matches:
+            # Strip nested HTML tags
+            text = re.sub(r"<[^>]+>", "", content)
+            text = text.strip()
+            if text and text not in texts:
+                texts.append(text)
+
+    if not texts:
+        return None
+
+    # Combine and normalize
+    combined = " ".join(texts)
+    combined = re.sub(r"\s+", " ", combined).strip()
+
+    return combined if combined else None
+
 
 # =============================================================================
 # Base Extraction Result

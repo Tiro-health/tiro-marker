@@ -7,7 +7,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-        <link rel="stylesheet" href="styles.css?v=6" />
+        <link rel="stylesheet" href="styles.css?v=9" />
 
         <!-- Import maps for ES modules -->
         <script type="importmap">
@@ -15,6 +15,7 @@
                 "imports": {
                     "lexical": "https://esm.sh/lexical@0.21.0",
                     "@lexical/rich-text": "https://esm.sh/@lexical/rich-text@0.21.0?deps=lexical@0.21.0",
+                    "@lexical/plain-text": "https://esm.sh/@lexical/plain-text@0.21.0?deps=lexical@0.21.0",
                     "@lexical/history": "https://esm.sh/@lexical/history@0.21.0?deps=lexical@0.21.0",
                     "@lexical/html": "https://esm.sh/@lexical/html@0.21.0?deps=lexical@0.21.0",
                     "@lexical/mark": "https://esm.sh/@lexical/mark@0.21.0?deps=lexical@0.21.0",
@@ -22,7 +23,8 @@
                     "@lexical/utils": "https://esm.sh/@lexical/utils@0.21.0?deps=lexical@0.21.0",
                     "@lexical/list": "https://esm.sh/@lexical/list@0.21.0?deps=lexical@0.21.0",
                     "@lexical/offset": "https://esm.sh/@lexical/offset@0.21.0?deps=lexical@0.21.0",
-                    "sentencex-wasm": "https://esm.sh/sentencex-wasm"
+                    "sentencex-wasm": "https://esm.sh/sentencex-wasm",
+                    "sentencex": "https://cdn.jsdelivr.net/npm/sentencex@0.1.0/dist/index.js"
                 }
             }
         </script>
@@ -74,6 +76,8 @@
                         </div>
                     </div>
                     <div class="panel-body" id="editor-container">
+                        <!-- Highlight overlay layer (z-index below editor) -->
+                        <div id="highlight-overlay" class="highlight-overlay"></div>
                         <!-- Lexical editor will be mounted here -->
                     </div>
                     <!-- Voice Input Bar -->
@@ -160,6 +164,6 @@
         <script src="https://cdn.tiro.health/sdk/next/tiro-web-sdk.iife.js"></script>
 
         <!-- Load application as ES module -->
-        <script type="module" src="js/main.js?v=26"></script>
+        <script type="module" src="js/main.js?v=29"></script>
     </body>
 </html>

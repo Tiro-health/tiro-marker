@@ -1,35 +1,23 @@
 """Mark Agent.
 
-Takes HTML + questionnaire items, outputs marked HTML.
+Takes HTML + questionnaire items, outputs QR blueprint with provenances.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any
 
 import logfire
 from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
 from pydantic_graph.beta.join import reduce_null
 
 from backend.agents.mark.context import marking_context
-from backend.agents.mark.labeling import apply_marks as apply_marks_to_html
-from backend.agents.mark.labeling import (
-    get_text_content,
-    label_html,
-    strip_labels,
-    strip_marks,
-    validate_marking,
-)
+from backend.agents.mark.labeling import label_html
 from backend.agents.mark.qr_bluprint import (
     MarkedItem,
     build_questionnaire_response_blueprint,
 )
 from backend.agents.mark.subagents import ParentContext, process_item
 from backend.agents.protocols import QuestionnaireItemProtocol
-from backend.models.fhir.common import CodeableConcept, Coding, Extension, Reference
-from backend.models.fhir.extensions import HTML_ELEMENT_ID_URL
-from backend.models.fhir.provenance import Provenance, ProvenanceAgent, ProvenanceEntity
 from backend.models.fhir.questionnaire_response import QuestionnaireResponse
 
 
@@ -54,7 +42,7 @@ class Mark:
 class MarkingResult:
     """Result of marking HTML with questionnaire items."""
 
-    marked_html: str
+    labeled_html: str
     blueprint: QuestionnaireResponse
 
 
@@ -79,137 +67,6 @@ class MarkInput:
 class MarkRequest:
     html: str
     q_items: Sequence[QuestionnaireItemProtocol]
-
-
-# --- Provenance constants (matching tiro-form frontend expectations) ---
-
-AGENT_TYPE_SYSTEM = "http://fhir.tiro.health/CodeSystem/agent-types"
-AGENT_TYPE_CODE = "marking-engine"
-AGENT_TYPE_DISPLAY = "Marking Engine"
-
-FORM_ACTIVITY_SYSTEM = "http://fhir.tiro.health/CodeSystem/form-activity"
-
-LIFECYCLE_SYSTEM = "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle"
-LIFECYCLE_CODE = "originate"
-LIFECYCLE_DISPLAY = "Originate/Retain Record Lifecycle Event"
-
-TARGET_ELEMENT_URL = "http://hl7.org/fhir/StructureDefinition/targetElement"
-
-ACTIVITY_TEXT = "AI marking of clinical document"
-AGENT_WHO_DISPLAY = "Atticus AI Marking Engine"
-
-
-def build_provenance_from_mark(
-    mark: Mark,
-    doc_ref_id: str | None,
-    recorded: datetime,
-) -> Provenance:
-    """Build a Provenance resource from a Mark.
-
-    Args:
-        mark: The Mark containing qr_id and labels.
-        doc_ref_id: DocumentReference ID (used in entity.what reference).
-        recorded: Timestamp for the provenance record.
-
-    Returns:
-        Provenance resource with entity extensions for HTML element IDs.
-    """
-    # Build extensions for each label
-    label_extensions = [
-        Extension(url=HTML_ELEMENT_ID_URL, valueString=str(label))
-        for label in mark.labels
-    ]
-
-    # Build the entity.what reference with label extensions
-    what_reference = (
-        f"DocumentReference/{doc_ref_id}" if doc_ref_id else "#"
-    )
-
-    return Provenance(
-        target=[
-            Reference(
-                reference="#",
-                extension=[
-                    Extension(
-                        url=TARGET_ELEMENT_URL,
-                        valueUri=mark.qr_id,
-                    )
-                ],
-            )
-        ],
-        recorded=recorded,
-        activity=CodeableConcept(
-            text=ACTIVITY_TEXT,
-            coding=[
-                Coding(
-                    system=FORM_ACTIVITY_SYSTEM,
-                    code="ai-clipboard",
-                    display="AI Clipboard",
-                    userSelected=True,
-                ),
-                Coding(
-                    system=FORM_ACTIVITY_SYSTEM,
-                    code="ai",
-                    display="AI marking",
-                ),
-                Coding(
-                    system=LIFECYCLE_SYSTEM,
-                    code=LIFECYCLE_CODE,
-                    display=LIFECYCLE_DISPLAY,
-                ),
-            ],
-        ),
-        agent=[
-            ProvenanceAgent(
-                type=CodeableConcept(
-                    coding=[
-                        Coding(
-                            system=AGENT_TYPE_SYSTEM,
-                            code=AGENT_TYPE_CODE,
-                            display=AGENT_TYPE_DISPLAY,
-                        )
-                    ]
-                ),
-                who=Reference(display=AGENT_WHO_DISPLAY),
-            )
-        ],
-        entity=[
-            ProvenanceEntity(
-                role=CodeableConcept(
-                    coding=[Coding(code="source")],
-                ),
-                what=Reference(
-                    reference=what_reference,
-                    extension=label_extensions,
-                ),
-            )
-        ],
-    )
-
-
-def build_provenances_from_marks(
-    marks: list[Mark],
-    doc_ref_id: str | None,
-) -> list[dict[str, Any]]:
-    """Build serialized Provenance dicts from marks.
-
-    Args:
-        marks: List of marks with qr_id and labels.
-        doc_ref_id: DocumentReference ID for entity references.
-
-    Returns:
-        List of Provenance resources serialized as dicts.
-    """
-    recorded = datetime.now(timezone.utc)
-    provenances: list[dict[str, Any]] = []
-
-    for mark in marks:
-        # Only create provenances for marks that have labels
-        if mark.labels:
-            prov = build_provenance_from_mark(mark, doc_ref_id, recorded)
-            provenances.append(prov.model_dump(by_alias=True))
-
-    return provenances
 
 
 async def mark_html(
@@ -241,7 +98,9 @@ async def mark_html(
 
         g = create_graph()
         graph = g.build()
-        state = MarkerState(html=labeled_html, document_reference_id=document_reference_id)
+        state = MarkerState(
+            html=labeled_html, document_reference_id=document_reference_id
+        )
         request = MarkRequest(html=labeled_html, q_items=q_items)
         result = await graph.run(state=state, inputs=request)
 
@@ -287,7 +146,11 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
         parent_ctx = ctx.inputs.parent_ctx
 
         # Log item being processed (trace level for filtering)
-        breadcrumb = " > ".join(parent_ctx.breadcrumb) if parent_ctx and parent_ctx.breadcrumb else None
+        breadcrumb = (
+            " > ".join(parent_ctx.breadcrumb)
+            if parent_ctx and parent_ctx.breadcrumb
+            else None
+        )
         logfire.trace(
             "→ {text}",
             text=item.text or item.linkId,
@@ -350,60 +213,27 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
     sync = g.join(reduce_null, initial=None)
 
     @g.step
-    async def apply_marks(
+    async def build_blueprint(
         ctx: StepContext[MarkerState, None, None],
     ) -> MarkingResult:
-        # Filter out group marks - only apply answer marks to HTML output
-        # Group marks are used internally for scoping but not rendered
+        # Log marking summary
         answer_marks = [m for m in ctx.state.marks if not m.is_group]
-
-        # Apply marks to labeled HTML and clean up
-        marked_html = apply_marks_to_html(ctx.state.html, answer_marks)
-
-        # Validate that marking didn't change text content
-        original_clean = strip_labels(ctx.state.html)
-        original_text = get_text_content(original_clean)
-        marked_text = get_text_content(strip_marks(marked_html))
-        is_valid = validate_marking(original_clean, marked_html)
-
         logfire.info(
-            "Mark validation {result}",
-            result="passed" if is_valid else "FAILED",
-            original_length=len(original_text),
-            marked_length=len(marked_text),
+            "Building blueprint",
             total_marks=len(ctx.state.marks),
-            answer_marks_applied=len(answer_marks),
-            group_marks_skipped=len(ctx.state.marks) - len(answer_marks),
+            answer_marks=len(answer_marks),
+            group_marks=len(ctx.state.marks) - len(answer_marks),
             marked_items_count=len(ctx.state.marked_items),
-            marked_html=marked_html,
         )
 
-        if not is_valid:
-            logfire.error(
-                "Marking validation failed: text content changed",
-                original_text_preview=original_text[:500],
-                marked_text_preview=marked_text[:500],
-            )
-            raise ValueError(
-                f"Marking validation failed: text content changed.\n"
-                f"Original length: {len(original_text)}, Marked length: {len(marked_text)}\n"
-                f"Original (first 200): {original_text[:200]!r}\n"
-                f"Marked (first 200): {marked_text[:200]!r}"
-            )
-
-        # Build provenances from marks (includes label IDs as extensions)
-        provenances = build_provenances_from_marks(
-            ctx.state.marks,
-            ctx.state.document_reference_id,
-        )
-
-        # Build QR blueprint from marked items with provenances
+        # Build QR blueprint from marked items with marks (handles provenance merging)
         blueprint = build_questionnaire_response_blueprint(
             ctx.state.marked_items,
-            provenances=provenances,
+            marks=ctx.state.marks,
+            doc_ref_id=ctx.state.document_reference_id,
         )
 
-        return MarkingResult(marked_html=marked_html, blueprint=blueprint)
+        return MarkingResult(labeled_html=ctx.state.html, blueprint=blueprint)
 
     g.add(
         g.edge_from(g.start_node).to(fan_out),
@@ -425,8 +255,8 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
                 ).to(sync)
             )
         ),
-        g.edge_from(sync).to(apply_marks),
-        g.edge_from(apply_marks).to(g.end_node),
+        g.edge_from(sync).to(build_blueprint),
+        g.edge_from(build_blueprint).to(g.end_node),
     )
 
     return g

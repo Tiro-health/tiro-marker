@@ -9,7 +9,9 @@ import logfire
 
 from backend.agents.populate.extraction import (
     ExtractionTask,
+    extract_labeled_content,
     extract_marked_content,
+    get_label_ids_from_provenance,
     run_extractions,
 )
 from backend.agents.protocols import QuestionnaireItemProtocol
@@ -99,13 +101,16 @@ def build_extraction_tasks(
 ) -> list[ExtractionTask]:
     """Build extraction tasks by walking the blueprint.
 
+    Uses provenance-based label lookup when available (new approach),
+    falling back to marked HTML extraction for backwards compatibility.
+
     Args:
-        html: Marked HTML with data-location attributes
-        blueprint: QR blueprint with item IDs
+        html: Labeled or marked HTML
+        blueprint: QR blueprint with item IDs and provenances in .contained
         q_items: Map of linkId -> questionnaire item
 
     Returns:
-        List of extraction tasks for items with marked content
+        List of extraction tasks for items with extractable content
     """
     tasks: list[ExtractionTask] = []
 
@@ -131,8 +136,17 @@ def build_extraction_tasks(
             q_item = q_items.get(item.linkId)
 
             if q_item and q_item.type not in ("group", "display") and item.id:
-                # Try to extract marked content for this item
-                content = extract_marked_content(html, item.id)
+                # Try provenance-based extraction first (new approach)
+                content: str | None = None
+                label_ids = get_label_ids_from_provenance(item.id, blueprint)
+
+                if label_ids:
+                    content = extract_labeled_content(html, label_ids)
+
+                # Fallback to marked content extraction (backwards compatibility)
+                if content is None:
+                    content = extract_marked_content(html, item.id)
+
                 if content:
                     # Collect sibling questions for disambiguation
                     sibling_questions = get_sibling_texts(items, item.linkId)
@@ -197,9 +211,32 @@ def fill_blueprint(
             # Process answer items
             processed_answers: list[QuestionnaireResponseItemAnswer] = []
 
+            # Check if existing answers have valueCoding (repeating coding items)
+            has_existing_coding = any(a.valueCoding for a in item.answer)
+
             if extracted_answers and not item.answer:
                 # No existing answers, just use extracted ones
                 processed_answers = extracted_answers
+            elif has_existing_coding:
+                # Existing answers with valueCoding (e.g., repeating coding items)
+                # Keep existing answers and process their children - don't override with extracted
+                for ans in item.answer:
+                    processed_ans_items = process_items(ans.item)
+
+                    new_ans = QuestionnaireResponseItemAnswer(
+                        valueBoolean=ans.valueBoolean,
+                        valueDecimal=ans.valueDecimal,
+                        valueInteger=ans.valueInteger,
+                        valueDate=ans.valueDate,
+                        valueDateTime=ans.valueDateTime,
+                        valueTime=ans.valueTime,
+                        valueString=ans.valueString,
+                        valueUri=ans.valueUri,
+                        valueCoding=ans.valueCoding,
+                        valueReference=ans.valueReference,
+                        item=processed_ans_items,
+                    )
+                    processed_answers.append(new_ans)
             elif extracted_answers and item.answer:
                 # Merge extracted answers with existing answer structure
                 # (preserve nested items from first existing answer)

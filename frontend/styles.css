@@ -777,6 +777,36 @@ body {
     border: none;
     border-radius: 0;
     overflow-y: auto;
+    position: relative; /* For overlay positioning */
+}
+
+/* ========================================
+   Highlight Overlay
+   ======================================== */
+.highlight-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2; /* Above editor (z-index: 1) for hover interactions */
+    pointer-events: none;
+    overflow: visible; /* Allow highlights for full content height */
+}
+
+.highlight-rect {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.highlight-rect:hover {
+    background: rgba(34, 211, 238, 0.35) !important;
+}
+
+.highlight-rect.highlight-glow {
+    background: rgba(34, 211, 238, 0.35) !important;
 }
 
 #lexical-editor {
@@ -791,6 +821,8 @@ body {
     color: var(--text-primary);
     background-color: transparent;
     caret-color: var(--accent-cyan) !important;
+    position: relative; /* Above highlight overlay */
+    z-index: 1;
 }
 
 #lexical-editor * {
