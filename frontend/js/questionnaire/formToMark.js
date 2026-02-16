@@ -11,7 +11,7 @@ import {
   clearMarkGlow,
   highlightMarksForQuestion,
   scrollToFirstMark,
-} from '../marking/index.js?v=12';
+} from '../marking/index.js?v=15';
 
 /** Cleanup function from the previous init (removes old listeners). */
 let cleanup = null;

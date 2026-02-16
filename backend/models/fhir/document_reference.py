@@ -84,6 +84,26 @@ def get_labeled_html_content(contents: list[DocumentReferenceContent]) -> str | 
     return None
 
 
+def create_labeled_content(labeled_html: str) -> DocumentReferenceContent:
+    """Create a DocumentReference.content entry for labeled HTML.
+
+    Args:
+        labeled_html: HTML with data-label attributes on spans.
+
+    Returns:
+        DocumentReferenceContent with labeled HTML profile.
+    """
+    return DocumentReferenceContent(
+        attachment=Attachment(
+            contentType="text/html",
+            data=base64.b64encode(labeled_html.encode()).decode(),
+        ),
+        profile=[
+            DocumentReferenceContentProfile(valueUri=LABELED_HTML_PROFILE),
+        ],
+    )
+
+
 def get_html_content(contents: list[DocumentReferenceContent]) -> str | None:
     """Extract HTML content from DocumentReference contents.
 

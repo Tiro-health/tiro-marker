@@ -4,7 +4,7 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
-import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=12';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=15';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
 import { initFormToMark } from './questionnaire/formToMark.js';
 import { initQuestionnaireSwitcher } from './questionnaire/switcher.js?v=2';

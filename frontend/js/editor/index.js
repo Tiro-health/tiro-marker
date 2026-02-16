@@ -15,7 +15,7 @@ import {
   $isTextNode,
   $createRangeSelection,
 } from 'lexical';
-import { registerRichText } from '@lexical/rich-text';
+import { registerPlainText } from '@lexical/plain-text';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
 import { editorConfig } from './config.js';
@@ -30,13 +30,24 @@ let editorInstance = null;
  * @returns {Object} Editor API
  */
 export function initializeEditor(containerElement, initialContent = '') {
+  // Preserve or create highlight overlay element
+  let overlayEl = containerElement.querySelector('#highlight-overlay');
+  if (!overlayEl) {
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'highlight-overlay';
+    overlayEl.className = 'highlight-overlay';
+  }
+
+  // Clear container but keep/add overlay
+  containerElement.innerHTML = '';
+  containerElement.appendChild(overlayEl);
+
   // Create the content editable element
   const contentEditable = document.createElement('div');
   contentEditable.contentEditable = 'true';
   contentEditable.id = 'lexical-editor';
   contentEditable.setAttribute('role', 'textbox');
   contentEditable.setAttribute('aria-multiline', 'true');
-  containerElement.innerHTML = '';
   containerElement.appendChild(contentEditable);
 
   // Create the editor instance
@@ -46,8 +57,9 @@ export function initializeEditor(containerElement, initialContent = '') {
   // Attach editor to DOM
   editor.setRootElement(contentEditable);
 
-  // Register rich text support (handles Enter, Backspace, etc.)
-  registerRichText(editor);
+  // Register plain text support (handles Enter, Backspace, etc.)
+  // PlainText mode uses single \n between paragraphs, matching buildTextMap's offset calculation
+  registerPlainText(editor);
 
   // Register history (undo/redo)
   const historyState = createEmptyHistoryState();
@@ -61,6 +73,8 @@ export function initializeEditor(containerElement, initialContent = '') {
   // Return the editor API
   return {
     editor,
+    editorElement: contentEditable,
+    overlayElement: overlayEl,
     getHtmlContent: () => getHtmlContent(),
     setHtmlContent: (html) => setHtmlContent(html),
     getTextContent: () => getTextContent(),
