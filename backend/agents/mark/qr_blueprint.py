@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Protocol, Sequence
 
@@ -46,6 +45,7 @@ class MarkedItem(BaseModel):
     text: str | None = None
     index: int | None = None  # For repeated items: 0, 1, 2...
     location_string: str  # Full path for parent grouping
+    is_group: bool = False  # True for group type items (children go under item, not answer)
 
     # Parent context
     parent_linkId: str | None = None
@@ -56,14 +56,6 @@ class MarkedItem(BaseModel):
     instance_answer: QuestionnaireResponseItemAnswer | None = (
         None  # ← coding goes in blueprint
     )
-
-
-@dataclass
-class BlueprintResult:
-    """Result of building QR blueprint with merged provenances."""
-
-    blueprint: QuestionnaireResponse
-    provenances: list[dict[str, Any]]
 
 
 def _build_provenance(
@@ -200,7 +192,7 @@ def build_questionnaire_response_blueprint(
         if item_id in labels_by_id:
             merged_labels[item_id] = labels_by_id[item_id]
 
-        # Determine answer structure
+        # Determine answer structure based on item type
         if marked.instance_answer is not None:
             # Repeat coding item: answer contains the coding, children go under answer.item
             answer = QuestionnaireResponseItemAnswer(
@@ -215,14 +207,36 @@ def build_questionnaire_response_blueprint(
                 answer=[answer],
                 item=[],
             )
-        else:
-            # Non-repeat or group: answer empty, children under item
+        elif marked.is_group:
+            # Group item: children go under item (FHIR spec for groups)
             return QuestionnaireResponseItem(
                 id=item_id,
                 linkId=marked.linkId,
                 text=marked.text,
                 answer=[],
                 item=child_qr_items,
+            )
+        elif child_qr_items:
+            # Non-group with children: children go under answer[0].item
+            # Answer has no value yet (populate will fill it)
+            answer = QuestionnaireResponseItemAnswer(
+                item=child_qr_items,
+            )
+            return QuestionnaireResponseItem(
+                id=item_id,
+                linkId=marked.linkId,
+                text=marked.text,
+                answer=[answer],
+                item=[],
+            )
+        else:
+            # Non-group without children: empty answer array
+            return QuestionnaireResponseItem(
+                id=item_id,
+                linkId=marked.linkId,
+                text=marked.text,
+                answer=[],
+                item=[],
             )
 
     def merge_repeating_coding(
@@ -261,9 +275,7 @@ def build_questionnaire_response_blueprint(
             for marked in group:
                 children = children_by_parent.get(marked.item_id, [])
                 # Recursively merge children too
-                child_qr_items = (
-                    merge_repeating_coding(children) if children else []
-                )
+                child_qr_items = merge_repeating_coding(children) if children else []
 
                 answer = QuestionnaireResponseItemAnswer(
                     valueCoding=marked.instance_answer.valueCoding,  # type: ignore[union-attr]

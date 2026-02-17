@@ -47,7 +47,10 @@ def get_label_ids_from_provenance(
 
     for resource in blueprint.contained:
         # Contained resources are raw dicts
-        if not isinstance(resource, dict) or resource.get("resourceType") != "Provenance":
+        if (
+            not isinstance(resource, dict)
+            or resource.get("resourceType") != "Provenance"
+        ):
             continue
 
         # Check if target matches item_id
@@ -55,7 +58,10 @@ def get_label_ids_from_provenance(
         for target in targets:
             extensions = target.get("extension", [])
             for ext in extensions:
-                if ext.get("url") == TARGET_ELEMENT_URL and ext.get("valueUri") == item_id:
+                if (
+                    ext.get("url") == TARGET_ELEMENT_URL
+                    and ext.get("valueUri") == item_id
+                ):
                     # Found matching provenance, extract label IDs from entity
                     entities = resource.get("entity", [])
                     if entities:
@@ -98,7 +104,7 @@ def extract_labeled_content(html: str, label_ids: list[int]) -> str | None:
         pattern = rf'<(\w+)[^>]*\bdata-label=["\']?{label_id}["\']?[^>]*>(.*?)</\1>'
         matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
 
-        for tag_name, content in matches:
+        for _, content in matches:
             # Strip nested HTML tags
             text = re.sub(r"<[^>]+>", "", content)
             text = text.strip()
@@ -132,7 +138,9 @@ class ExtractionResult(BaseModel):
 # =============================================================================
 
 
-def create_coding_model(options: list[str], multi_select: bool = False) -> type[BaseModel]:
+def create_coding_model(
+    options: list[str], multi_select: bool = False
+) -> type[BaseModel]:
     """Create a dynamic model with Literal options for coding questions.
 
     Args:
@@ -163,7 +171,10 @@ def create_coding_model(options: list[str], multi_select: bool = False) -> type[
         return create_model(
             "MultiCodingExtraction",
             __base__=ExtractionResult,
-            values=(list[OptionType], Field(default=[], description="Selected options (can be multiple)")),  # type: ignore[valid-type]
+            values=(
+                list[OptionType],
+                Field(default=[], description="Selected options (can be multiple)"),
+            ),  # type: ignore[valid-type]
         )
 
     return create_model(
@@ -511,9 +522,7 @@ def extract_marked_content(html: str, item_id: str) -> str | None:
     # Deduplicate - remove parts that are substrings of other parts
     unique_parts = []
     for part in combined_parts:
-        is_substring = any(
-            part != other and part in other for other in combined_parts
-        )
+        is_substring = any(part != other and part in other for other in combined_parts)
         if not is_substring:
             unique_parts.append(part)
 

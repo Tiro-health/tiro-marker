@@ -11,13 +11,13 @@ from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
 from pydantic_graph.beta.join import reduce_null
 
 from backend.agents.mark.context import marking_context
-from backend.agents.mark.labeling import label_html
-from backend.agents.mark.qr_bluprint import (
+from backend.agents.mark.qr_blueprint import (
     MarkedItem,
     build_questionnaire_response_blueprint,
 )
 from backend.agents.mark.subagents import ParentContext, process_item
 from backend.agents.protocols import QuestionnaireItemProtocol
+from backend.ai_models import ModelName
 from backend.models.fhir.questionnaire_response import QuestionnaireResponse
 
 
@@ -49,6 +49,7 @@ class MarkingResult:
 @dataclass
 class MarkerState:
     html: str
+    model_name: ModelName = ModelName.GEMINI_FLASH_25
     marks: list[Mark] = field(default_factory=list)
     marked_items: list[MarkedItem] = field(default_factory=list)
     document_reference_id: str | None = None
@@ -73,8 +74,8 @@ async def mark_html(
     html: str,
     q_items: Sequence[QuestionnaireItemProtocol],
     questionnaire_title: str | None = None,
-    pre_labeled: bool = False,
     document_reference_id: str | None = None,
+    model_name: ModelName = ModelName.GEMINI_FLASH_25,
 ) -> MarkingResult:
     """Mark HTML with questionnaire item spans.
 
@@ -82,26 +83,22 @@ async def mark_html(
         html: Source HTML to mark.
         q_items: Questionnaire items to identify spans for.
         questionnaire_title: Optional title for context in prompts.
-        pre_labeled: If True, skip internal labeling (HTML already has labels).
         document_reference_id: Optional DocumentReference ID for provenance.
+        model_name: LLM model to use for marking.
 
     Returns:
-        MarkingResult with marked HTML and QR blueprint.
+        MarkingResult with labeled HTML and QR blueprint.
     """
     # Set global context for all prompts in this marking operation
     with marking_context(questionnaire_title=questionnaire_title):
-        # Label the HTML for AI selection (unless pre-labeled)
-        if pre_labeled:
-            labeled_html = html
-        else:
-            labeled_html, _label_count = label_html(html)
-
         g = create_graph()
         graph = g.build()
         state = MarkerState(
-            html=labeled_html, document_reference_id=document_reference_id
+            html=html,
+            model_name=model_name,
+            document_reference_id=document_reference_id,
         )
-        request = MarkRequest(html=labeled_html, q_items=q_items)
+        request = MarkRequest(html=html, q_items=q_items)
         result = await graph.run(state=state, inputs=request)
 
         return result
@@ -164,6 +161,7 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
             item,
             location,
             html,
+            model_name=ctx.state.model_name,
             siblings=siblings,
             parent_ctx=parent_ctx,
         )

@@ -126,23 +126,33 @@ questionnaire:
               - ja
               - nee
 
-expected_marks:
-  - "carotis-ingreep"
-  - "patientkarakteristieken"
-  - "post-op-complications"
-  - "patientkarakteristieken.bmi-group"
-  - "carotis-ingreep.indicatie.answer"
-  - "carotis-ingreep.indicatie.datum-eerste-symptomen.answer"
-  - "post-op-complications.tia.answer"
-  - "patientkarakteristieken.bmi-group.height.answer"
-  - "patientkarakteristieken.bmi-group.weight.answer"
-  - "patientkarakteristieken.bmi-group.bmi.answer"
-  - "carotis-ingreep.locatie.answer"
-  - "carotis-ingreep.zijde-ingreep.answer"
-  - "post-op-complications.perifeer-zenuwletsel.perifeer-zenuwletsel-corresponderende-zijde.answer"
-  - "post-op-complications.cva.cva-corresponderende-zijde.answer"
-  - "post-op-complications.tia.tia-corresponderende-zijde.answer"
-  - "carotis-ingreep.procedure-type.answer"
-  - "carotis-ingreep.ingreepdatum.answer"
-  - "post-op-complications.overlijden.answer"
-  - "post-op-complications.cva.answer"
+expected_answers:
+  # Carotis ingreep group
+  - fhirpath: "item.where(linkId='carotis-ingreep').item.where(linkId='procedure-type').answer.valueCoding.display"
+    match: exact
+    expected: "Carotisendarterectomie"
+
+  - fhirpath: "item.where(linkId='carotis-ingreep').item.where(linkId='zijde-ingreep').answer.valueCoding.display"
+    match: exact
+    expected: "links"
+
+  - fhirpath: "item.where(linkId='carotis-ingreep').item.where(linkId='locatie').answer.valueCoding.display"
+    match: exact
+    expected: "arteria carotis interna"
+
+  - fhirpath: "item.where(linkId='carotis-ingreep').item.where(linkId='indicatie').answer.valueCoding.display"
+    match: exact
+    expected: "symptomatisch lijden"
+
+  # Patient characteristics - BMI group
+  - fhirpath: "item.where(linkId='patientkarakteristieken').item.where(linkId='bmi-group').item.where(linkId='height').answer.valueDecimal"
+    match: exact
+    expected: 178
+
+  - fhirpath: "item.where(linkId='patientkarakteristieken').item.where(linkId='bmi-group').item.where(linkId='weight').answer.valueDecimal"
+    match: exact
+    expected: 82
+
+  - fhirpath: "item.where(linkId='patientkarakteristieken').item.where(linkId='bmi-group').item.where(linkId='bmi').answer.valueDecimal"
+    match: exact
+    expected: 26

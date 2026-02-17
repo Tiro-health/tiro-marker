@@ -28,10 +28,28 @@ questionnaire:
                         type: string
                         text: Additional Notes
 
-expected_marks:
-  - "medication-group"
-  - "medication-group.medication-name.dose.start-date.status.answer"
-  - "medication-group.medication-name.dose.start-date.status.notes.answer"
-  - "medication-group.medication-name.answer"
-  - "medication-group.medication-name.dose.answer"
-  - "medication-group.medication-name.dose.start-date.answer"
+expected_answers:
+  # Level 1: medication-name (medication-group is group → direct .item access)
+  - fhirpath: "item.where(linkId='medication-group').item.where(linkId='medication-name').answer.valueString"
+    match: llm
+    expected: "Metformin"
+
+  # Level 2: dose (medication-name is string → children under answer.item)
+  - fhirpath: "item.where(linkId='medication-group').item.where(linkId='medication-name').answer.item.where(linkId='dose').answer.valueDecimal"
+    match: exact
+    expected: 500
+
+  # Level 3: start-date (dose is decimal → children under answer.item)
+  - fhirpath: "item.where(linkId='medication-group').item.where(linkId='medication-name').answer.item.where(linkId='dose').answer.item.where(linkId='start-date').answer.valueDate"
+    match: exact
+    expected: "2024-03-15"
+
+  # Level 4: status (start-date is date → children under answer.item)
+  - fhirpath: "item.where(linkId='medication-group').item.where(linkId='medication-name').answer.item.where(linkId='dose').answer.item.where(linkId='start-date').answer.item.where(linkId='status').answer.valueCoding.display"
+    match: exact
+    expected: "Active"
+
+  # Level 5: notes (status is coding → children under answer.item)
+  - fhirpath: "item.where(linkId='medication-group').item.where(linkId='medication-name').answer.item.where(linkId='dose').answer.item.where(linkId='start-date').answer.item.where(linkId='status').answer.item.where(linkId='notes').answer.valueString"
+    match: llm
+    expected: "Patient tolerates well with no side effects"

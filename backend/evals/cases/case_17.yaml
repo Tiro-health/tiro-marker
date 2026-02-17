@@ -139,28 +139,102 @@ questionnaire:
         type: string
         text: Samenvatting
 
-expected_marks:
-  - "bevindingen-beenmerg-gewricht-9"
-  - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.vocht-status.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh"
-  - "bevindingen-beenmerg-gewricht-9.botstructuur.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-pathologie.answer"
-  - "bevindingen-beenmerg-gewricht-9.botstructuur.botstructuur-pathologie.answer"
-  - "bevindingen-beenmerg-gewricht-9.botstructuur.botstructuur-pathologie.botletsel-detail.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh.afmeting-h.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh.afmeting-b.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-afmeting.afmeting-lbh.afmeting-l.answer"
-  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.answer"
-  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Partieel gescheurd.answer"
-  - "bevindingen-beenmerg-gewricht-9.botstructuur.botstructuur-localisatie.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-gradatie.answer"
-  - "bevindingen-beenmerg-gewricht-9.beenmergsignaal.beenmergsignaal-localisatie.answer"
-  - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.vocht-status.vocht-gradatie.answer"
-  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Partieel gescheurd.vkb-scheur-locatie.answer"
-  - "bevindingen-beenmerg-gewricht-9.achterste-kruisband.answer"
-  - "bevindingen-beenmerg-gewricht-9.voorste-kruisband.vkb-pathologie.option-http://example.org/test|Normaal.answer"
-  - "bevindingen-beenmerg-gewricht-9.achterste-kruisband.akb-pathologie.answer"
-  - "bevindingen-beenmerg-gewricht-9.intra-articulair-vocht.answer"
-  - "bevindingen-beenmerg-gewricht-9.samenvatting.answer"
+expected_answers:
+  # --- Botstructuur (string with nested children) ---
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='botstructuur').answer.valueString"
+    match: llm
+    expected: "Overwegend normaal, klein botletsel laterale femurcondyl"
+
+  # botstructuur is string → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='botstructuur').answer.item.where(linkId='botstructuur-pathologie').answer.valueCoding.display"
+    match: exact
+    expected: "Botletsel"
+
+  # botstructuur-pathologie is coding → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='botstructuur').answer.item.where(linkId='botstructuur-pathologie').answer.item.where(linkId='botletsel-detail').answer.valueCoding.display"
+    match: exact
+    expected: "Benigne"
+
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='botstructuur').answer.item.where(linkId='botstructuur-localisatie').answer.valueCoding.display"
+    match: exact
+    expected: "Laterale femurcondyl"
+
+  # --- Beenmergsignaal (string with nested children) ---
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.valueString"
+    match: llm
+    expected: "Oedeem in laterale femurcondyl en lateraal tibiaplateau, passend bij contusie"
+
+  # beenmergsignaal is string → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-pathologie').answer.valueCoding.display"
+    match: exact
+    expected: "Oedeem"
+
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-localisatie').answer.valueCoding.display"
+    match: exact
+    expected: "Laterale femurcondyl"
+
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-gradatie').answer.valueCoding.display"
+    match: exact
+    expected: "Uitgesproken"
+
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-afmeting').answer.valueCoding.display"
+    match: exact
+    expected: "XXX mm (L x B x H)"
+
+  # beenmergsignaal-afmeting is coding → afmeting-lbh under answer.item, afmeting-lbh is group
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-afmeting').answer.item.where(linkId='afmeting-lbh').item.where(linkId='afmeting-l').answer.valueDecimal"
+    match: exact
+    expected: 22
+
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-afmeting').answer.item.where(linkId='afmeting-lbh').item.where(linkId='afmeting-b').answer.valueDecimal"
+    match: exact
+    expected: 15
+
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='beenmergsignaal').answer.item.where(linkId='beenmergsignaal-afmeting').answer.item.where(linkId='afmeting-lbh').item.where(linkId='afmeting-h').answer.valueDecimal"
+    match: exact
+    expected: 18
+
+  # --- Voorste kruisband (string with nested children) ---
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='voorste-kruisband').answer.valueString"
+    match: llm
+    expected: "Partieel gescheurd, scheur anteromediaal"
+
+  # voorste-kruisband is string → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='voorste-kruisband').answer.item.where(linkId='vkb-pathologie').answer.valueCoding.display"
+    match: set
+    expected: "Partieel gescheurd"
+
+  # vkb-pathologie is coding → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='voorste-kruisband').answer.item.where(linkId='vkb-pathologie').answer.where(valueCoding.display='Partieel gescheurd').item.where(linkId='vkb-scheur-locatie').answer.valueCoding.display"
+    match: exact
+    expected: "Anteromediaal"
+
+  # --- Achterste kruisband (string with nested children) ---
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='achterste-kruisband').answer.valueString"
+    match: llm
+    expected: "Normaal"
+
+  # achterste-kruisband is string → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='achterste-kruisband').answer.item.where(linkId='akb-pathologie').answer.valueCoding.display"
+    match: exact
+    expected: "Normaal"
+
+  # --- Intra-articulair vocht (string with nested children) ---
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='intra-articulair-vocht').answer.valueString"
+    match: llm
+    expected: "Matig intra-articulair vocht"
+
+  # intra-articulair-vocht is string → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='intra-articulair-vocht').answer.item.where(linkId='vocht-status').answer.valueCoding.display"
+    match: exact
+    expected: "Pathologie"
+
+  # vocht-status is coding → children under answer.item
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='intra-articulair-vocht').answer.item.where(linkId='vocht-status').answer.item.where(linkId='vocht-gradatie').answer.valueCoding.display"
+    match: exact
+    expected: "Matig"
+
+  # --- Samenvatting ---
+  - fhirpath: "item.where(linkId='bevindingen-beenmerg-gewricht-9').item.where(linkId='samenvatting').answer.valueString"
+    match: llm
+    expected: "Partiële VKB scheur anteromediaal, beenmergoedeem lateraal passend bij contusie, benigne botletsel, vocht in het gewricht"

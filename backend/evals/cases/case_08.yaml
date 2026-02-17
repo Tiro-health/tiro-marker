@@ -33,23 +33,73 @@ questionnaire:
         type: string
         text: Current medications
 
-expected_marks:
-  - "patient-history"
-  - "patient-history.patient-name.answer"
-  - "patient-history.patient-dob.answer"
-  - "patient-history.hospitalization.0"
-  - "patient-history.hospitalization.0.hospital-name.answer"
-  - "patient-history.hospitalization.0.admission-date.answer"
-  - "patient-history.hospitalization.0.reason.answer"
-  - "patient-history.hospitalization.0.discharge-date.answer"
-  - "patient-history.hospitalization.1"
-  - "patient-history.hospitalization.1.hospital-name.answer"
-  - "patient-history.hospitalization.1.admission-date.answer"
-  - "patient-history.hospitalization.1.reason.answer"
-  - "patient-history.hospitalization.1.discharge-date.answer"
-  - "patient-history.hospitalization.2"
-  - "patient-history.hospitalization.2.hospital-name.answer"
-  - "patient-history.hospitalization.2.admission-date.answer"
-  - "patient-history.hospitalization.2.reason.answer"
-  - "patient-history.hospitalization.2.discharge-date.answer"
-  - "patient-history.current-medications.answer"
+expected_answers:
+  # Patient info
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='patient-name').answer.valueString"
+    match: llm
+    expected: "Sarah Johnson"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='patient-dob').answer.valueDate"
+    match: exact
+    expected: "1985-03-15"
+
+  # Count of hospitalizations
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization').count()"
+    match: exact
+    expected: 3
+
+  # First hospitalization - St. Mary's
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[0].item.where(linkId='hospital-name').answer.valueString"
+    match: llm
+    expected: "St. Mary's Medical Center"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[0].item.where(linkId='admission-date').answer.valueDate"
+    match: exact
+    expected: "2022-05-10"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[0].item.where(linkId='discharge-date').answer.valueDate"
+    match: exact
+    expected: "2022-05-15"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[0].item.where(linkId='reason').answer.valueString"
+    match: llm
+    expected: "acute appendicitis"
+
+  # Second hospitalization - City General
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[1].item.where(linkId='hospital-name').answer.valueString"
+    match: llm
+    expected: "City General Hospital"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[1].item.where(linkId='admission-date').answer.valueDate"
+    match: exact
+    expected: "2023-08-22"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[1].item.where(linkId='discharge-date').answer.valueDate"
+    match: exact
+    expected: "2023-08-29"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[1].item.where(linkId='reason').answer.valueString"
+    match: llm
+    expected: "severe pneumonia"
+
+  # Third hospitalization - Regional Medical
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[2].item.where(linkId='hospital-name').answer.valueString"
+    match: llm
+    expected: "Regional Medical Center"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[2].item.where(linkId='admission-date').answer.valueDate"
+    match: exact
+    expected: "2024-11-03"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[2].item.where(linkId='discharge-date').answer.valueDate"
+    match: exact
+    expected: "2024-11-18"
+
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='hospitalization')[2].item.where(linkId='reason').answer.valueString"
+    match: llm
+    expected: "fractured left femur"
+
+  # Current medications
+  - fhirpath: "item.where(linkId='patient-history').item.where(linkId='current-medications').answer.valueString"
+    match: llm
+    expected: "Lisinopril, Metformin"

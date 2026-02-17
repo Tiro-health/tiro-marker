@@ -19,7 +19,7 @@ from backend.agents.mark.prompts import (
     format_repeating_coding_prompt,
     format_repeating_group_prompt,
 )
-from backend.agents.mark.qr_bluprint import MarkedItem
+from backend.agents.mark.qr_blueprint import MarkedItem
 from backend.agents.protocols import QuestionnaireItemProtocol
 from backend.ai_models import ModelName, create_agent
 from backend.models.fhir.common import Coding
@@ -351,6 +351,7 @@ async def simple_container_strategy(
         linkId=item.linkId,
         text=item.text,
         location_string=location,
+        is_group=True,  # Group item: children go under item, not answer
         parent_linkId=parent_ctx.linkId if parent_ctx else None,
         parent_index=parent_ctx.index if parent_ctx else None,
         parent_id=parent_ctx.item_id if parent_ctx else None,
@@ -439,6 +440,7 @@ async def repeating_group_strategy(
             text=item.text,
             index=i,
             location_string=instance_location,
+            is_group=True,  # Repeating group item: children go under item
             parent_linkId=parent_ctx.linkId if parent_ctx else None,
             parent_index=parent_ctx.index if parent_ctx else None,
             parent_id=parent_ctx.item_id if parent_ctx else None,

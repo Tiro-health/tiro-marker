@@ -78,17 +78,23 @@ def format_extraction_prompt(
         case "coding":
             if repeats:
                 prompt_parts.append(
-                    "    <instruction>Select ALL options from valid_options that are mentioned in the text</instruction>"
+                    "    <instruction>Select ALL options from valid_options that correctly answer the question based on the text</instruction>"
                 )
                 prompt_parts.append(
                     "    <instruction>Multiple selections allowed - include every option that applies</instruction>"
                 )
+                prompt_parts.append(
+                    "    <instruction>Do NOT select options just because they are mentioned - they must be a correct answer to the question</instruction>"
+                )
+                prompt_parts.append(
+                    "    <instruction>Options that are explicitly negative, absent, ruled out, or not detected are NOT correct answers</instruction>"
+                )
             else:
                 prompt_parts.append(
-                    "    <instruction>Select exactly one option from valid_options that best matches</instruction>"
+                    "    <instruction>Select exactly one option from valid_options that best answers the question</instruction>"
                 )
             prompt_parts.append(
-                "    <instruction>Only select an option if clearly indicated in the text</instruction>"
+                "    <instruction>Only select an option if the text supports it as a correct answer</instruction>"
             )
         case "boolean":
             prompt_parts.append("    <instruction>Extract true or false based on the text</instruction>")
