@@ -5,4 +5,8 @@ questionnaire:
     type: string
     text: What is the patient's blood pressure?
 
-expected_marks: []
+expected_answers:
+  # Blood pressure should NOT be present (not mentioned in the document)
+  - fhirpath: "item.where(linkId='blood-pressure').answer.count()"
+    match: exact
+    expected: 0

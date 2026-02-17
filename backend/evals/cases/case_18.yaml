@@ -1,5 +1,9 @@
 name: Relative dates test - Tests datetime context for resolving relative dates like yesterday, last week
 description: Relative dates test - Tests datetime context for resolving relative dates like yesterday, last week
+
+# Context date for relative date resolution (document date)
+datetime_context: "2026-01-15T10:00:00"
+
 questionnaire:
   - linkId: symptom-onset
     type: date
@@ -16,3 +20,29 @@ questionnaire:
   - linkId: symptom-description
     type: string
     text: Describe the symptoms
+
+expected_answers:
+  # Symptom onset: "yesterday evening" - should be yesterday relative to today
+  - fhirpath: "item.where(linkId='symptom-onset').answer.valueDate"
+    match: llm
+    expected: "Yesterday's date (1 day before today)"
+
+  # Last meal: "this morning at 7:30 AM" - should be today at 07:30
+  - fhirpath: "item.where(linkId='last-meal').answer.valueDateTime"
+    match: llm
+    expected: "Today's date at 07:30 AM"
+
+  # Last doctor visit: "last week" - should be about 7 days ago
+  - fhirpath: "item.where(linkId='last-doctor-visit').answer.valueDate"
+    match: llm
+    expected: "About 7 days before today (last week)"
+
+  # Medication started: "about two weeks ago" - should be about 14 days ago
+  - fhirpath: "item.where(linkId='medication-started').answer.valueDate"
+    match: llm
+    expected: "About 14 days before today (two weeks ago)"
+
+  # Symptom description
+  - fhirpath: "item.where(linkId='symptom-description').answer.valueString"
+    match: llm
+    expected: "Crampy abdominal discomfort in the lower right quadrant with occasional nausea"

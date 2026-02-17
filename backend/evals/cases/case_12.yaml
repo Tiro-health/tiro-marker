@@ -17,5 +17,14 @@ questionnaire:
         type: date
         text: Date quit smoking
 
-expected_marks:
-  - "smoking-status.answer"
+expected_answers:
+  # Smoking status IS present
+  - fhirpath: "item.where(linkId='smoking-status').answer.valueCoding.display"
+    match: exact
+    expected: "Former smoker"
+
+  # Quit date should NOT be present (not mentioned in the document)
+  # smoking-status is coding (not group), so children are under answer.item
+  - fhirpath: "item.where(linkId='smoking-status').answer.item.where(linkId='quit-date').answer.count()"
+    match: exact
+    expected: 0

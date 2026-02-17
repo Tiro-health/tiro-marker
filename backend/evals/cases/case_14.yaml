@@ -28,9 +28,23 @@ questionnaire:
                 type: string
                 text: City
 
-expected_marks:
-  - "test"
-  - "test.patient-information.answer"
-  - "test.patient-information.age.answer"
-  - "test.patient-information.country.answer"
-  - "test.patient-information.country.city.answer"
+expected_answers:
+  # Patient information (full sentence)
+  - fhirpath: "item.where(linkId='test').item.where(linkId='patient-information').answer.valueString"
+    match: llm
+    expected: "De patient is 29 jaar oud en is van België, Gent"
+
+  # Age (patient-information is text, not group → use answer.item)
+  - fhirpath: "item.where(linkId='test').item.where(linkId='patient-information').answer.item.where(linkId='age').answer.valueDecimal"
+    match: exact
+    expected: 29
+
+  # Country (patient-information is text, not group → use answer.item)
+  - fhirpath: "item.where(linkId='test').item.where(linkId='patient-information').answer.item.where(linkId='country').answer.valueCoding.display"
+    match: exact
+    expected: "Belgium"
+
+  # City (country is coding, not group → use answer.item)
+  - fhirpath: "item.where(linkId='test').item.where(linkId='patient-information').answer.item.where(linkId='country').answer.item.where(linkId='city').answer.valueString"
+    match: llm
+    expected: "Gent"

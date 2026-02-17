@@ -11,29 +11,19 @@ from backend.agents.cleanup import cleanup_transcription
 from backend.agents.mark import mark_html
 from backend.agents.populate import populate_from_html
 from backend.config import settings
-from backend.speech import transcribe_audio
-from backend.speech.health import check_medasr_health
-from backend.speech.medasr import AudioConversionError, TranscribeResult
 from backend.models.fhir import (
     DocumentReference,
     Questionnaire,
     QuestionnaireResponse,
 )
 from backend.models.fhir.document_reference import (
-    create_labeled_content,
-    get_html_content,
     get_labeled_html_content,
     get_marked_content,
 )
 from backend.models.fhir.primitives import make_canonical
-
-
-class MarkResponse(BaseModel):
-    """Response from mark endpoint containing marked document and QR blueprint."""
-
-    document_reference: DocumentReference
-    blueprint: QuestionnaireResponse
-
+from backend.speech import transcribe_audio
+from backend.speech.health import check_medasr_health
+from backend.speech.medasr import AudioConversionError, TranscribeResult
 
 router = APIRouter(prefix="/api")
 
@@ -84,7 +74,7 @@ async def medasr_health() -> MedASRHealthResponse:
 async def mark(
     document_reference: DocumentReference = Body(...),
     questionnaire: Questionnaire = Body(...),
-) -> MarkResponse:
+) -> QuestionnaireResponse:
     """Mark document and build QR blueprint with provenances.
 
     The blueprint contains provenances that map QR item IDs to HTML label IDs,
@@ -92,11 +82,9 @@ async def mark(
     """
     # Check for pre-labeled HTML first
     labeled_html = get_labeled_html_content(document_reference.content)
-    pre_labeled = labeled_html is not None
 
     # Fall back to regular HTML if no pre-labeled content
-    html = labeled_html or get_html_content(document_reference.content)
-    if html is None:
+    if labeled_html is None:
         raise HTTPException(status_code=400, detail="No HTML content found")
 
     # Ensure document reference has an ID for provenance tracking
@@ -104,30 +92,13 @@ async def mark(
 
     # Mark the HTML and build blueprint with provenances
     result = await mark_html(
-        html,
+        labeled_html,
         questionnaire.item,
         questionnaire_title=questionnaire.title or questionnaire.name,
-        pre_labeled=pre_labeled,
         document_reference_id=doc_ref_id,
     )
 
-    # Build updated contents list
-    # If HTML wasn't pre-labeled, add the labeled HTML for populate to use
-    if pre_labeled:
-        new_contents = document_reference.content
-    else:
-        labeled_content = create_labeled_content(result.labeled_html)
-        new_contents = [labeled_content, *document_reference.content]
-
-    # Update document reference with labeled content and ID
-    updated_doc_ref = document_reference.model_copy(
-        update={"content": new_contents, "id": doc_ref_id}
-    )
-
-    return MarkResponse(
-        document_reference=updated_doc_ref,
-        blueprint=result.blueprint,
-    )
+    return result.blueprint
 
 
 @router.post("/populate")

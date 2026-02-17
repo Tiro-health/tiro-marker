@@ -1,6 +1,5 @@
 """Test fixtures for backend tests."""
 
-import base64
 import json
 from pathlib import Path
 from typing import Any, Iterator
@@ -11,15 +10,14 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.models.fhir import (
-    Attachment,
     Coding,
     DocumentReference,
-    DocumentReferenceContent,
     Questionnaire,
     QuestionnaireItem,
     QuestionnaireItemAnswerOption,
 )
 from backend.models.fhir.common import Extension
+from backend.models.fhir.document_reference import create_labeled_content
 from backend.models.fhir.extensions import QUESTIONNAIRE_UNIT_URL
 
 # Cases moved to evals directory
@@ -112,18 +110,9 @@ def yaml_to_questionnaire(yaml_items: list[dict[str, Any]]) -> Questionnaire:
 
 def clinical_note_to_document_reference(html_content: str) -> DocumentReference:
     """Convert clinical note HTML to FHIR DocumentReference."""
-    encoded_html = base64.b64encode(html_content.encode("utf-8")).decode("utf-8")
 
     return DocumentReference(
-        status="current",
-        content=[
-            DocumentReferenceContent(
-                attachment=Attachment(
-                    contentType="text/html",
-                    data=encoded_html,
-                )
-            )
-        ],
+        status="current", content=[create_labeled_content(html_content)]
     )
 
 
