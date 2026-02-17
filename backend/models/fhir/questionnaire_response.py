@@ -36,7 +36,7 @@ class QuestionnaireResponseItemAnswer(FHIRBaseModel):
 class QuestionnaireResponseItem(FHIRBaseModel):
     """FHIR QuestionnaireResponse.item element."""
 
-    id: Id | None = None
+    id: str | None = None
     linkId: LinkId
     definition: Uri | None = None
     text: str | None = None

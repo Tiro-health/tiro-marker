@@ -4,7 +4,6 @@ Extensible architecture - register new strategies as needed.
 """
 
 import re
-import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import cast
@@ -30,7 +29,7 @@ from backend.models.fhir.questionnaire_response import QuestionnaireResponseItem
 class MarkResult:
     """Result of marking a question."""
 
-    qr_id: str  # UUID-based ID for QR blueprint (data-location)
+    qr_id: str  # Location-based ID for QR blueprint (data-location)
     frontend_location: (
         str  # Hierarchical path for form linking (data-frontend-location)
     )
@@ -45,7 +44,7 @@ class ParentContext:
     linkId: str | None = None
     text: str | None = None  # Parent's human-readable name
     index: int | None = None
-    item_id: str | None = None  # Parent's UUID-based ID
+    item_id: str | None = None  # Parent's location-based ID
     instance_answer: QuestionnaireResponseItemAnswer | None = None
     breadcrumb: list[str] | None = None  # Full path e.g. ["Medications", "Dosage"]
 
@@ -262,8 +261,9 @@ async def default_strategy(
     """Default: LLM finds answer value in HTML."""
     extended_marks: list[ExtendedMarkResult] = []
 
-    # Generate UUID-based ID for this item
-    item_id = str(uuid.uuid4())
+    # Use location string as ID (matches frontend ID generation)
+    location_string = f"{location}.answer"
+    item_id = location_string
 
     if item.type not in ("group", "display"):
         prompt = format_default_prompt(item, html, siblings, parent_ctx)
@@ -272,7 +272,7 @@ async def default_strategy(
         result = await agent.run(prompt)
 
         mark = MarkResult(
-            qr_id=item_id,  # UUID-linkId format for data-location
+            qr_id=item_id,  # Location-based ID for data-location
             frontend_location=f"{location}.answer",  # Hierarchical path for form linking
             labels=result.output.labels,
         )
@@ -334,14 +334,14 @@ async def simple_container_strategy(
 
     No LLM call needed - just extract all root-level labeled elements.
     """
-    # Generate UUID-based ID for this item
-    item_id = str(uuid.uuid4())
+    # Use location string as ID (matches frontend ID generation)
+    item_id = location
 
     # Get all root-level labels from the HTML
     root_labels = get_root_labels(html)
 
     mark = MarkResult(
-        qr_id=item_id,  # UUID-linkId format for data-location
+        qr_id=item_id,  # Location-based ID for data-location
         frontend_location=location,  # Hierarchical path for form linking
         labels=root_labels,
         is_group=True,  # Group marks are excluded from HTML output
@@ -420,8 +420,8 @@ async def repeating_group_strategy(
 
     for i, instance in enumerate(result.output.instances):
         instance_location = f"{location}.{i}"
-        # Generate UUID-based ID for this instance
-        item_id = str(uuid.uuid4())
+        # Use location string as ID (matches frontend ID generation)
+        item_id = instance_location
 
         # Extract scoped HTML for this instance
         instance_html = (
@@ -429,7 +429,7 @@ async def repeating_group_strategy(
         )
 
         mark = MarkResult(
-            qr_id=item_id,  # UUID-linkId format for data-location
+            qr_id=item_id,  # Location-based ID for data-location
             frontend_location=instance_location,  # Hierarchical path for form linking
             labels=instance.labels,
             is_group=True,  # Group marks are excluded from HTML output
@@ -519,12 +519,6 @@ async def repeating_coding_strategy(
     for field_name, code in field_to_code.items():
         labels = getattr(result.output, field_name, [])
         if labels:
-            # Generate UUID-based ID for this option instance
-            item_id = str(uuid.uuid4())
-
-            # Extract scoped HTML for this option
-            option_html = extract_html_for_labels(html, labels)
-
             # Parse code into system|code if it contains a pipe
             code_parts = code.split("|", 1)
             if len(code_parts) == 2:
@@ -532,6 +526,16 @@ async def repeating_coding_strategy(
             else:
                 system = None
                 code_value = code
+
+            # Encode the code for use in location string (same as for children)
+            encoded_code = quote(code, safe="").replace(".", "-")
+
+            # Use location string as ID (matches frontend ID generation)
+            # For repeating coding, each option needs a unique ID
+            item_id = f"{location}.option-{encoded_code}.answer"
+
+            # Extract scoped HTML for this option
+            option_html = extract_html_for_labels(html, labels)
 
             # Find the display name from the original options list
             display_name = next((d for c, d in options if c == code), code_value)
@@ -546,10 +550,13 @@ async def repeating_coding_strategy(
             )
 
             mark = MarkResult(
-                qr_id=item_id,  # UUID-linkId format for data-location
+                qr_id=item_id,  # Location-based ID for data-location
                 frontend_location=f"{location}.answer",  # Hierarchical path for form linking
                 labels=labels,
             )
+
+            # Option location for children
+            option_location = f"{location}.option-{encoded_code}"
 
             # Create MarkedItem for this option instance
             marked_item = MarkedItem(
@@ -557,7 +564,7 @@ async def repeating_coding_strategy(
                 linkId=item.linkId,
                 text=item.text,
                 index=option_index,
-                location_string=f"{location}.answer",
+                location_string=item_id,  # Same as item_id for consistency
                 parent_linkId=parent_ctx.linkId if parent_ctx else None,
                 parent_index=parent_ctx.index if parent_ctx else None,
                 parent_id=parent_ctx.item_id if parent_ctx else None,
@@ -570,11 +577,6 @@ async def repeating_coding_strategy(
             # Children get an option-specific path
             # e.g., dosage -> emergency-assessment.medications.option-xxx.medication-dosage.answer
             if item.item:
-                # Encode the code to match tiro-form-filler's ID encoding:
-                # 1. URL-encode special chars (:, /, |, etc.)
-                # 2. Replace . with - (quote() doesn't encode dots)
-                encoded_code = quote(code, safe="").replace(".", "-")
-                option_location = f"{location}.option-{encoded_code}"
 
                 # Build parent context for children of this option
                 child_parent_ctx = ParentContext(

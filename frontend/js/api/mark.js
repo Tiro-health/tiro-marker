@@ -24,12 +24,17 @@ export async function markDocument(html, questionnaire, options = {}) {
     ? buildLabeledDocumentReference(html)
     : buildDocumentReference(html);
 
-  const response = await post('/mark', {
+  // Backend returns blueprint directly (QuestionnaireResponse)
+  const blueprint = await post('/mark', {
     document_reference: documentReference,
     questionnaire: questionnaire,
   });
 
-  return response;
+  // Return both for populate to use
+  return {
+    document_reference: documentReference,
+    blueprint: blueprint,
+  };
 }
 
 /**

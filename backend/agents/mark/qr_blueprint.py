@@ -40,7 +40,7 @@ class MarkProtocol(Protocol):
 class MarkedItem(BaseModel):
     """Item identified by marker. Tracks position and parent answer."""
 
-    item_id: str  # UUID-based ID, matches data-location in HTML and QR item.id
+    item_id: str  # Location-based ID, matches data-location in HTML and QR item.id
     linkId: str
     text: str | None = None
     index: int | None = None  # For repeated items: 0, 1, 2...
