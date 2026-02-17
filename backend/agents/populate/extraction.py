@@ -127,10 +127,14 @@ def extract_labeled_content(html: str, label_ids: list[int]) -> str | None:
 
 
 class ExtractionResult(BaseModel):
-    """Base model for extraction results with failure handling."""
+    """Base model for extraction results with reasoning."""
 
     extracted: bool = Field(description="True if a value was successfully extracted")
-    reason: str | None = Field(default=None, description="Reason if extraction failed")
+    reason: str = Field(
+        description="Reasoning for the extraction decision. "
+        "If extracted=true, explain why this value was chosen. "
+        "If extracted=false, explain why no value could be extracted."
+    )
 
 
 # =============================================================================
@@ -276,7 +280,7 @@ class ExtractionTask:
     unit: str | None = None
     repeats: bool = False  # For coding: allows multiple selections
     sibling_questions: list[str] | None = None  # Other questions at same level
-    parent_text: str | None = None  # Parent question text for context
+    breadcrumb: list[str] | None = None  # Full path: ["Parent", "Child", "Question"]
 
 
 # =============================================================================
@@ -284,10 +288,19 @@ class ExtractionTask:
 # =============================================================================
 
 
+@dataclass
+class ExtractionAnswer:
+    """Result of a single extraction with answers and reasoning."""
+
+    item_id: str
+    answers: list[QuestionnaireResponseItemAnswer]
+    reason: str
+
+
 async def extract_answer(
     task: ExtractionTask,
     model_name: ModelName = ModelName.GEMINI_FLASH_25,
-) -> tuple[str, list[QuestionnaireResponseItemAnswer]]:
+) -> ExtractionAnswer:
     """Extract answer(s) for a single item.
 
     Args:
@@ -295,7 +308,7 @@ async def extract_answer(
         model_name: The LLM model to use for extraction
 
     Returns:
-        Tuple of (item_id, list of answers). Empty list if extraction failed.
+        ExtractionAnswer with item_id, answers list, and reasoning.
     """
     # Get option display names for the model
     option_displays = [display for _, display in task.options] if task.options else None
@@ -314,7 +327,7 @@ async def extract_answer(
         unit=task.unit,
         repeats=task.repeats,
         sibling_questions=task.sibling_questions,
-        parent_text=task.parent_text,
+        breadcrumb=task.breadcrumb,
     )
 
     # Create and run the agent
@@ -322,31 +335,35 @@ async def extract_answer(
     with logfire.span("Extract: {text}", text=task.text or task.linkId):
         result = await agent.run(prompt)
 
+    reason = result.output.reason
+
     # Check if extraction succeeded
     if not result.output.extracted:
-        return task.item_id, []
+        return ExtractionAnswer(item_id=task.item_id, answers=[], reason=reason)
 
     # Handle multi-select vs single-select
     if task.repeats and task.item_type == "coding":
         # Multi-select: values is a list
         values = getattr(result.output, "values", [])
         if not values:
-            return task.item_id, []
+            return ExtractionAnswer(item_id=task.item_id, answers=[], reason=reason)
         answers = [
             ans
             for v in values
             if (ans := value_to_answer(task.item_type, v, task.options)) is not None
         ]
-        return task.item_id, answers
+        return ExtractionAnswer(item_id=task.item_id, answers=answers, reason=reason)
     else:
         # Single value
         value = getattr(result.output, "value", None)
         if value is None:
-            return task.item_id, []
+            return ExtractionAnswer(item_id=task.item_id, answers=[], reason=reason)
         answer = value_to_answer(task.item_type, value, task.options)
         if answer is None:
-            return task.item_id, []
-        return task.item_id, [answer]
+            return ExtractionAnswer(item_id=task.item_id, answers=[], reason=reason)
+        return ExtractionAnswer(
+            item_id=task.item_id, answers=[answer], reason=reason
+        )
 
 
 def value_to_answer(
@@ -429,7 +446,7 @@ def find_coding_for_display(
 async def run_extractions(
     tasks: list[ExtractionTask],
     model_name: ModelName = ModelName.GEMINI_FLASH_25,
-) -> dict[str, list[QuestionnaireResponseItemAnswer]]:
+) -> dict[str, ExtractionAnswer]:
     """Run all extraction tasks in parallel.
 
     Args:
@@ -437,7 +454,7 @@ async def run_extractions(
         model_name: The LLM model to use
 
     Returns:
-        Dict mapping item_id to list of extracted answers (excludes failed extractions)
+        Dict mapping item_id to ExtractionAnswer (includes reasoning for all items)
     """
     if not tasks:
         return {}
@@ -447,8 +464,8 @@ async def run_extractions(
         *[extract_answer(task, model_name) for task in tasks]
     )
 
-    # Filter out failed extractions and build answers map
-    return {item_id: answers for item_id, answers in results if answers}
+    # Return all results (including those with empty answers for their reasoning)
+    return {result.item_id: result for result in results}
 
 
 # =============================================================================

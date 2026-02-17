@@ -28,7 +28,7 @@ class Mark:
     Used to track where questionnaire items should be marked in the HTML document.
     """
 
-    # UUID-based location for QR blueprint (data-location)
+    # Location-based ID for QR blueprint (data-location)
     qr_id: str
     # Hierarchical path for form linking (data-frontend-location)
     frontend_location: str
