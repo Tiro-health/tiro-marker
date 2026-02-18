@@ -5,7 +5,7 @@
  * Note: Hover highlighting removed - now using provenance icon click instead.
  */
 
-import { scrollToFirstMark } from '../marking/index.js?v=18';
+import { scrollToFirstMark } from '../marking/index.js?v=26';
 
 /** Cleanup function from the previous init (removes old listeners). */
 let cleanup = null;
