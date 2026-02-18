@@ -53,3 +53,7 @@ poetry run pytest
 ```bash
 poetry run uvicorn backend.main:app --reload
 ```
+
+This starts the backend API and serves the frontend. Open **http://localhost:8000** in your browser to access the UI.
+
+- API documentation is available at http://localhost:8000/docs

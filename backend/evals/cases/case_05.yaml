@@ -70,21 +70,43 @@ questionnaire:
                     type: string
                     text: Frequency
 
-expected_marks:
-  - "medical-assessment"
-  - "medical-assessment.medical-history"
-  - "medical-assessment.current-visit"
-  - "medical-assessment.medical-history.patient-name"
-  - "medical-assessment.medical-history.primary-condition"
-  - "medical-assessment.current-visit.chief-complaint"
-  - "medical-assessment.current-visit.vital-signs"
-  - "medical-assessment.current-visit.medications"
-  - "medical-assessment.current-visit.medications.medication-name"
-  - "medical-assessment.medical-history.primary-condition.onset-date.answer"
-  - "medical-assessment.medical-history.primary-condition.current-status.answer"
-  - "medical-assessment.current-visit.chief-complaint.complaint-severity.answer"
-  - "medical-assessment.current-visit.chief-complaint.complaint-location.answer"
-  - "medical-assessment.current-visit.vital-signs.blood-pressure.answer"
-  - "medical-assessment.current-visit.vital-signs.temperature.answer"
-  - "medical-assessment.current-visit.medications.medication-name.medication-dosage.answer"
-  - "medical-assessment.current-visit.medications.medication-name.medication-frequency.answer"
+expected_answers:
+  # medical-assessment > medical-history > primary-condition > onset-date
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='medical-history').item.where(linkId='primary-condition').item.where(linkId='onset-date').answer.valueString"
+    match: llm
+    expected: "January 2020"
+
+  # medical-assessment > medical-history > primary-condition > current-status
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='medical-history').item.where(linkId='primary-condition').item.where(linkId='current-status').answer.valueString"
+    match: llm
+    expected: "Well controlled"
+
+  # medical-assessment > current-visit > chief-complaint > complaint-severity
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='current-visit').item.where(linkId='chief-complaint').item.where(linkId='complaint-severity').answer.valueString"
+    match: llm
+    expected: "moderate, 5 out of 10"
+
+  # medical-assessment > current-visit > chief-complaint > complaint-location
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='current-visit').item.where(linkId='chief-complaint').item.where(linkId='complaint-location').answer.valueString"
+    match: llm
+    expected: "left side of chest with radiation to left arm"
+
+  # medical-assessment > current-visit > vital-signs > blood-pressure
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='current-visit').item.where(linkId='vital-signs').item.where(linkId='blood-pressure').answer.valueString"
+    match: llm
+    expected: "135/88 mmHg"
+
+  # medical-assessment > current-visit > vital-signs > temperature
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='current-visit').item.where(linkId='vital-signs').item.where(linkId='temperature').answer.valueString"
+    match: llm
+    expected: "37.2 degrees Celsius"
+
+  # medical-assessment > current-visit > medications > medication-name > medication-dosage
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='current-visit').item.where(linkId='medications').item.where(linkId='medication-name').item.where(linkId='medication-dosage').answer.valueString"
+    match: llm
+    expected: "500mg"
+
+  # medical-assessment > current-visit > medications > medication-name > medication-frequency
+  - fhirpath: "item.where(linkId='medical-assessment').item.where(linkId='current-visit').item.where(linkId='medications').item.where(linkId='medication-name').item.where(linkId='medication-frequency').answer.valueString"
+    match: llm
+    expected: "Twice daily"

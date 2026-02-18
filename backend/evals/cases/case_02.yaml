@@ -35,11 +35,36 @@ questionnaire:
   - linkId: previous-cardiac-history
     type: boolean
 
-expected_marks:
-  - "onset.answer"
-  - "chief-complaint.answer"
-  - "pain-character.answer"
-  - "radiation.option-http://example.org/test|left arm.answer"
-  - "associated-symptoms.option-http://example.org/test|shortness of breath.answer"
-  - "associated-symptoms.option-http://example.org/test|sweating.answer"
-  - "previous-cardiac-history.answer"
+expected_answers:
+  # String - chief complaint
+  - fhirpath: "item.where(linkId='chief-complaint').answer.valueString"
+    match: llm
+    expected: "chest pain"
+
+  # Integer - onset in hours
+  - fhirpath: "item.where(linkId='onset').answer.valueInteger"
+    match: exact
+    expected: 2
+
+  # Coding - pain character
+  - fhirpath: "item.where(linkId='pain-character').answer.valueCoding.display"
+    match: exact
+    expected: "crushing"
+
+  # Coding repeats - radiation (only left arm mentioned)
+  - fhirpath: "item.where(linkId='radiation').answer.valueCoding.display"
+    match: set
+    expected:
+      - "left arm"
+
+  # Coding repeats - associated symptoms (shortness of breath and sweating)
+  - fhirpath: "item.where(linkId='associated-symptoms').answer.valueCoding.display"
+    match: set
+    expected:
+      - "shortness of breath"
+      - "sweating"
+
+  # Boolean - no previous cardiac history
+  - fhirpath: "item.where(linkId='previous-cardiac-history').answer.valueBoolean"
+    match: exact
+    expected: false

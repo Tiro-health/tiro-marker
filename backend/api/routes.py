@@ -1,6 +1,7 @@
 """API routes."""
 
 import logging
+import uuid
 
 import httpx
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
@@ -10,29 +11,19 @@ from backend.agents.cleanup import cleanup_transcription
 from backend.agents.mark import mark_html
 from backend.agents.populate import populate_from_html
 from backend.config import settings
-from backend.speech import transcribe_audio
-from backend.speech.health import check_medasr_health
-from backend.speech.medasr import AudioConversionError, TranscribeResult
 from backend.models.fhir import (
     DocumentReference,
     Questionnaire,
     QuestionnaireResponse,
 )
 from backend.models.fhir.document_reference import (
-    create_marked_content,
-    get_html_content,
+    get_labeled_html_content,
     get_marked_content,
-    replace_marked_content,
 )
 from backend.models.fhir.primitives import make_canonical
-
-
-class MarkResponse(BaseModel):
-    """Response from mark endpoint containing marked document and QR blueprint."""
-
-    document_reference: DocumentReference
-    blueprint: QuestionnaireResponse
-
+from backend.speech import transcribe_audio
+from backend.speech.health import check_medasr_health
+from backend.speech.medasr import AudioConversionError, TranscribeResult
 
 router = APIRouter(prefix="/api")
 
@@ -83,36 +74,31 @@ async def medasr_health() -> MedASRHealthResponse:
 async def mark(
     document_reference: DocumentReference = Body(...),
     questionnaire: Questionnaire = Body(...),
-) -> MarkResponse:
-    """Mark document with relevant content for questionnaire items."""
-    canonical = get_questionnaire_canonical(questionnaire)
+) -> QuestionnaireResponse:
+    """Mark document and build QR blueprint with provenances.
 
-    # Extract HTML from document
-    html = get_html_content(document_reference.content)
-    if html is None:
+    The blueprint contains provenances that map QR item IDs to HTML label IDs,
+    enabling the populate endpoint to extract content from the labeled HTML.
+    """
+    # Check for pre-labeled HTML first
+    labeled_html = get_labeled_html_content(document_reference.content)
+
+    # Fall back to regular HTML if no pre-labeled content
+    if labeled_html is None:
         raise HTTPException(status_code=400, detail="No HTML content found")
 
-    # Mark the HTML and build blueprint
+    # Ensure document reference has an ID for provenance tracking
+    doc_ref_id = document_reference.id or str(uuid.uuid4())
+
+    # Mark the HTML and build blueprint with provenances
     result = await mark_html(
-        html,
+        labeled_html,
         questionnaire.item,
         questionnaire_title=questionnaire.title or questionnaire.name,
+        document_reference_id=doc_ref_id,
     )
 
-    # Create marked content entry and replace any existing for this questionnaire
-    marked_content = create_marked_content(result.marked_html, canonical)
-    new_contents = replace_marked_content(
-        document_reference.content,
-        canonical,
-        marked_content,
-    )
-
-    updated_doc_ref = document_reference.model_copy(update={"content": new_contents})
-
-    return MarkResponse(
-        document_reference=updated_doc_ref,
-        blueprint=result.blueprint,
-    )
+    return result.blueprint
 
 
 @router.post("/populate")
@@ -121,28 +107,38 @@ async def populate(
     document_reference: DocumentReference = Body(...),
     blueprint: QuestionnaireResponse = Body(...),
 ) -> QuestionnaireResponse:
-    """Populate questionnaire from marked document.
+    """Populate questionnaire from labeled or marked document.
+
+    Supports two extraction modes:
+    1. New: Labeled HTML + provenance (label IDs in blueprint.contained)
+    2. Legacy: Marked HTML with <mark data-location> tags
 
     Args:
         questionnaire: The questionnaire definition with item types and options
-        document_reference: Document containing marked HTML
-        blueprint: QR blueprint from /mark endpoint with item IDs
+        document_reference: Document containing labeled or marked HTML
+        blueprint: QR blueprint from /mark endpoint with item IDs and provenances
 
     Returns:
-        QuestionnaireResponse with answers populated from marked content
+        QuestionnaireResponse with answers populated from content
     """
     canonical = get_questionnaire_canonical(questionnaire)
 
-    # Find marked content for this questionnaire
-    marked_html = get_marked_content(document_reference.content, canonical)
-    if marked_html is None:
+    # Try labeled HTML first (new approach - uses provenance for extraction)
+    html = get_labeled_html_content(document_reference.content)
+
+    if html is None:
+        # Fallback to marked HTML (backwards compatibility)
+        html = get_marked_content(document_reference.content, canonical)
+
+    if html is None:
         raise HTTPException(
             status_code=400,
-            detail=f"No marked content found for questionnaire: {canonical}",
+            detail=f"No labeled or marked content found for questionnaire: {canonical}",
         )
 
-    # Populate from marked HTML using blueprint structure
-    return await populate_from_html(marked_html, blueprint, questionnaire.item)
+    # Populate from HTML using blueprint structure
+    # (build_extraction_tasks handles both labeled and marked HTML)
+    return await populate_from_html(html, blueprint, questionnaire.item)
 
 
 class TranscribeResponse(BaseModel):

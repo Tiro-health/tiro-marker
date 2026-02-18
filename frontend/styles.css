@@ -698,6 +698,42 @@ body {
     pointer-events: none;
 }
 
+/* ---- Language Select ---- */
+.lang-select {
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.4rem center;
+    padding-right: 1.5rem;
+}
+
+.lang-select:hover {
+    border-color: var(--border-accent);
+    color: var(--text-primary);
+}
+
+.lang-select:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.15);
+}
+
+.lang-select option {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
 /* ---- MedASR Status Indicator ---- */
 .medasr-status {
     position: absolute;
@@ -777,6 +813,41 @@ body {
     border: none;
     border-radius: 0;
     overflow-y: auto;
+    position: relative; /* For overlay positioning */
+}
+
+/* ========================================
+   Highlight Overlay
+   ======================================== */
+.highlight-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2; /* Above editor (z-index: 1) for hover interactions */
+    pointer-events: none;
+    overflow: visible; /* Allow highlights for full content height */
+}
+
+.highlight-rect {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.highlight-rect:hover {
+    background: rgba(34, 211, 238, 0.35) !important;
+}
+
+.highlight-rect.highlight-glow {
+    background: rgba(34, 211, 238, 0.35) !important;
+}
+
+/* Hover state for all matching sentence segments */
+.highlight-rect.highlight-hover {
+    background: rgba(34, 211, 238, 0.35) !important;
 }
 
 #lexical-editor {
@@ -791,6 +862,8 @@ body {
     color: var(--text-primary);
     background-color: transparent;
     caret-color: var(--accent-cyan) !important;
+    position: relative; /* Above highlight overlay */
+    z-index: 1;
 }
 
 #lexical-editor * {
@@ -1427,4 +1500,121 @@ body {
 
 [role="dialog"].bg-popover > div:last-child button:hover {
     background: var(--bg-hover);
+}
+
+/* ========================================
+   Provenance Navigation Tooltip
+   ======================================== */
+.provenance-tooltip {
+    position: fixed;
+    width: 280px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    animation: provenance-fade-in 0.15s ease-out;
+}
+
+.provenance-tooltip.hidden {
+    display: none !important;
+}
+
+@keyframes provenance-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.provenance-reason {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-height: 4.5em; /* ~3 lines */
+    overflow-y: auto;
+    margin-bottom: 0.5rem;
+}
+
+.provenance-divider {
+    height: 1px;
+    background-color: var(--border-primary);
+    margin: 0.5rem 0;
+}
+
+.provenance-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.provenance-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.provenance-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.provenance-prev,
+.provenance-next {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-input);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+}
+
+.provenance-prev:hover,
+.provenance-next:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-accent);
+}
+
+.provenance-prev:disabled,
+.provenance-next:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.provenance-counter {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   Provenance Sentence Highlights
+   ======================================== */
+.highlight-rect.provenance-highlight-soft {
+    background: rgba(34, 211, 238, 0.15) !important;
+    transition: background 0.2s ease;
+}
+
+.highlight-rect.provenance-highlight-strong {
+    background: rgba(34, 211, 238, 0.35) !important;
+    transition: background 0.2s ease;
 }

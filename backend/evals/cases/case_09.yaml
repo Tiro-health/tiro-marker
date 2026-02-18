@@ -20,10 +20,33 @@ questionnaire:
     type: date
     text: Follow-up Appointment Date
 
-expected_marks:
-  - "6.answer"
-  - "1.answer"
-  - "4.answer"
-  - "2.answer"
-  - "3.answer"
-  - "5.answer"
+expected_answers:
+  # Chief Complaint
+  - fhirpath: "item.where(linkId='1').answer.valueString"
+    match: llm
+    expected: "chest pain and difficulty breathing"
+
+  # Admission Date
+  - fhirpath: "item.where(linkId='2').answer.valueDate"
+    match: exact
+    expected: "2024-01-15"
+
+  # Primary Diagnosis
+  - fhirpath: "item.where(linkId='3').answer.valueString"
+    match: llm
+    expected: "Acute decompensated congestive heart failure"
+
+  # Systolic Blood Pressure at Discharge
+  - fhirpath: "item.where(linkId='4').answer.valueDecimal"
+    match: exact
+    expected: 128
+
+  # Medication Name
+  - fhirpath: "item.where(linkId='5').answer.valueString"
+    match: llm
+    expected: "Furosemide"
+
+  # Follow-up Appointment Date
+  - fhirpath: "item.where(linkId='6').answer.valueDate"
+    match: exact
+    expected: "2024-02-01"

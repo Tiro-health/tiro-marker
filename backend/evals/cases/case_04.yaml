@@ -20,9 +20,23 @@ questionnaire:
             type: string
             text: Treatment given
 
-expected_marks:
-  - "visit-info"
-  - "visit-info.primary-symptom.answer"
-  - "visit-info.primary-symptom.severity.answer"
-  - "visit-info.primary-symptom.duration.answer"
-  - "visit-info.primary-symptom.treatment.answer"
+expected_answers:
+  # Nested: visit-info (group) > primary-symptom (string)
+  - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.valueString"
+    match: llm
+    expected: "headache"
+
+  # Nested: visit-info (group) > primary-symptom (string) > severity (via answer.item)
+  - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.item.where(linkId='severity').answer.valueString"
+    match: llm
+    expected: "8 out of 10"
+
+  # Nested: visit-info (group) > primary-symptom (string) > duration (via answer.item)
+  - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.item.where(linkId='duration').answer.valueString"
+    match: llm
+    expected: "3 hours"
+
+  # Nested: visit-info (group) > primary-symptom (string) > treatment (via answer.item)
+  - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.item.where(linkId='treatment').answer.valueString"
+    match: llm
+    expected: "ibuprofen 400mg"

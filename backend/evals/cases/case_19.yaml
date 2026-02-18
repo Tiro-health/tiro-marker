@@ -37,3 +37,49 @@ questionnaire:
   - linkId: blood-pressure
     type: string
     text: Blood pressure
+
+expected_answers:
+  # Chief complaint
+  - fhirpath: "item.where(linkId='chief-complaint').answer.valueString"
+    match: llm
+    expected: "Persistent cough for 5 days"
+
+  # Fever - NEGATIVE: "Patient denies fever"
+  - fhirpath: "item.where(linkId='fever-present').answer.valueBoolean"
+    match: exact
+    expected: false
+
+  # Chest pain - NEGATIVE: "No chest pain reported"
+  - fhirpath: "item.where(linkId='chest-pain').answer.valueBoolean"
+    match: exact
+    expected: false
+
+  # Shortness of breath - POSITIVE: "Positive for mild shortness of breath"
+  - fhirpath: "item.where(linkId='shortness-of-breath').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  # Nausea/vomiting - NEGATIVE: "Denies nausea, vomiting"
+  - fhirpath: "item.where(linkId='nausea-vomiting').answer.valueBoolean"
+    match: exact
+    expected: false
+
+  # Cardiac history - NEGATIVE: "No history of heart disease"
+  - fhirpath: "item.where(linkId='cardiac-history').answer.valueBoolean"
+    match: exact
+    expected: false
+
+  # Smoking status: "Patient quit smoking 5 years ago"
+  - fhirpath: "item.where(linkId='smoking-status').answer.valueCoding.display"
+    match: exact
+    expected: "Former smoker"
+
+  # Alcohol use: "Does not drink alcohol"
+  - fhirpath: "item.where(linkId='alcohol-use').answer.valueCoding.display"
+    match: exact
+    expected: "None"
+
+  # Blood pressure
+  - fhirpath: "item.where(linkId='blood-pressure').answer.valueString"
+    match: llm
+    expected: "122/78 mmHg"

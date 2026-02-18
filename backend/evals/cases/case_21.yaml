@@ -26,8 +26,28 @@ questionnaire:
     type: string
     text: General notes
 
-expected_marks:
-  - "medications.medication-summary.answer"
-  - "medications.medication-notes.answer"
-  - "allergies.allergy-summary.answer"
-  - "allergies.allergy-notes.answer"
+expected_answers:
+  # Medications group > Summary (should get medication summary, not allergy summary)
+  - fhirpath: "item.where(linkId='medications').item.where(linkId='medication-summary').answer.valueString"
+    match: llm
+    expected: "Patient takes aspirin 81mg daily for cardiovascular protection"
+
+  # Medications group > Additional notes
+  - fhirpath: "item.where(linkId='medications').item.where(linkId='medication-notes').answer.valueString"
+    match: llm
+    expected: "Started aspirin 6 months ago, well tolerated"
+
+  # Allergies group > Summary (should get allergy summary, not medication summary)
+  - fhirpath: "item.where(linkId='allergies').item.where(linkId='allergy-summary').answer.valueString"
+    match: llm
+    expected: "Patient has penicillin allergy with rash"
+
+  # Allergies group > Additional notes
+  - fhirpath: "item.where(linkId='allergies').item.where(linkId='allergy-notes').answer.valueString"
+    match: llm
+    expected: "Reaction occurred in childhood, avoids all penicillin derivatives"
+
+  # General notes should NOT have the irrelevant text about phone/coffee
+  - fhirpath: "item.where(linkId='general-notes').answer.count()"
+    match: exact
+    expected: 0

@@ -22,8 +22,23 @@ questionnaire:
       - vomiting
       - photophobia
 
-expected_marks:
-  - "chief-complaint.answer"
-  - "duration.answer"
-  - "severity.answer"
-  - "symptoms.option-http://example.org/test|nausea.answer"
+expected_answers:
+  # String - uses LLM judge for semantic similarity
+  - fhirpath: "item.where(linkId='chief-complaint').answer.valueString"
+    match: llm
+    expected: "headache"
+
+  # Integer - exact match
+  - fhirpath: "item.where(linkId='duration').answer.valueInteger"
+    match: exact
+    expected: 3
+
+  # Coding - check display (code may be null for free-text extraction)
+  - fhirpath: "item.where(linkId='severity').answer.valueCoding.display"
+    match: exact
+    expected: "moderate"
+
+  # Symptoms should be empty (patient denies nausea)
+  - fhirpath: "item.where(linkId='symptoms').answer.count()"
+    match: exact
+    expected: 0

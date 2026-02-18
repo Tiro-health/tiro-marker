@@ -73,14 +73,46 @@ questionnaire:
       - weakness
       - none
 
-expected_marks:
-  - "pain-details"
-  - "pain-details.pain-characteristics"
-  - "pain-details.pain-modifiers"
-  - "pain-present.answer"
-  - "pain-details.pain-location.answer"
-  - "pain-details.pain-characteristics.pain-duration.answer"
-  - "pain-details.pain-characteristics.pain-severity.answer"
-  - "pain-details.pain-modifiers.better-with.option-http://example.org/test|rest.answer"
-  - "pain-details.pain-modifiers.worse-with.option-http://example.org/test|movement.answer"
-  - "neurological-symptoms.option-http://example.org/test|none.answer"
+expected_answers:
+  # Boolean - pain present (implied from "Patient reports lower back pain")
+  - fhirpath: "item.where(linkId='pain-present').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  # Nested: pain-details > pain-location
+  - fhirpath: "item.where(linkId='pain-details').item.where(linkId='pain-location').answer.valueCoding.display"
+    match: exact
+    expected: "lower back"
+
+  # Nested: pain-details > pain-characteristics > pain-duration (1 week = 7 days)
+  - fhirpath: "item.where(linkId='pain-details').item.where(linkId='pain-characteristics').item.where(linkId='pain-duration').answer.valueInteger"
+    match: exact
+    expected: 7
+
+  # Nested: pain-details > pain-characteristics > pain-quality
+  - fhirpath: "item.where(linkId='pain-details').item.where(linkId='pain-characteristics').item.where(linkId='pain-quality').answer.valueCoding.display"
+    match: exact
+    expected: "aching"
+
+  # Nested: pain-details > pain-characteristics > pain-severity (6/10)
+  - fhirpath: "item.where(linkId='pain-details').item.where(linkId='pain-characteristics').item.where(linkId='pain-severity').answer.valueInteger"
+    match: exact
+    expected: 6
+
+  # Nested: pain-details > pain-modifiers > worse-with
+  - fhirpath: "item.where(linkId='pain-details').item.where(linkId='pain-modifiers').item.where(linkId='worse-with').answer.valueCoding.display"
+    match: set
+    expected:
+      - "movement"
+
+  # Nested: pain-details > pain-modifiers > better-with
+  - fhirpath: "item.where(linkId='pain-details').item.where(linkId='pain-modifiers').item.where(linkId='better-with').answer.valueCoding.display"
+    match: set
+    expected:
+      - "rest"
+
+  # Neurological symptoms - "none" (no radiation, numbness, tingling)
+  - fhirpath: "item.where(linkId='neurological-symptoms').answer.valueCoding.display"
+    match: set
+    expected:
+      - "none"
