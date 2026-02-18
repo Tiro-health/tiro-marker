@@ -11,7 +11,7 @@
 
 import { markDocument } from "../api/mark.js";
 import { extractMappingFromProvenance, getAllLabelIds } from "./provenanceParser.js";
-import { initHighlighting } from "../highlighting/index.js";
+import { initHighlighting } from "../highlighting/index.js?v=4";
 
 // Module state
 let editorAPI = null;
@@ -97,34 +97,63 @@ function createTooltip() {
   const editorContainer = document.getElementById("editor-container");
   if (!editorContainer) return;
 
-  let lastHoveredRect = null;
+  let lastHoveredLabelId = null;
+
+  // Helper to highlight all rects with matching label ID
+  function highlightAllMatchingRects(labelId) {
+    if (!labelId) return;
+    const overlay = document.getElementById('highlight-overlay');
+    if (!overlay) return;
+    const matchingRects = overlay.querySelectorAll(`.highlight-rect[data-label-id="${labelId}"]`);
+    for (const r of matchingRects) {
+      r.classList.add('highlight-hover');
+    }
+  }
+
+  // Helper to clear all hover highlights
+  function clearHoverHighlights() {
+    const overlay = document.getElementById('highlight-overlay');
+    if (!overlay) return;
+    const hoveredRects = overlay.querySelectorAll('.highlight-rect.highlight-hover');
+    for (const r of hoveredRects) {
+      r.classList.remove('highlight-hover');
+    }
+  }
 
   editorContainer.addEventListener("mouseover", (e) => {
     const rect = e.target.closest('.highlight-rect');
-    if (rect && rect !== lastHoveredRect) {
-      lastHoveredRect = rect;
+    if (rect) {
+      const labelId = rect.dataset.labelId;
+      if (labelId !== lastHoveredLabelId) {
+        // Clear previous hover highlights
+        clearHoverHighlights();
+        lastHoveredLabelId = labelId;
 
-      // Get questions from data attributes
-      let questions = [];
-      let locations = [];
-      try {
-        questions = JSON.parse(rect.dataset.questions || '[]');
-        locations = JSON.parse(rect.dataset.frontendLocations || '[]');
-      } catch (err) {
-        if (rect.dataset.questionText) questions = [rect.dataset.questionText];
-        if (rect.dataset.frontendLocation) locations = [rect.dataset.frontendLocation];
-      }
+        // Highlight ALL rects with the same label ID
+        highlightAllMatchingRects(labelId);
 
-      // Show tooltip
-      if (questions.length > 0) {
-        const text = questions.map(q => `Q: ${q}`).join('\n');
-        showTooltip(tooltip, rect, text);
-      }
+        // Get questions from data attributes
+        let questions = [];
+        let locations = [];
+        try {
+          questions = JSON.parse(rect.dataset.questions || '[]');
+          locations = JSON.parse(rect.dataset.frontendLocations || '[]');
+        } catch (err) {
+          if (rect.dataset.questionText) questions = [rect.dataset.questionText];
+          if (rect.dataset.frontendLocation) locations = [rect.dataset.frontendLocation];
+        }
 
-      // Highlight linked form fields
-      clearHighlightedContainers();
-      for (const loc of locations) {
-        highlightFormFieldContainer(loc);
+        // Show tooltip
+        if (questions.length > 0) {
+          const text = questions.map(q => `Q: ${q}`).join('\n');
+          showTooltip(tooltip, rect, text);
+        }
+
+        // Highlight linked form fields
+        clearHighlightedContainers();
+        for (const loc of locations) {
+          highlightFormFieldContainer(loc);
+        }
       }
     }
   });
@@ -132,14 +161,20 @@ function createTooltip() {
   editorContainer.addEventListener("mouseout", (e) => {
     const rect = e.target.closest('.highlight-rect');
     if (rect && !rect.contains(e.relatedTarget)) {
-      lastHoveredRect = null;
-      hideTooltip(tooltip);
-      clearHighlightedContainers();
+      // Check if we're moving to another rect with the same label ID
+      const relatedRect = e.relatedTarget?.closest?.('.highlight-rect');
+      if (!relatedRect || relatedRect.dataset.labelId !== lastHoveredLabelId) {
+        lastHoveredLabelId = null;
+        clearHoverHighlights();
+        hideTooltip(tooltip);
+        clearHighlightedContainers();
+      }
     }
   });
 
   editorContainer.addEventListener("mouseleave", () => {
-    lastHoveredRect = null;
+    lastHoveredLabelId = null;
+    clearHoverHighlights();
     hideTooltip(tooltip);
     clearHighlightedContainers();
   });

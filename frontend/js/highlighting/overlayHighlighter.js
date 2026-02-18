@@ -6,7 +6,7 @@
  * Uses Range.getClientRects() for visual positioning.
  */
 
-import { buildTextMap, textOffsetToDOM } from './sentenceTracker.js';
+import { buildTextMap, textOffsetToDOM } from './sentenceTracker.js?v=3';
 
 // Re-export for convenience
 export { buildTextMap, textOffsetToDOM };
@@ -149,6 +149,7 @@ export function createHighlightManager(editorEl, overlayEl) {
   let currentSentences = [];
   let questionInfoFn = null;
   let resizeObserver = null;
+  let mutationObserver = null;
   let rafId = null;
 
   function scheduleRender() {
@@ -214,6 +215,16 @@ export function createHighlightManager(editorEl, overlayEl) {
   });
   resizeObserver.observe(editorEl);
 
+  // Re-render on DOM mutations (text reflow from content changes)
+  mutationObserver = new MutationObserver(() => {
+    scheduleRender();
+  });
+  mutationObserver.observe(editorEl, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+
   // Re-render on scroll
   const scrollContainer = editorEl.closest('.panel-body') || editorEl.parentElement;
   if (scrollContainer) {
@@ -258,6 +269,9 @@ export function createHighlightManager(editorEl, overlayEl) {
     destroy() {
       if (resizeObserver) {
         resizeObserver.disconnect();
+      }
+      if (mutationObserver) {
+        mutationObserver.disconnect();
       }
       if (rafId) {
         cancelAnimationFrame(rafId);

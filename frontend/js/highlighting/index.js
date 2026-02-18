@@ -9,11 +9,11 @@
  * Zero DOM mutation to Lexical's tree.
  */
 
-import { createSentenceTracker, generateLabeledHtml, buildTextMap } from './sentenceTracker.js';
+import { createSentenceTracker, generateLabeledHtml, buildTextMap } from './sentenceTracker.js?v=3';
 import { createHighlightManager } from './overlayHighlighter.js';
 
 // Re-export for direct use
-export { buildTextMap } from './sentenceTracker.js';
+export { buildTextMap } from './sentenceTracker.js?v=3';
 export { createHighlightRenderer, DEFAULT_HIGHLIGHT_COLOR } from './overlayHighlighter.js';
 
 /**

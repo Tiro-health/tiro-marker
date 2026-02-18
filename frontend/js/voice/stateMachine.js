@@ -29,6 +29,7 @@ export const State = Object.freeze({
  *   onPreviewText?: (text: string) => void,
  *   onError?: (error: Error) => void,
  *   onLevelUpdate?: (level: number) => void,
+ *   lang?: string,
  * }} callbacks
  */
 export function createVoiceStateMachine(editorAPI, {
@@ -36,7 +37,9 @@ export function createVoiceStateMachine(editorAPI, {
   onPreviewText,
   onError,
   onLevelUpdate,
+  lang = 'en-US',
 } = {}) {
+  let currentLang = lang;
   let state = State.IDLE;
   let audioCapture = null;
   let silenceDetector = null;
@@ -171,6 +174,7 @@ export function createVoiceStateMachine(editorAPI, {
 
       // 3. Start live preview (Web Speech)
       livePreview = createLivePreview({
+        lang: currentLang,
         onInterim: (text) => {
           currentText = text;
           onPreviewText?.(text);
@@ -262,6 +266,12 @@ export function createVoiceStateMachine(editorAPI, {
     destroy() {
       cleanup();
       state = State.IDLE;
+    },
+
+    /** Change the speech recognition language */
+    setLanguage(newLang) {
+      currentLang = newLang;
+      livePreview?.setLanguage(newLang);
     },
   };
 }

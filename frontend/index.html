@@ -7,7 +7,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-        <link rel="stylesheet" href="styles.css?v=9" />
+        <link rel="stylesheet" href="styles.css?v=12" />
 
         <!-- Import maps for ES modules -->
         <script type="importmap">
@@ -82,6 +82,12 @@
                     </div>
                     <!-- Voice Input Bar -->
                     <div class="voice-bar" id="voice-bar">
+                        <select class="lang-select" id="voice-lang-select" title="Speech language">
+                            <option value="en-US">EN</option>
+                            <option value="nl-NL">NL</option>
+                            <option value="fr-FR">FR</option>
+                            <option value="de-DE">DE</option>
+                        </select>
                         <button class="mic-btn" id="mic-btn" title="Voice input">
                             <!-- Mic icon (shown when idle) -->
                             <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
@@ -160,10 +166,24 @@
         <!-- Toast Container -->
         <div class="toast-container" id="toast-container"></div>
 
+        <!-- Provenance Tooltip Card -->
+        <div id="provenance-tooltip" class="provenance-tooltip hidden">
+            <div class="provenance-reason"></div>
+            <div class="provenance-divider"></div>
+            <div class="provenance-stepper">
+                <span class="provenance-label">References</span>
+                <div class="provenance-nav">
+                    <button class="provenance-prev" aria-label="Previous source">&#9664;</button>
+                    <span class="provenance-counter">1 / 1</span>
+                    <button class="provenance-next" aria-label="Next source">&#9654;</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Load Tiro SDK -->
         <script src="https://cdn.tiro.health/sdk/next/tiro-web-sdk.iife.js"></script>
 
         <!-- Load application as ES module -->
-        <script type="module" src="js/main.js?v=29"></script>
+        <script type="module" src="js/main.js?v=43"></script>
     </body>
 </html>
