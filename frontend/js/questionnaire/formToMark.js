@@ -1,17 +1,11 @@
 /**
  * Form → Mark Navigation
- * Hover a question row (.bg-gray-50) in the form panel → linked marks glow blue.
  * Click a question row → scroll the editor to the first linked mark.
  *
- * Listens inside the shadow DOM so we can use .closest('.bg-gray-50') —
- * the same div that gets the blue highlight when clicking a mark.
+ * Note: Hover highlighting removed - now using provenance icon click instead.
  */
 
-import {
-  clearMarkGlow,
-  highlightMarksForQuestion,
-  scrollToFirstMark,
-} from '../marking/index.js?v=15';
+import { scrollToFirstMark } from '../marking/index.js?v=18';
 
 /** Cleanup function from the previous init (removes old listeners). */
 let cleanup = null;
@@ -76,32 +70,17 @@ export function initFormToMark(formFiller) {
     const root = formFiller.shadowRoot;
     if (!root) return false;
 
-    function onMouseOver(e) {
-      const id = linkIdFromRow(e);
-      if (!id) { clearMarkGlow(); return; }
-      clearMarkGlow();
-      highlightMarksForQuestion(id);
-    }
-
+    // Note: Hover highlighting removed - now using provenance icon click instead
     function onClick(e) {
       const id = linkIdFromRow(e);
       if (id) scrollToFirstMark(id);
     }
 
-    function onLeave() {
-      clearMarkGlow();
-    }
-
-    // Listen inside the shadow root for hover / click
-    root.addEventListener('mouseover', onMouseOver);
+    // Listen inside the shadow root for click only
     root.addEventListener('click', onClick);
-    // Listen on the host for mouse leaving the form entirely
-    formFiller.addEventListener('mouseleave', onLeave);
 
     cleanup = () => {
-      root.removeEventListener('mouseover', onMouseOver);
       root.removeEventListener('click', onClick);
-      formFiller.removeEventListener('mouseleave', onLeave);
     };
 
     console.log('Form→mark navigation initialized (shadow root)');

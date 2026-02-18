@@ -8,26 +8,29 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 
 /**
  * Create a live preview instance using the Web Speech API.
- * @param {{ onInterim?: (text: string) => void, onFinal?: (text: string) => void, onError?: (error: Error) => void }} callbacks
- * @returns {{ start: () => void, stop: () => void, isSupported: boolean }}
+ * @param {{ onInterim?: (text: string) => void, onFinal?: (text: string) => void, onError?: (error: Error) => void, lang?: string }} callbacks
+ * @returns {{ start: () => void, stop: () => void, restart: () => void, setLanguage: (lang: string) => void, isSupported: boolean }}
  */
-export function createLivePreview({ onInterim, onFinal, onError } = {}) {
+export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' } = {}) {
   if (!SpeechRecognition) {
     return {
       start() {},
       stop() {},
+      restart() {},
+      setLanguage() {},
       isSupported: false,
     };
   }
 
   let recognition = null;
   let shouldRestart = false;
+  let currentLang = lang;
 
   function createRecognition() {
     const rec = new SpeechRecognition();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = 'en-US';
+    rec.lang = currentLang;
 
     rec.onresult = (event) => {
       let interim = '';
@@ -117,6 +120,15 @@ export function createLivePreview({ onInterim, onFinal, onError } = {}) {
           // Ignore if already started
         }
       }, 100);
+    },
+
+    /** Change the recognition language */
+    setLanguage(newLang) {
+      currentLang = newLang;
+      // If currently running, restart with new language
+      if (recognition && shouldRestart) {
+        this.restart();
+      }
     },
   };
 }

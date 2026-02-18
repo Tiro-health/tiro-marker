@@ -187,7 +187,7 @@ export function buildTextMap(root) {
     'DIV', 'P', 'BR', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE'
   ]);
 
-  function walk(node, isFirst) {
+  function walk(node, isFirst, parentTag = null) {
     if (node.nodeType === Node.TEXT_NODE) {
       if (node.length > 0) {
         segs.push({ node, textStart: offset, len: node.length });
@@ -196,15 +196,22 @@ export function buildTextMap(root) {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const tag = node.tagName;
       if (tag === 'BR') {
-        offset += 1;
+        // Skip BR if it's a placeholder in an empty paragraph (Lexical uses BR for empty <p>)
+        // These don't contribute to getTextContent() so we shouldn't count them
+        const isPlaceholder = parentTag === 'P' && node.parentNode?.childNodes.length === 1;
+        if (!isPlaceholder) {
+          offset += 1;
+        }
         return;
       }
+      // With proper <p> elements, Lexical's getTextContent() uses \n\n (2 chars) between paragraphs
+      // This matches segmentText's split('\n') which creates empty strings between consecutive \n
       if (blockTags.has(tag) && !isFirst && offset > 0) {
-        offset += 1;
+        offset += 2;
       }
       let first = true;
       for (const child of node.childNodes) {
-        walk(child, first);
+        walk(child, first, tag);
         first = false;
       }
     }
@@ -212,7 +219,7 @@ export function buildTextMap(root) {
 
   let first = true;
   for (const child of root.childNodes) {
-    walk(child, first);
+    walk(child, first, null);
     first = false;
   }
 
