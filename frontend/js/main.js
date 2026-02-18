@@ -4,7 +4,7 @@
  */
 
 import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=4';
-import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=18';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=26';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
 import { initFormToMark } from './questionnaire/formToMark.js?v=2';
 import { initProvenanceNav, setPopulateResponse } from './questionnaire/provenanceNav.js?v=11';
@@ -25,7 +25,7 @@ let editorContainer = null;
 let editorAPI = null;
 
 // Live populate mode state
-let populateLive = false;
+let populateLive = true;
 
 // Voice dictation state machine
 let voiceStateMachine = null;

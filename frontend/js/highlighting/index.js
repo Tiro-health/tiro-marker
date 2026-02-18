@@ -109,5 +109,23 @@ export function initHighlighting(editorEl, overlayEl) {
       manager.destroy();
       tracker.clear();
     },
+
+    /**
+     * Set active provenance highlights.
+     * These persist across re-renders (scroll, resize, content changes).
+     *
+     * @param {string[]} strongIds - Label IDs to highlight strongly (current reference)
+     * @param {string[]} softIds - Label IDs to highlight softly (other references)
+     */
+    setActiveProvenance(strongIds, softIds) {
+      manager.setActiveProvenance(strongIds, softIds);
+    },
+
+    /**
+     * Clear active provenance highlights.
+     */
+    clearActiveProvenance() {
+      manager.clearActiveProvenance();
+    },
   };
 }

@@ -5,7 +5,7 @@
 
 // State
 let markerLive = true;
-let populateLive = false;
+let populateLive = true;
 let markerWorking = false;
 let populateWorking = false;
 

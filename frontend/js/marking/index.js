@@ -42,7 +42,7 @@ window._markQuestionText = {};
 let highlightedContainers = [];
 
 // Form field highlight color
-const HIGHLIGHT_COLOR = "rgba(34, 211, 238, 0.30)";
+const HIGHLIGHT_COLOR = "rgba(34, 211, 238, 0.15)";
 
 /**
  * Initialize the marking system.
@@ -88,6 +88,9 @@ export async function initMarking(editor, q = null, callbacks = {}) {
 
 /**
  * Create tooltip for hover display.
+ *
+ * Uses coordinate-based detection since highlight rects have pointer-events: none.
+ * This allows native Lexical text selection and cursor placement to work normally.
  */
 function createTooltip() {
   const tooltip = document.createElement("div");
@@ -98,6 +101,45 @@ function createTooltip() {
   if (!editorContainer) return;
 
   let lastHoveredLabelId = null;
+
+  /**
+   * Find a highlight rect at the given screen coordinates.
+   * @param {number} x - Screen X coordinate
+   * @param {number} y - Screen Y coordinate
+   * @returns {HTMLElement|null} The highlight rect element or null
+   */
+  function findHighlightAtPoint(x, y) {
+    const overlay = document.getElementById('highlight-overlay');
+    if (!overlay) return null;
+
+    const rects = overlay.querySelectorAll('.highlight-rect');
+    for (const rect of rects) {
+      const bounds = rect.getBoundingClientRect();
+      if (x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom) {
+        return rect;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get data from a highlight rect element.
+   * @param {HTMLElement} rect - The highlight rect element
+   * @returns {{labelId: string, questions: string[], locations: string[]}}
+   */
+  function getHighlightData(rect) {
+    const labelId = rect.dataset.labelId;
+    let questions = [];
+    let locations = [];
+    try {
+      questions = JSON.parse(rect.dataset.questions || '[]');
+      locations = JSON.parse(rect.dataset.frontendLocations || '[]');
+    } catch (err) {
+      if (rect.dataset.questionText) questions = [rect.dataset.questionText];
+      if (rect.dataset.frontendLocation) locations = [rect.dataset.frontendLocation];
+    }
+    return { labelId, questions, locations };
+  }
 
   // Helper to highlight all rects with matching label ID
   function highlightAllMatchingRects(labelId) {
@@ -120,10 +162,21 @@ function createTooltip() {
     }
   }
 
-  editorContainer.addEventListener("mouseover", (e) => {
-    const rect = e.target.closest('.highlight-rect');
+  // Clear hover state
+  function clearHoverState() {
+    lastHoveredLabelId = null;
+    clearHoverHighlights();
+    hideTooltip(tooltip);
+    clearHighlightedContainers();
+  }
+
+  // Handle mousemove - check if over a highlight by coordinates
+  editorContainer.addEventListener("mousemove", (e) => {
+    const rect = findHighlightAtPoint(e.clientX, e.clientY);
+
     if (rect) {
-      const labelId = rect.dataset.labelId;
+      const { labelId, questions, locations } = getHighlightData(rect);
+
       if (labelId !== lastHoveredLabelId) {
         // Clear previous hover highlights
         clearHoverHighlights();
@@ -131,17 +184,6 @@ function createTooltip() {
 
         // Highlight ALL rects with the same label ID
         highlightAllMatchingRects(labelId);
-
-        // Get questions from data attributes
-        let questions = [];
-        let locations = [];
-        try {
-          questions = JSON.parse(rect.dataset.questions || '[]');
-          locations = JSON.parse(rect.dataset.frontendLocations || '[]');
-        } catch (err) {
-          if (rect.dataset.questionText) questions = [rect.dataset.questionText];
-          if (rect.dataset.frontendLocation) locations = [rect.dataset.frontendLocation];
-        }
 
         // Show tooltip
         if (questions.length > 0) {
@@ -155,50 +197,32 @@ function createTooltip() {
           highlightFormFieldContainer(loc);
         }
       }
-    }
-  });
-
-  editorContainer.addEventListener("mouseout", (e) => {
-    const rect = e.target.closest('.highlight-rect');
-    if (rect && !rect.contains(e.relatedTarget)) {
-      // Check if we're moving to another rect with the same label ID
-      const relatedRect = e.relatedTarget?.closest?.('.highlight-rect');
-      if (!relatedRect || relatedRect.dataset.labelId !== lastHoveredLabelId) {
-        lastHoveredLabelId = null;
-        clearHoverHighlights();
-        hideTooltip(tooltip);
-        clearHighlightedContainers();
-      }
+    } else if (lastHoveredLabelId !== null) {
+      // Mouse moved off all highlights
+      clearHoverState();
     }
   });
 
   editorContainer.addEventListener("mouseleave", () => {
-    lastHoveredLabelId = null;
-    clearHoverHighlights();
-    hideTooltip(tooltip);
-    clearHighlightedContainers();
+    clearHoverState();
   });
 
-  // Click to navigate
+  // Handle click - navigate to form field if clicking on a highlight
   editorContainer.addEventListener("click", (e) => {
-    const rect = e.target.closest('.highlight-rect');
+    const rect = findHighlightAtPoint(e.clientX, e.clientY);
+
     if (rect) {
-      setTimeout(() => {
-        clearHighlightedContainers();
-        let locations = [];
-        try {
-          locations = JSON.parse(rect.dataset.frontendLocations || '[]');
-        } catch (err) {
-          if (rect.dataset.frontendLocation) locations = [rect.dataset.frontendLocation];
+      const { locations } = getHighlightData(rect);
+
+      // Navigate to form field
+      clearHighlightedContainers();
+      if (locations.length > 0) {
+        highlightFormFieldContainer(locations[0]);
+        const result = findFormField(locations[0]);
+        if (result) {
+          result.field.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-        if (locations.length > 0) {
-          highlightFormFieldContainer(locations[0]);
-          const result = findFormField(locations[0]);
-          if (result) {
-            result.field.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }
-      }, 0);
+      }
     } else {
       clearHighlightedContainers();
     }
@@ -643,4 +667,26 @@ export function findMarksByFrontendLocation(location) {
     }
   }
   return results;
+}
+
+/**
+ * Set active provenance highlights.
+ * These persist across re-renders (scroll, resize, content changes).
+ *
+ * @param {string[]} strongIds - Label IDs to highlight strongly (current reference)
+ * @param {string[]} softIds - Label IDs to highlight softly (other references)
+ */
+export function setActiveProvenance(strongIds, softIds) {
+  if (highlightingSystem) {
+    highlightingSystem.setActiveProvenance(strongIds, softIds);
+  }
+}
+
+/**
+ * Clear active provenance highlights.
+ */
+export function clearActiveProvenance() {
+  if (highlightingSystem) {
+    highlightingSystem.clearActiveProvenance();
+  }
 }
