@@ -14,8 +14,10 @@ import {
   $isElementNode,
   $isTextNode,
   $createRangeSelection,
+  KEY_ENTER_COMMAND,
+  COMMAND_PRIORITY_CRITICAL,
 } from 'lexical';
-import { registerRichText } from '@lexical/rich-text';
+import { registerPlainText } from '@lexical/plain-text';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
 import { editorConfig } from './config.js';
@@ -30,13 +32,24 @@ let editorInstance = null;
  * @returns {Object} Editor API
  */
 export function initializeEditor(containerElement, initialContent = '') {
+  // Preserve or create highlight overlay element
+  let overlayEl = containerElement.querySelector('#highlight-overlay');
+  if (!overlayEl) {
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'highlight-overlay';
+    overlayEl.className = 'highlight-overlay';
+  }
+
+  // Clear container but keep/add overlay
+  containerElement.innerHTML = '';
+  containerElement.appendChild(overlayEl);
+
   // Create the content editable element
   const contentEditable = document.createElement('div');
   contentEditable.contentEditable = 'true';
   contentEditable.id = 'lexical-editor';
   contentEditable.setAttribute('role', 'textbox');
   contentEditable.setAttribute('aria-multiline', 'true');
-  containerElement.innerHTML = '';
   containerElement.appendChild(contentEditable);
 
   // Create the editor instance
@@ -46,8 +59,65 @@ export function initializeEditor(containerElement, initialContent = '') {
   // Attach editor to DOM
   editor.setRootElement(contentEditable);
 
-  // Register rich text support (handles Enter, Backspace, etc.)
-  registerRichText(editor);
+  // Register plain text support (handles Enter, Backspace, etc.)
+  registerPlainText(editor);
+
+  // Override Enter key to create paragraphs instead of BR tags
+  // PlainText mode creates BR on Enter, but we need proper <p> for offset calculation
+  editor.registerCommand(
+    KEY_ENTER_COMMAND,
+    (event) => {
+      event?.preventDefault();
+
+      editor.update(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) return;
+
+        // Delete selected content if any
+        selection.deleteCharacter();
+
+        // Get the anchor node and find parent paragraph
+        const anchorNode = selection.anchor.getNode();
+        let currentParagraph = anchorNode;
+        while (currentParagraph && currentParagraph.getType() !== 'paragraph') {
+          currentParagraph = currentParagraph.getParent();
+        }
+
+        // Create a new paragraph
+        const newParagraph = $createParagraphNode();
+
+        // If cursor is in the middle of text, split it
+        if ($isTextNode(anchorNode)) {
+          const offset = selection.anchor.offset;
+          const textContent = anchorNode.getTextContent();
+
+          if (offset < textContent.length) {
+            // Split: text after cursor goes to new paragraph
+            const afterText = textContent.slice(offset);
+            anchorNode.setTextContent(textContent.slice(0, offset));
+
+            if (afterText) {
+              const newTextNode = $createTextNode(afterText);
+              newParagraph.append(newTextNode);
+            }
+          }
+        }
+
+        // Insert new paragraph after current one
+        if (currentParagraph) {
+          currentParagraph.insertAfter(newParagraph);
+        } else {
+          $getRoot().append(newParagraph);
+        }
+
+        // Move cursor to start of new paragraph
+        newParagraph.selectStart();
+      });
+
+      return true; // Prevent default PlainText BR behavior
+    },
+    COMMAND_PRIORITY_CRITICAL
+  );
 
   // Register history (undo/redo)
   const historyState = createEmptyHistoryState();
@@ -61,6 +131,8 @@ export function initializeEditor(containerElement, initialContent = '') {
   // Return the editor API
   return {
     editor,
+    editorElement: contentEditable,
+    overlayElement: overlayEl,
     getHtmlContent: () => getHtmlContent(),
     setHtmlContent: (html) => setHtmlContent(html),
     getTextContent: () => getTextContent(),
@@ -250,14 +322,16 @@ export function appendText(text) {
 export function insertTextAtCursor(text) {
   if (!editorInstance || !text) return;
 
+  // Normalize line endings (Windows \r\n, old Mac \r) to Unix \n
+  const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
   editorInstance.update(() => {
     const selection = $getSelection();
+    const root = $getRoot();
 
     // If no selection or not a range selection, fall back to appending at end
     if (!$isRangeSelection(selection)) {
-      // Fall back to append behavior
-      const root = $getRoot();
-      const lines = text.split('\n');
+      const lines = normalizedText.split('\n');
 
       let lastNode = null;
       for (const line of lines) {
@@ -280,19 +354,42 @@ export function insertTextAtCursor(text) {
       return;
     }
 
-    // We have a valid selection - insert at cursor position
-    // Start on a new line from cursor
-    selection.insertParagraph();
+    // We have a valid selection - find the current paragraph
+    const anchorNode = selection.anchor.getNode();
+    let currentParagraph = anchorNode;
+    while (currentParagraph && currentParagraph.getType() !== 'paragraph') {
+      currentParagraph = currentParagraph.getParent();
+    }
 
-    const lines = text.split('\n');
+    // Create proper paragraph nodes for each line (avoids BR tags from insertParagraph)
+    const lines = normalizedText.split('\n');
+    let lastNode = null;
+    let insertAfter = currentParagraph;
+
     for (let i = 0; i < lines.length; i++) {
-      if (i > 0) {
-        // Insert a paragraph break before subsequent lines
-        selection.insertParagraph();
-      }
+      const paragraph = $createParagraphNode();
       if (lines[i]) {
-        selection.insertText(lines[i]);
+        const textNode = $createTextNode(lines[i]);
+        paragraph.append(textNode);
+        lastNode = textNode;
       }
+
+      if (insertAfter) {
+        insertAfter.insertAfter(paragraph);
+        insertAfter = paragraph;
+      } else {
+        root.append(paragraph);
+        insertAfter = paragraph;
+      }
+    }
+
+    // Move cursor to end of last inserted text
+    if (lastNode) {
+      const newSelection = $createRangeSelection();
+      const len = lastNode.getTextContent().length;
+      newSelection.anchor.set(lastNode.getKey(), len, 'text');
+      newSelection.focus.set(lastNode.getKey(), len, 'text');
+      $setSelection(newSelection);
     }
   });
 }

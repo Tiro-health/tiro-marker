@@ -192,7 +192,7 @@ questionnaire:
               - niet uitgevoerd
       - linkId: who-score
         type: coding
-        text: WHO Score
+        text: primaire WHO Score
         answerOptions:
           - WHO-score 0
           - WHO-score 1
@@ -518,86 +518,216 @@ questionnaire:
         type: text
         text: Prognose
 
-expected_marks:
-  - "mdt-header"
-  - "medische-voorgeschiedenis"
-  - "primaire-presentatie"
-  - "behandeloverzicht"
-  - "actuele-problematiek"
-  - "besluit"
-  - "primaire-presentatie.tumorlokalisatie"
-  - "primaire-presentatie.tnm-staging"
-  - "primaire-presentatie.ihc-profiel"
-  - "primaire-presentatie.longfunctie"
-  - "primaire-presentatie.charlson-index"
-  - "actuele-problematiek.rtnm-classificatie"
-  - "actuele-problematiek.beschrijving.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening"
-  - "mdt-header.consult-datum.answer"
-  - "mdt-header.moc-aanvrager.answer"
-  - "primaire-presentatie.charlson-index.cci-vaatziekte.answer"
-  - "primaire-presentatie.rookstatus.answer"
-  - "primaire-presentatie.charlson-index.cci-myocardinfarct.answer"
-  - "primaire-presentatie.charlson-index.cci-copd.answer"
-  - "primaire-presentatie.charlson-index.cci-dementie.answer"
-  - "medische-voorgeschiedenis.voorgeschiedenis-tekst.answer"
-  - "primaire-presentatie.rookstatus.pakjaren.answer"
-  - "primaire-presentatie.charlson-index.cci-diabetes.answer"
-  - "primaire-presentatie.incidentiedatum.answer"
-  - "actuele-problematiek.gewichtsverlies-3m.answer"
-  - "actuele-problematiek.leeftijd-categorie.answer"
-  - "primaire-presentatie.diagnose.answer"
-  - "primaire-presentatie.charlson-index.cci-leeftijd.answer"
-  - "primaire-presentatie.tumorlokalisatie.lokalisatie-rechts.answer"
-  - "primaire-presentatie.tnm-staging.cm-stage.answer"
-  - "primaire-presentatie.tnm-staging.cm-stage.locatie-metastase.option-http://example.org/test|bot.answer"
-  - "primaire-presentatie.tnm-staging.cm-stage.locatie-metastase.option-http://example.org/test|hersenen.answer"
-  - "primaire-presentatie.tnm-staging.cm-stage.locatie-metastase.option-http://example.org/test|lever.answer"
-  - "primaire-presentatie.tnm-staging.cn-stage.answer"
-  - "primaire-presentatie.tnm-staging.ct-stage.answer"
-  - "primaire-presentatie.tnm-staging.stadium.answer"
-  - "primaire-presentatie.ihc-profiel.pd-l1.answer"
-  - "primaire-presentatie.ihc-profiel.p40.answer"
-  - "primaire-presentatie.mutaties.option-http://example.org/test|EGFR.answer"
-  - "primaire-presentatie.mutaties.option-http://example.org/test|EGFR.egfr-subtypes.option-http://example.org/test|ex19.answer"
-  - "primaire-presentatie.mutaties.option-http://example.org/test|KRAS.answer"
-  - "primaire-presentatie.mutaties.option-http://example.org/test|ALK.answer"
-  - "primaire-presentatie.mutaties.option-http://example.org/test|ROS1.answer"
-  - "primaire-presentatie.mutaties.option-http://example.org/test|BRAF.answer"
-  - "primaire-presentatie.ihc-profiel.ttf-1.answer"
-  - "primaire-presentatie.longfunctie.fev1.answer"
-  - "primaire-presentatie.longfunctie.dlco.answer"
-  - "primaire-presentatie.longfunctie.longfunctie-status.answer"
-  - "primaire-presentatie.nierfunctie.answer"
-  - "primaire-presentatie.charlson-index.cci-solide-tumor.answer"
-  - "primaire-presentatie.charlson-index.cci-score.answer"
-  - "behandeloverzicht.behandeling-entry.0"
-  - "behandeloverzicht.behandeling-entry.0.behandeling-type.answer"
-  - "behandeloverzicht.behandeling-entry.0.lijn.answer"
-  - "behandeloverzicht.behandeling-entry.0.behandeling-type.radiatie-dosis.answer"
-  - "behandeloverzicht.behandeling-entry.0.behandeling-type.omschrijving.answer"
-  - "behandeloverzicht.behandeling-entry.0.periode-start.answer"
-  - "behandeloverzicht.behandeling-entry.0.behandeling-type.aantal-fracties.answer"
-  - "behandeloverzicht.behandeling-entry.0.behandeling-type.recist-bor.answer"
-  - "behandeloverzicht.behandeling-entry.1"
-  - "behandeloverzicht.behandeling-entry.1.lijn.answer"
-  - "behandeloverzicht.behandeling-entry.1.behandeling-type.answer"
-  - "behandeloverzicht.behandeling-entry.1.behandeling-type.aantal-fracties.answer"
-  - "behandeloverzicht.behandeling-entry.1.behandeling-type.omschrijving.answer"
-  - "behandeloverzicht.behandeling-entry.1.periode-start.answer"
-  - "behandeloverzicht.behandeling-entry.1.behandeling-type.radiatie-dosis.answer"
-  - "primaire-presentatie.who-score.answer"
-  - "actuele-problematiek.actuele-who-score.answer"
-  - "actuele-problematiek.rtnm-classificatie.rn-stage.answer"
-  - "actuele-problematiek.rtnm-classificatie.rm-stage.answer"
-  - "actuele-problematiek.rtnm-classificatie.rt-stage.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-voedselinname.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-score.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-bmi.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-gewichtsverlies.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-mobiliteit.answer"
-  - "actuele-problematiek.leeftijd-categorie.g8-screening.g8-neuropsycho.answer"
-  - "besluit.behandelplan.answer"
-  - "besluit.therapie-intentie.answer"
-  - "besluit.prognose.answer"
-  - "primaire-presentatie.extra-opmerkingen.answer"
+expected_answers:
+  # --- MDT Header (group) ---
+  - fhirpath: "item.where(linkId='mdt-header').item.where(linkId='consult-datum').answer.valueDate"
+    match: exact
+    expected: "2026-01-15"
+
+  - fhirpath: "item.where(linkId='mdt-header').item.where(linkId='moc-aanvrager').answer.valueCoding.display"
+    match: exact
+    expected: "Dr. Peeters"
+
+  # --- Medische voorgeschiedenis (group) ---
+  - fhirpath: "item.where(linkId='medische-voorgeschiedenis').item.where(linkId='voorgeschiedenis-tekst').answer.valueString"
+    match: llm
+    expected: "COPD Gold II since 2018, type 2 diabetes mellitus, myocardial infarction in 2019 with PCI stent, peripheral vascular disease, ex-smoker since 2020 with 45 pack-years"
+
+  # --- Primaire presentatie (group) ---
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='incidentiedatum').answer.valueDate"
+    match: exact
+    expected: "2025-09-03"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='diagnose').answer.valueCoding.display"
+    match: exact
+    expected: "NSCLC - adenocarcinoom"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='who-score').answer.valueCoding.display"
+    match: exact
+    expected: "WHO-score 1"
+
+  # Tumor lokalisatie (nested group)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='tumorlokalisatie').item.where(linkId='lokalisatie-rechts').answer.valueCoding.display"
+    match: exact
+    expected: "rechter bovenkwab"
+
+  # TNM staging (nested group)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='tnm-staging').item.where(linkId='ct-stage').answer.valueCoding.display"
+    match: exact
+    expected: "T2a"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='tnm-staging').item.where(linkId='cn-stage').answer.valueCoding.display"
+    match: exact
+    expected: "N2b"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='tnm-staging').item.where(linkId='cm-stage').answer.valueCoding.display"
+    match: exact
+    expected: "M1c1"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='tnm-staging').item.where(linkId='stadium').answer.valueCoding.display"
+    match: exact
+    expected: "IVB"
+
+  # Metastasis locations (cm-stage is coding → children under answer.item)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='tnm-staging').item.where(linkId='cm-stage').answer.item.where(linkId='locatie-metastase').answer.valueCoding.display"
+    match: set
+    expected:
+      - "bot"
+      - "hersenen"
+      - "lever"
+
+  # Mutations (repeating coding) - only EGFR is positive, others are "negatief"
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='mutaties').answer.valueCoding.display"
+    match: set
+    expected:
+      - "EGFR"
+
+  # EGFR subtype (mutaties is coding → children under answer.item)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='mutaties').answer.where(valueCoding.display='EGFR').item.where(linkId='egfr-subtypes').answer.valueCoding.display"
+    match: set
+    expected:
+      - "ex19"
+
+  # IHC profiel (nested group)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='ihc-profiel').item.where(linkId='pd-l1').answer.valueDecimal"
+    match: exact
+    expected: 85
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='ihc-profiel').item.where(linkId='ttf-1').answer.valueCoding.display"
+    match: exact
+    expected: "positief"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='ihc-profiel').item.where(linkId='p40').answer.valueCoding.display"
+    match: exact
+    expected: "negatief"
+
+  # Rookstatus (coding with nested child)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='rookstatus').answer.valueCoding.display"
+    match: exact
+    expected: "ex-roker"
+
+  # Pakjaren (rookstatus is coding → children under answer.item)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='rookstatus').answer.item.where(linkId='pakjaren').answer.valueDecimal"
+    match: exact
+    expected: 45
+
+  # Nierfunctie
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='nierfunctie').answer.valueDecimal"
+    match: exact
+    expected: 67
+
+  # Longfunctie (nested group)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='longfunctie').item.where(linkId='fev1').answer.valueDecimal"
+    match: exact
+    expected: 58
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='longfunctie').item.where(linkId='dlco').answer.valueDecimal"
+    match: exact
+    expected: 52
+
+  # Charlson index (nested group)
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-leeftijd').answer.valueCoding.display"
+    match: exact
+    expected: "70–79"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-myocardinfarct').answer.valueCoding.display"
+    match: exact
+    expected: "ja"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-vaatziekte').answer.valueCoding.display"
+    match: exact
+    expected: "ja"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-dementie').answer.valueCoding.display"
+    match: exact
+    expected: "nee"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-copd').answer.valueCoding.display"
+    match: exact
+    expected: "ja"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-diabetes').answer.valueCoding.display"
+    match: exact
+    expected: "ongecompliceerd"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-solide-tumor').answer.valueCoding.display"
+    match: exact
+    expected: "metastatisch"
+
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='charlson-index').item.where(linkId='cci-score').answer.valueDecimal"
+    match: exact
+    expected: 8
+
+  # Extra opmerkingen
+  - fhirpath: "item.where(linkId='primaire-presentatie').item.where(linkId='extra-opmerkingen').answer.valueString"
+    match: llm
+    expected: "Family present at discussion, well informed. Next MOC planned in 6 weeks."
+
+  # --- Actuele problematiek (group) ---
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='beschrijving').answer.valueString"
+    match: llm
+    expected: "Progression under osimertinib with new brain metastases and increasing bone metastases"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='actuele-who-score').answer.valueCoding.display"
+    match: exact
+    expected: "WHO-score 2"
+
+  # rTNM classification (nested group)
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='rtnm-classificatie').item.where(linkId='rt-stage').answer.valueCoding.display"
+    match: exact
+    expected: "T2a"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='rtnm-classificatie').item.where(linkId='rn-stage').answer.valueCoding.display"
+    match: exact
+    expected: "N2b"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='rtnm-classificatie').item.where(linkId='rm-stage').answer.valueCoding.display"
+    match: exact
+    expected: "M1"
+
+  # Leeftijd categorie (coding with nested group child)
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.valueCoding.display"
+    match: exact
+    expected: "75 jaar of ouder"
+
+  # G8 screening (leeftijd-categorie is coding → g8-screening under answer.item, g8-screening is group)
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.item.where(linkId='g8-screening').item.where(linkId='g8-voedselinname').answer.valueCoding.display"
+    match: exact
+    expected: "matige afname"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.item.where(linkId='g8-screening').item.where(linkId='g8-gewichtsverlies').answer.valueCoding.display"
+    match: exact
+    expected: "1-3 kg"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.item.where(linkId='g8-screening').item.where(linkId='g8-mobiliteit').answer.valueCoding.display"
+    match: exact
+    expected: "gaat naar buiten"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.item.where(linkId='g8-screening').item.where(linkId='g8-neuropsycho').answer.valueCoding.display"
+    match: exact
+    expected: "geen psychologische aandoeningen"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.item.where(linkId='g8-screening').item.where(linkId='g8-bmi').answer.valueCoding.display"
+    match: exact
+    expected: "21-23 kg/m²"
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='leeftijd-categorie').answer.item.where(linkId='g8-screening').item.where(linkId='g8-score').answer.valueDecimal"
+    match: exact
+    expected: 11
+
+  - fhirpath: "item.where(linkId='actuele-problematiek').item.where(linkId='gewichtsverlies-3m').answer.valueCoding.display"
+    match: exact
+    expected: "> 5%"
+
+  # --- Besluit (group) ---
+  - fhirpath: "item.where(linkId='besluit').item.where(linkId='behandelplan').answer.valueString"
+    match: llm
+    expected: "Continue carboplatin/pemetrexed for 4 cycles with CT evaluation after 2 cycles. Palliative radiotherapy on symptomatic bone metastases. Geriatric consultation requested."
+
+  - fhirpath: "item.where(linkId='besluit').item.where(linkId='therapie-intentie').answer.valueCoding.display"
+    match: exact
+    expected: "Palliatief (inclusief SABR-oligometastasen)"
+
+  - fhirpath: "item.where(linkId='besluit').item.where(linkId='prognose').answer.valueString"
+    match: llm
+    expected: "Reserved prognosis, median survival 6-9 months for EGFR-positive NSCLC with brain metastases after first-line TKI progression"

@@ -10,5 +10,8 @@ questionnaire:
         type: decimal
         text: Body temperature
 
-expected_marks:
-  - "vital-signs"
+expected_answers:
+  # Temperature should NOT be present (not mentioned in the document)
+  - fhirpath: "item.where(linkId='vital-signs').item.where(linkId='temperature').answer.count()"
+    match: exact
+    expected: 0

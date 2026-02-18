@@ -97,35 +97,130 @@ questionnaire:
         type: string
         text: Plan
 
-expected_marks:
-  - "complete-assessment"
-  - "complete-assessment.patient-name.answer"
-  - "complete-assessment.patient-age.answer"
-  - "complete-assessment.patient-gender.answer"
-  - "complete-assessment.date-of-birth.answer"
-  - "complete-assessment.blood-pressure.answer"
-  - "complete-assessment.heart-rate.answer"
-  - "complete-assessment.temperature.answer"
-  - "complete-assessment.respiratory-rate.answer"
-  - "complete-assessment.oxygen-saturation.answer"
-  - "complete-assessment.weight.answer"
-  - "complete-assessment.height.answer"
-  - "complete-assessment.bmi.answer"
-  - "complete-assessment.chief-complaint.answer"
-  - "complete-assessment.history-present-illness.answer"
-  - "complete-assessment.cardiovascular-review.answer"
-  - "complete-assessment.respiratory-review.answer"
-  - "complete-assessment.gastrointestinal-review.answer"
-  - "complete-assessment.neurological-review.answer"
-  - "complete-assessment.musculoskeletal-review.answer"
-  - "complete-assessment.past-medical-history.answer"
-  - "complete-assessment.current-medications.answer"
-  - "complete-assessment.allergies.answer"
-  - "complete-assessment.smoking-status.answer"
-  - "complete-assessment.alcohol-use.answer"
-  - "complete-assessment.exercise-habits.answer"
-  - "complete-assessment.occupation.answer"
-  - "complete-assessment.family-history.answer"
-  - "complete-assessment.physical-exam.answer"
-  - "complete-assessment.assessment.answer"
-  - "complete-assessment.plan.answer"
+expected_answers:
+  # Patient Demographics
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='patient-name').answer.valueString"
+    match: llm
+    expected: "Robert Chen"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='patient-age').answer.valueString"
+    match: llm
+    expected: "58 years old"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='patient-gender').answer.valueString"
+    match: llm
+    expected: "Male"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='date-of-birth').answer.valueString"
+    match: llm
+    expected: "March 15, 1967"
+
+  # Vital Signs
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='blood-pressure').answer.valueString"
+    match: llm
+    expected: "142/90 mmHg"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='heart-rate').answer.valueString"
+    match: llm
+    expected: "78 beats per minute"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='temperature').answer.valueString"
+    match: llm
+    expected: "37.1°C"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='respiratory-rate').answer.valueString"
+    match: llm
+    expected: "16 breaths per minute"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='oxygen-saturation').answer.valueString"
+    match: llm
+    expected: "98%"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='weight').answer.valueString"
+    match: llm
+    expected: "92 kg"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='height').answer.valueString"
+    match: llm
+    expected: "175 cm"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='bmi').answer.valueString"
+    match: llm
+    expected: "30.0 kg/m²"
+
+  # Chief Complaint & HPI
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='chief-complaint').answer.valueString"
+    match: llm
+    expected: "intermittent chest discomfort and shortness of breath on exertion"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='history-present-illness').answer.valueString"
+    match: llm
+    expected: "chest tightness and pressure with physical activity, lasts 5-10 minutes, resolves with rest"
+
+  # Review of Systems
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='cardiovascular-review').answer.valueString"
+    match: llm
+    expected: "intermittent chest pressure with exertion, mild lower extremity edema"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='respiratory-review').answer.valueString"
+    match: llm
+    expected: "shortness of breath with exertion, denies cough or wheezing"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='gastrointestinal-review').answer.valueString"
+    match: llm
+    expected: "occasional heartburn, controlled with antacids"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='neurological-review').answer.valueString"
+    match: llm
+    expected: "occasional tension headaches, no dizziness or weakness"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='musculoskeletal-review').answer.valueString"
+    match: llm
+    expected: "mild chronic lower back pain"
+
+  # Medical History
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='past-medical-history').answer.valueString"
+    match: llm
+    expected: "Type 2 Diabetes, Hypertension, Hyperlipidemia"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='current-medications').answer.valueString"
+    match: llm
+    expected: "Metformin, Lisinopril, Atorvastatin, Aspirin"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='allergies').answer.valueString"
+    match: llm
+    expected: "Penicillin"
+
+  # Social History
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='smoking-status').answer.valueString"
+    match: llm
+    expected: "Former smoker, quit 5 years ago"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='alcohol-use').answer.valueString"
+    match: llm
+    expected: "occasional, 1-2 beers per week"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='exercise-habits').answer.valueString"
+    match: llm
+    expected: "minimal regular exercise"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='occupation').answer.valueString"
+    match: llm
+    expected: "Software engineer"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='family-history').answer.valueString"
+    match: llm
+    expected: "Father had MI at age 62, Mother has diabetes and hypertension"
+
+  # Exam, Assessment, Plan
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='physical-exam').answer.valueString"
+    match: llm
+    expected: "alert, regular heart rhythm, clear lungs, trace bilateral lower extremity edema"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='assessment').answer.valueString"
+    match: llm
+    expected: "possible stable angina, cardiovascular risk factors"
+
+  - fhirpath: "item.where(linkId='complete-assessment').item.where(linkId='plan').answer.valueString"
+    match: llm
+    expected: "EKG, chest X-ray, cardiac stress test, labs"

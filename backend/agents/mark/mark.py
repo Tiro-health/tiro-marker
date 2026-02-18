@@ -1,6 +1,6 @@
 """Mark Agent.
 
-Takes HTML + questionnaire items, outputs marked HTML.
+Takes HTML + questionnaire items, outputs QR blueprint with provenances.
 """
 
 from collections.abc import Sequence
@@ -11,20 +11,13 @@ from pydantic_graph.beta import GraphBuilder, StepContext, TypeExpression
 from pydantic_graph.beta.join import reduce_null
 
 from backend.agents.mark.context import marking_context
-from backend.agents.mark.labeling import apply_marks as apply_marks_to_html
-from backend.agents.mark.labeling import (
-    get_text_content,
-    label_html,
-    strip_labels,
-    strip_marks,
-    validate_marking,
-)
-from backend.agents.mark.qr_bluprint import (
+from backend.agents.mark.qr_blueprint import (
     MarkedItem,
     build_questionnaire_response_blueprint,
 )
 from backend.agents.mark.subagents import ParentContext, process_item
 from backend.agents.protocols import QuestionnaireItemProtocol
+from backend.ai_models import ModelName
 from backend.models.fhir.questionnaire_response import QuestionnaireResponse
 
 
@@ -35,7 +28,7 @@ class Mark:
     Used to track where questionnaire items should be marked in the HTML document.
     """
 
-    # UUID-based location for QR blueprint (data-location)
+    # Location-based ID for QR blueprint (data-location)
     qr_id: str
     # Hierarchical path for form linking (data-frontend-location)
     frontend_location: str
@@ -49,15 +42,17 @@ class Mark:
 class MarkingResult:
     """Result of marking HTML with questionnaire items."""
 
-    marked_html: str
+    labeled_html: str
     blueprint: QuestionnaireResponse
 
 
 @dataclass
 class MarkerState:
     html: str
+    model_name: ModelName = ModelName.GEMINI_FLASH_25
     marks: list[Mark] = field(default_factory=list)
     marked_items: list[MarkedItem] = field(default_factory=list)
+    document_reference_id: str | None = None
 
 
 @dataclass
@@ -79,6 +74,8 @@ async def mark_html(
     html: str,
     q_items: Sequence[QuestionnaireItemProtocol],
     questionnaire_title: str | None = None,
+    document_reference_id: str | None = None,
+    model_name: ModelName = ModelName.GEMINI_FLASH_25,
 ) -> MarkingResult:
     """Mark HTML with questionnaire item spans.
 
@@ -86,19 +83,22 @@ async def mark_html(
         html: Source HTML to mark.
         q_items: Questionnaire items to identify spans for.
         questionnaire_title: Optional title for context in prompts.
+        document_reference_id: Optional DocumentReference ID for provenance.
+        model_name: LLM model to use for marking.
 
     Returns:
-        MarkingResult with marked HTML and QR blueprint.
+        MarkingResult with labeled HTML and QR blueprint.
     """
     # Set global context for all prompts in this marking operation
     with marking_context(questionnaire_title=questionnaire_title):
-        # First, label the HTML for AI selection
-        labeled_html, _label_count = label_html(html)
-
         g = create_graph()
         graph = g.build()
-        state = MarkerState(html=labeled_html)
-        request = MarkRequest(html=labeled_html, q_items=q_items)
+        state = MarkerState(
+            html=html,
+            model_name=model_name,
+            document_reference_id=document_reference_id,
+        )
+        request = MarkRequest(html=html, q_items=q_items)
         result = await graph.run(state=state, inputs=request)
 
         return result
@@ -143,7 +143,11 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
         parent_ctx = ctx.inputs.parent_ctx
 
         # Log item being processed (trace level for filtering)
-        breadcrumb = " > ".join(parent_ctx.breadcrumb) if parent_ctx and parent_ctx.breadcrumb else None
+        breadcrumb = (
+            " > ".join(parent_ctx.breadcrumb)
+            if parent_ctx and parent_ctx.breadcrumb
+            else None
+        )
         logfire.trace(
             "→ {text}",
             text=item.text or item.linkId,
@@ -157,6 +161,7 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
             item,
             location,
             html,
+            model_name=ctx.state.model_name,
             siblings=siblings,
             parent_ctx=parent_ctx,
         )
@@ -206,51 +211,27 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
     sync = g.join(reduce_null, initial=None)
 
     @g.step
-    async def apply_marks(
+    async def build_blueprint(
         ctx: StepContext[MarkerState, None, None],
     ) -> MarkingResult:
-        # Filter out group marks - only apply answer marks to HTML output
-        # Group marks are used internally for scoping but not rendered
+        # Log marking summary
         answer_marks = [m for m in ctx.state.marks if not m.is_group]
-
-        # Apply marks to labeled HTML and clean up
-        marked_html = apply_marks_to_html(ctx.state.html, answer_marks)
-
-        # Validate that marking didn't change text content
-        original_clean = strip_labels(ctx.state.html)
-        original_text = get_text_content(original_clean)
-        marked_text = get_text_content(strip_marks(marked_html))
-        is_valid = validate_marking(original_clean, marked_html)
-
         logfire.info(
-            "Mark validation {result}",
-            result="passed" if is_valid else "FAILED",
-            original_length=len(original_text),
-            marked_length=len(marked_text),
+            "Building blueprint",
             total_marks=len(ctx.state.marks),
-            answer_marks_applied=len(answer_marks),
-            group_marks_skipped=len(ctx.state.marks) - len(answer_marks),
+            answer_marks=len(answer_marks),
+            group_marks=len(ctx.state.marks) - len(answer_marks),
             marked_items_count=len(ctx.state.marked_items),
-            marked_html=marked_html,
         )
 
-        if not is_valid:
-            logfire.error(
-                "Marking validation failed: text content changed",
-                original_text_preview=original_text[:500],
-                marked_text_preview=marked_text[:500],
-            )
-            raise ValueError(
-                f"Marking validation failed: text content changed.\n"
-                f"Original length: {len(original_text)}, Marked length: {len(marked_text)}\n"
-                f"Original (first 200): {original_text[:200]!r}\n"
-                f"Marked (first 200): {marked_text[:200]!r}"
-            )
+        # Build QR blueprint from marked items with marks (handles provenance merging)
+        blueprint = build_questionnaire_response_blueprint(
+            ctx.state.marked_items,
+            marks=ctx.state.marks,
+            doc_ref_id=ctx.state.document_reference_id,
+        )
 
-        # Build QR blueprint from marked items
-        blueprint = build_questionnaire_response_blueprint(ctx.state.marked_items)
-
-        return MarkingResult(marked_html=marked_html, blueprint=blueprint)
+        return MarkingResult(labeled_html=ctx.state.html, blueprint=blueprint)
 
     g.add(
         g.edge_from(g.start_node).to(fan_out),
@@ -272,8 +253,8 @@ def create_graph() -> GraphBuilder[MarkerState, None, MarkRequest, MarkingResult
                 ).to(sync)
             )
         ),
-        g.edge_from(sync).to(apply_marks),
-        g.edge_from(apply_marks).to(g.end_node),
+        g.edge_from(sync).to(build_blueprint),
+        g.edge_from(build_blueprint).to(g.end_node),
     )
 
     return g

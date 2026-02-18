@@ -22,7 +22,7 @@ def format_extraction_prompt(
     unit: str | None = None,
     repeats: bool = False,
     sibling_questions: list[str] | None = None,
-    parent_text: str | None = None,
+    breadcrumb: list[str] | None = None,
 ) -> str:
     """Format a prompt for extracting an answer from marked content.
 
@@ -34,7 +34,7 @@ def format_extraction_prompt(
         unit: For quantity types, the expected unit
         repeats: For coding types, whether multiple selections are allowed
         sibling_questions: Other questions at the same level (for context)
-        parent_text: Parent question text (for context)
+        breadcrumb: Full path in the form hierarchy (e.g., ["Medications", "Lisinopril", "Dosage"])
 
     Returns:
         Formatted prompt string
@@ -53,13 +53,17 @@ def format_extraction_prompt(
         prompt_parts.append("    <multiple_allowed>true</multiple_allowed>")
     prompt_parts.append("  </question>")
 
-    # Context section (always include for datetime, optionally parent/siblings)
+    # Context section (always include for datetime, optionally breadcrumb/siblings)
     prompt_parts.append("  <context>")
     # Current datetime for resolving relative dates like "yesterday", "last week"
     now = datetime.now()
     prompt_parts.append(f"    <current_datetime>{now.strftime('%Y-%m-%d %H:%M')}</current_datetime>")
-    if parent_text:
-        prompt_parts.append(f"    <parent_question>{parent_text}</parent_question>")
+    if breadcrumb:
+        prompt_parts.append(f"    <form_breadcrumb>{' > '.join(breadcrumb)}</form_breadcrumb>")
+        prompt_parts.append(
+            "    <note>The breadcrumb shows the exact form location. "
+            "Extract ONLY the answer that matches this specific context.</note>"
+        )
     if sibling_questions:
         siblings_str = ", ".join(sibling_questions)
         prompt_parts.append(f"    <sibling_questions>{siblings_str}</sibling_questions>")
@@ -78,17 +82,23 @@ def format_extraction_prompt(
         case "coding":
             if repeats:
                 prompt_parts.append(
-                    "    <instruction>Select ALL options from valid_options that are mentioned in the text</instruction>"
+                    "    <instruction>Select ALL options from valid_options that correctly answer the question based on the text</instruction>"
                 )
                 prompt_parts.append(
                     "    <instruction>Multiple selections allowed - include every option that applies</instruction>"
                 )
+                prompt_parts.append(
+                    "    <instruction>Do NOT select options just because they are mentioned - they must be a correct answer to the question</instruction>"
+                )
+                prompt_parts.append(
+                    "    <instruction>Options that are explicitly negative, absent, ruled out, or not detected are NOT correct answers</instruction>"
+                )
             else:
                 prompt_parts.append(
-                    "    <instruction>Select exactly one option from valid_options that best matches</instruction>"
+                    "    <instruction>Select exactly one option from valid_options that best answers the question</instruction>"
                 )
             prompt_parts.append(
-                "    <instruction>Only select an option if clearly indicated in the text</instruction>"
+                "    <instruction>Only select an option if the text supports it as a correct answer</instruction>"
             )
         case "boolean":
             prompt_parts.append("    <instruction>Extract true or false based on the text</instruction>")

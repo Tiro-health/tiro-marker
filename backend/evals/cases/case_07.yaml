@@ -99,30 +99,118 @@ questionnaire:
           - "Yes"
           - "No"
 
-expected_marks:
-  - "emergency-assessment.patient-name.answer"
-  - "emergency-assessment.admission-datetime.answer"
-  - "emergency-assessment.patient-conscious.answer"
-  - "emergency-assessment.chief-complaint.answer"
-  - "emergency-assessment.symptom-onset-time.answer"
-  - "emergency-assessment.pain-present.answer"
-  - "emergency-assessment.pain-severity.answer"
-  - "emergency-assessment.triage-level.answer"
-  - "emergency-assessment.vital-signs-group.temperature.answer"
-  - "emergency-assessment.vital-signs-group.heart-rate.answer"
-  - "emergency-assessment.vital-signs-group.oxygen-saturation.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.medication-dosage.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.medication-frequency.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Aspirin.medication-route.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Metformin.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Metformin.medication-dosage.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Metformin.medication-frequency.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Metformin.medication-route.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.medication-dosage.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.medication-frequency.answer"
-  - "emergency-assessment.medications.option-http://example.org/test|Lisinopril.medication-route.answer"
-  - "emergency-assessment.diagnosis.answer"
-  - "emergency-assessment.last-meal-date.answer"
-  - "emergency-assessment.procedure-required.answer"
+expected_answers:
+  # String - patient name
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='patient-name').answer.valueString"
+    match: llm
+    expected: "Sarah Johnson"
+
+  # DateTime - admission (FHIR format)
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='admission-datetime').answer.valueDateTime"
+    match: llm
+    expected: "2026-01-12T14:30:00"
+
+  # Coding - patient conscious
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='patient-conscious').answer.valueCoding.display"
+    match: exact
+    expected: "Yes"
+
+  # String - chief complaint
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='chief-complaint').answer.valueString"
+    match: llm
+    expected: "severe chest pain radiating to left arm"
+
+  # Time - symptom onset
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='symptom-onset-time').answer.valueTime"
+    match: llm
+    expected: "12:45"
+
+  # Coding - pain present
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='pain-present').answer.valueCoding.display"
+    match: exact
+    expected: "Yes"
+
+  # Decimal - pain severity
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='pain-severity').answer.valueDecimal"
+    match: exact
+    expected: 7
+
+  # Coding - triage level
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='triage-level').answer.valueCoding.display"
+    match: exact
+    expected: "Urgent"
+
+  # Nested group: vital signs
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='vital-signs-group').item.where(linkId='temperature').answer.valueDecimal"
+    match: exact
+    expected: 37.8
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='vital-signs-group').item.where(linkId='heart-rate').answer.valueDecimal"
+    match: exact
+    expected: 95
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='vital-signs-group').item.where(linkId='oxygen-saturation').answer.valueDecimal"
+    match: exact
+    expected: 96
+
+  # Medications - all 3 should be present, no extras
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.valueCoding.display"
+    match: set
+    expected:
+      - "Aspirin"
+      - "Metformin"
+      - "Lisinopril"
+
+  # Nested medication details - Aspirin (medications is coding → children under answer.item)
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Aspirin').item.where(linkId='medication-dosage').answer.valueString"
+    match: llm
+    expected: "81 milligrams"
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Aspirin').item.where(linkId='medication-frequency').answer.valueString"
+    match: llm
+    expected: "Once daily in the morning"
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Aspirin').item.where(linkId='medication-route').answer.valueCoding.display"
+    match: exact
+    expected: "Oral"
+
+  # Nested medication details - Metformin
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Metformin').item.where(linkId='medication-dosage').answer.valueString"
+    match: llm
+    expected: "500 milligrams"
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Metformin').item.where(linkId='medication-frequency').answer.valueString"
+    match: llm
+    expected: "Twice daily with meals"
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Metformin').item.where(linkId='medication-route').answer.valueCoding.display"
+    match: exact
+    expected: "Oral"
+
+  # Nested medication details - Lisinopril
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Lisinopril').item.where(linkId='medication-dosage').answer.valueString"
+    match: llm
+    expected: "10 milligrams"
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Lisinopril').item.where(linkId='medication-frequency').answer.valueString"
+    match: llm
+    expected: "Once daily in the morning"
+
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='medications').answer.where(valueCoding.display='Lisinopril').item.where(linkId='medication-route').answer.valueCoding.display"
+    match: exact
+    expected: "Oral"
+
+  # Coding - diagnosis
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='diagnosis').answer.valueCoding.display"
+    match: exact
+    expected: "Acute myocardial infarction"
+
+  # Date - last meal
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='last-meal-date').answer.valueDate"
+    match: exact
+    expected: "2026-01-12"
+
+  # Coding - procedure required
+  - fhirpath: "item.where(linkId='emergency-assessment').item.where(linkId='procedure-required').answer.valueCoding.display"
+    match: exact
+    expected: "Yes"

@@ -37,4 +37,55 @@ questionnaire:
     text: Working diagnosis
   - linkId: treatment-plan
     type: string
-    text: Treatment plan
+    text: Assessment and plan
+
+expected_answers:
+  # Chief complaint: "CC: Pt c/o SOB x 3d" = shortness of breath for 3 days
+  - fhirpath: "item.where(linkId='chief-complaint').answer.valueString"
+    match: llm
+    expected: "Shortness of breath for 3 days, worse with exertion"
+
+  # Duration: "x 3d" = 3 days
+  - fhirpath: "item.where(linkId='duration-days').answer.valueInteger"
+    match: exact
+    expected: 3
+
+  # Heart rate: "HR 102"
+  - fhirpath: "item.where(linkId='heart-rate').answer.valueInteger"
+    match: exact
+    expected: 102
+
+  # Systolic BP: "BP 145/92" → 145
+  - fhirpath: "item.where(linkId='blood-pressure-systolic').answer.valueInteger"
+    match: exact
+    expected: 145
+
+  # Diastolic BP: "BP 145/92" → 92
+  - fhirpath: "item.where(linkId='blood-pressure-diastolic').answer.valueInteger"
+    match: exact
+    expected: 92
+
+  # Temperature: "T 38.2"
+  - fhirpath: "item.where(linkId='temperature').answer.valueDecimal"
+    match: exact
+    expected: 38.2
+
+  # Oxygen saturation: "SpO2 94% RA"
+  - fhirpath: "item.where(linkId='oxygen-saturation').answer.valueInteger"
+    match: exact
+    expected: 94
+
+  # Respiratory rate: "RR 22"
+  - fhirpath: "item.where(linkId='respiratory-rate').answer.valueInteger"
+    match: exact
+    expected: 22
+
+  # Diagnosis: "A/P: Acute on chronic CHF exacerbation, r/o pneumonia"
+  - fhirpath: "item.where(linkId='diagnosis').answer.valueString"
+    match: llm
+    expected: "Acute on chronic CHF exacerbation, rule out pneumonia"
+
+  # Assessment and plan (includes diagnostics and therapeutics)
+  - fhirpath: "item.where(linkId='treatment-plan').answer.valueString"
+    match: llm
+    expected: "CXR, BNP, CBC, BMP, troponin; IV Lasix 40mg; O2 via nasal cannula to maintain SpO2 >94%; Admit to telemetry"

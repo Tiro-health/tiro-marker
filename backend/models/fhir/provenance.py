@@ -7,7 +7,7 @@ from backend.models.fhir.common import (
     FHIRBaseModel,
     Reference,
 )
-from backend.models.fhir.primitives import Id, Instant
+from backend.models.fhir.primitives import Id, Instant, Markdown
 
 
 class ProvenanceAgent(FHIRBaseModel):
@@ -17,6 +17,25 @@ class ProvenanceAgent(FHIRBaseModel):
     who: Reference | None = None
 
 
+class ProvenanceEntity(FHIRBaseModel):
+    """FHIR Provenance.entity element."""
+
+    role: CodeableConcept
+    what: Reference
+
+    @property
+    def html_element_ids(self) -> list[str]:
+        html_element_ids: list[str] = []
+        for extension in self.what.extension:
+            if (
+                extension.url
+                == "https://fhir.tiro.health/StructureDefinition/html-element-id"
+            ):
+                assert extension.valueString is not None
+                html_element_ids.append(extension.valueString)
+        return html_element_ids
+
+
 class Provenance(FHIRBaseModel):
     """FHIR Provenance resource (minimal for contained use)."""
 
@@ -24,5 +43,9 @@ class Provenance(FHIRBaseModel):
     id: Id | None = None
     target: list[Reference] = Field(default=[])
     recorded: Instant | None = None
+    why: Markdown | None = Field(
+        default=None, description="Why was the event performed?"
+    )
     activity: CodeableConcept | None = None
     agent: list[ProvenanceAgent] = Field(default=[])
+    entity: list[ProvenanceEntity] = Field(default=[])

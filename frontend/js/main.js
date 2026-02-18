@@ -3,10 +3,11 @@
  * Main entry point - modular architecture with Lexical editor
  */
 
-import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=3';
-import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=12';
+import { initializeEditor, getHtmlContent, getTextContent } from './editor/index.js?v=4';
+import { initMarking, setMarkingEnabled, triggerManualMark, getLastMarkResult, setOnMarkComplete, setQuestionnaire, clearAllMarks } from './marking/index.js?v=18';
 import { initLinkHandler } from './questionnaire/linkHandler.js';
-import { initFormToMark } from './questionnaire/formToMark.js';
+import { initFormToMark } from './questionnaire/formToMark.js?v=2';
+import { initProvenanceNav, setPopulateResponse } from './questionnaire/provenanceNav.js?v=11';
 import { initQuestionnaireSwitcher } from './questionnaire/switcher.js?v=2';
 import { initAgentControls, setMarkerWorking, setPopulateWorking } from './ui/agentControls.js?v=2';
 import { initMedASRStatus } from './ui/medasrStatus.js?v=14';
@@ -28,6 +29,9 @@ let populateLive = false;
 
 // Voice dictation state machine
 let voiceStateMachine = null;
+
+// Voice language preference (persisted in localStorage)
+let voiceLang = localStorage.getItem('voiceLang') || 'en-US';
 
 /**
  * Start the live clock in the header
@@ -380,6 +384,39 @@ function applyFormDarkTheme(formEl) {
         background-color: #475569 !important;
         border-color: #64748b !important;
       }
+
+      /* Provenance button styles - applied via .provenance-btn class in JS */
+      .provenance-btn {
+        border-radius: 6px !important;
+        transition: transform 0.15s ease !important;
+        cursor: pointer !important;
+        padding: 4px !important;
+        box-shadow: none !important;
+        outline: none !important;
+        background-color: transparent !important;
+      }
+      .provenance-btn:hover {
+        background-color: transparent !important;
+        transform: scale(1.1) !important;
+        box-shadow: none !important;
+      }
+      .provenance-btn:focus {
+        box-shadow: none !important;
+        outline: none !important;
+        background-color: transparent !important;
+      }
+      .provenance-btn:active {
+        transform: scale(0.95) !important;
+      }
+      .provenance-btn img {
+        width: 16px !important;
+        height: 16px !important;
+      }
+
+      /* Hide any Radix UI tooltips from the SDK on provenance buttons */
+      [data-radix-popper-content-wrapper] {
+        display: none !important;
+      }
     `);
 
     formEl.shadowRoot.adoptedStyleSheets = [
@@ -455,6 +492,9 @@ function loadQuestionnaire(questionnaire) {
 
   // Initialize form→mark reverse navigation (question hover/click → mark glow/scroll)
   initFormToMark(newForm);
+
+  // Initialize provenance navigation (provenance icon click → sentence stepper)
+  initProvenanceNav(newForm);
 
   console.log('Questionnaire loaded:', questionnaire.title || questionnaire.url);
 }
@@ -572,12 +612,32 @@ function setupEventListeners() {
     submitFormBtn.addEventListener('click', handleFormSubmit);
   }
 
+  // Language selector for voice input
+  const langSelect = document.getElementById('voice-lang-select');
+  if (langSelect) {
+    // Set initial value from stored preference
+    langSelect.value = voiceLang;
+
+    langSelect.addEventListener('change', (e) => {
+      voiceLang = e.target.value;
+      localStorage.setItem('voiceLang', voiceLang);
+
+      // Update voice state machine if it exists
+      if (voiceStateMachine) {
+        voiceStateMachine.setLanguage(voiceLang);
+      }
+
+      console.log('Voice language changed to:', voiceLang);
+    });
+  }
+
   // Mic button — voice dictation
   const micBtn = document.getElementById('mic-btn');
   if (micBtn) {
     micBtn.addEventListener('click', () => {
       if (!voiceStateMachine) {
         voiceStateMachine = createVoiceStateMachine(editorAPI, {
+          lang: voiceLang,
           onStateChange: handleVoiceStateChange,
           onPreviewText: handleVoicePreview,
           onLevelUpdate: handleAudioLevel,
@@ -714,11 +774,15 @@ async function handlePopulateWithResult(markResult, questionnaire = null) {
   }
 
   if (clinicalForm) {
+    // Store the response for provenance lookups (SDK strips custom fields like 'why')
+    setPopulateResponse(questionnaireResponse);
+
     if (typeof clinicalForm.setResponse === 'function') {
       await clinicalForm.setResponse(questionnaireResponse);
     } else {
       clinicalForm.response = questionnaireResponse;
     }
+
     console.log('Form populated:', questionnaireResponse);
   }
 }
