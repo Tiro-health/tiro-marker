@@ -8,15 +8,29 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 
 /**
  * Create a live preview instance using the Web Speech API.
- * @param {{ onInterim?: (text: string) => void, onFinal?: (text: string) => void, onError?: (error: Error) => void, lang?: string }} callbacks
- * @returns {{ start: () => void, stop: () => void, restart: () => void, setLanguage: (lang: string) => void, isSupported: boolean }}
+ * @param {{
+ *   onInterim?: (text: string) => void,
+ *   onFinal?: (text: string) => void,
+ *   onError?: (error: Error) => void,
+ *   onRestarted?: () => void,
+ *   lang?: string
+ * }} callbacks
+ * @returns {{
+ *   start: () => void,
+ *   stop: () => void,
+ *   restart: () => Promise<void>,
+ *   setLanguage: (lang: string) => void,
+ *   isSupported: boolean
+ * }}
  */
-export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' } = {}) {
+export function createLivePreview({ onInterim, onFinal, onError, onRestarted, lang = 'en-US' } = {}) {
   if (!SpeechRecognition) {
     return {
       start() {},
       stop() {},
-      restart() {},
+      restart() {
+        return Promise.resolve();
+      },
       setLanguage() {},
       isSupported: false,
     };
@@ -25,6 +39,7 @@ export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' 
   let recognition = null;
   let shouldRestart = false;
   let currentLang = lang;
+  let restartPromiseResolve = null;
 
   function createRecognition() {
     const rec = new SpeechRecognition();
@@ -33,20 +48,21 @@ export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' 
     rec.lang = currentLang;
 
     rec.onresult = (event) => {
-      let interim = '';
-      let finalText = '';
+      // Build full transcript from ALL results (not just from resultIndex)
+      // This ensures we accumulate text properly
+      let fullTranscript = '';
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalText += transcript;
-        } else {
-          interim += transcript;
-        }
+      for (let i = 0; i < event.results.length; i++) {
+        fullTranscript += event.results[i][0].transcript;
       }
 
-      if (finalText) onFinal?.(finalText);
-      if (interim) onInterim?.(interim);
+      // Check if the latest result is final
+      const lastResult = event.results[event.results.length - 1];
+      if (lastResult.isFinal) {
+        onFinal?.(fullTranscript);
+      } else {
+        onInterim?.(fullTranscript);
+      }
     };
 
     rec.onerror = (event) => {
@@ -56,6 +72,13 @@ export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' 
     };
 
     rec.onend = () => {
+      // Resolve any pending restart promise
+      if (restartPromiseResolve) {
+        const resolve = restartPromiseResolve;
+        restartPromiseResolve = null;
+        resolve();
+      }
+
       // Only auto-restart if this is still the current recognition instance
       // This prevents old instances from restarting after restart() is called
       if (rec !== recognition) return;
@@ -90,7 +113,7 @@ export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' 
       shouldRestart = false;
       if (recognition) {
         try {
-          recognition.stop();
+          recognition.abort(); // Use abort() for immediate stop
         } catch {
           // Ignore
         }
@@ -98,28 +121,55 @@ export function createLivePreview({ onInterim, onFinal, onError, lang = 'en-US' 
       }
     },
 
-    /** Restart recognition fresh (blank slate) */
-    restart() {
-      // Temporarily disable auto-restart to prevent old recognition from restarting
-      shouldRestart = false;
-      if (recognition) {
-        try {
-          recognition.stop();
-        } catch {
-          // Ignore
-        }
-        recognition = null;
+    /**
+     * Restart recognition fresh (blank slate).
+     * Returns a Promise that resolves when new recognition has started.
+     * @returns {Promise<void>}
+     */
+    async restart() {
+      // If no active recognition, just start fresh
+      if (!recognition) {
+        this.start();
+        onRestarted?.();
+        return;
       }
-      // Small delay before starting new recognition (browser needs time to release mic)
-      setTimeout(() => {
-        shouldRestart = true;
-        recognition = createRecognition();
-        try {
-          recognition.start();
-        } catch {
-          // Ignore if already started
-        }
-      }, 100);
+
+      // Create promise to wait for end event
+      const endPromise = new Promise((resolve) => {
+        restartPromiseResolve = resolve;
+
+        // Timeout fallback in case end event never fires
+        setTimeout(() => {
+          if (restartPromiseResolve === resolve) {
+            restartPromiseResolve = null;
+            resolve();
+          }
+        }, 500);
+      });
+
+      // Use abort() for immediate stop (doesn't wait for audio processing)
+      shouldRestart = false;
+      const oldRec = recognition;
+      recognition = null;
+
+      try {
+        oldRec.abort();
+      } catch {
+        // Ignore
+      }
+
+      // Wait for end event (or timeout)
+      await endPromise;
+
+      // Now start fresh recognition
+      shouldRestart = true;
+      recognition = createRecognition();
+      try {
+        recognition.start();
+        onRestarted?.();
+      } catch {
+        // Ignore if already started
+      }
     },
 
     /** Change the recognition language */

@@ -692,12 +692,6 @@ body {
     75%  { content: ' ..'; }
 }
 
-.voice-bar.voice-stopping .mic-btn {
-    opacity: 0.5;
-    cursor: wait;
-    pointer-events: none;
-}
-
 /* ---- Language Select ---- */
 .lang-select {
     background: var(--bg-input);

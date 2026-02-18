@@ -640,7 +640,6 @@ function setupEventListeners() {
           lang: voiceLang,
           onStateChange: handleVoiceStateChange,
           onPreviewText: handleVoicePreview,
-          onLevelUpdate: handleAudioLevel,
           onError: (err) => {
             console.error('Voice error:', err);
           },
@@ -812,21 +811,15 @@ function handleVoiceStateChange(newState) {
   const curEl = document.getElementById('voice-cur');
   if (!voiceBar) return;
 
-  voiceBar.classList.remove('voice-recording', 'voice-flushing');
+  voiceBar.classList.remove('voice-recording');
 
-  switch (newState) {
-    case VoiceState.RECORDING:
-      voiceBar.classList.add('voice-recording');
-      break;
-    case VoiceState.FLUSHING:
-      voiceBar.classList.add('voice-recording', 'voice-flushing');
-      break;
-    case VoiceState.IDLE:
-    default:
-      lineWordOffset = 0;
-      if (prevEl) prevEl.textContent = '';
-      if (curEl) curEl.textContent = 'Tap to dictate clinical notes';
-      break;
+  if (newState === VoiceState.RECORDING) {
+    voiceBar.classList.add('voice-recording');
+  } else {
+    // IDLE
+    lineWordOffset = 0;
+    if (prevEl) prevEl.textContent = '';
+    if (curEl) curEl.textContent = 'Tap to dictate clinical notes';
   }
 }
 
@@ -861,18 +854,6 @@ function handleVoicePreview(text) {
 
   // Show current line
   curEl.textContent = words.slice(lineWordOffset).join(' ') || '\u00a0';
-}
-
-/**
- * Handle audio level updates — drive mic button glow intensity.
- * @param {number} dBFS - Audio level in dBFS (typically -60 to 0)
- */
-function handleAudioLevel(dBFS) {
-  const btn = document.getElementById('mic-btn');
-  if (!btn) return;
-  // Map dBFS (-50…-5) to 0…1 intensity (wider range, harder to max out)
-  const intensity = Math.max(0, Math.min(1, (dBFS + 50) / 45));
-  btn.style.setProperty('--audio-level', intensity);
 }
 
 // Initialize on DOMContentLoaded
