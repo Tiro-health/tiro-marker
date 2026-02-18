@@ -33,8 +33,9 @@ export function createHighlightRenderer(editorEl, overlayEl) {
      *
      * @param {Array<{id: number, start: number, end: number}>} sentences - Sentences to highlight
      * @param {Object} questionDataMap - Map of labelId → {qrId, questionText, frontendLocation}
+     * @param {Object} activeProvenance - { strong: string[], soft: string[] } label IDs to highlight
      */
-    render(sentences, questionDataMap = {}) {
+    render(sentences, questionDataMap = {}, activeProvenance = { strong: [], soft: [] }) {
       overlayEl.innerHTML = '';
 
       if (!sentences.length) {
@@ -86,9 +87,15 @@ export function createHighlightRenderer(editorEl, overlayEl) {
             height: ${r.height}px;
             background: ${DEFAULT_HIGHLIGHT_COLOR};
             border-radius: 3px;
-            pointer-events: auto;
-            cursor: pointer;
           `;
+
+          // Apply provenance highlight classes if active
+          const labelIdStr = String(s.id);
+          if (activeProvenance.strong.includes(labelIdStr)) {
+            div.classList.add('provenance-highlight-strong');
+          } else if (activeProvenance.soft.includes(labelIdStr)) {
+            div.classList.add('provenance-highlight-soft');
+          }
 
           overlayEl.appendChild(div);
         }
@@ -151,6 +158,7 @@ export function createHighlightManager(editorEl, overlayEl) {
   let resizeObserver = null;
   let mutationObserver = null;
   let rafId = null;
+  let activeProvenanceLabelIds = { strong: [], soft: [] }; // Provenance highlight state
 
   function scheduleRender() {
     if (rafId) return;
@@ -206,7 +214,7 @@ export function createHighlightManager(editorEl, overlayEl) {
     const allLabelIds = Object.values(currentMapping).flat().map(String);
     const toHighlight = currentSentences.filter(s => allLabelIds.includes(String(s.id)));
 
-    renderer.render(toHighlight, questionDataMap);
+    renderer.render(toHighlight, questionDataMap, activeProvenanceLabelIds);
   }
 
   // Re-render on resize
@@ -280,6 +288,29 @@ export function createHighlightManager(editorEl, overlayEl) {
         scrollContainer.removeEventListener('scroll', scheduleRender);
       }
       renderer.clear();
+    },
+
+    /**
+     * Set active provenance highlights.
+     * These will be applied during render and persist across re-renders.
+     *
+     * @param {string[]} strongIds - Label IDs to highlight strongly (current reference)
+     * @param {string[]} softIds - Label IDs to highlight softly (other references)
+     */
+    setActiveProvenance(strongIds, softIds) {
+      activeProvenanceLabelIds = {
+        strong: (strongIds || []).map(String),
+        soft: (softIds || []).map(String),
+      };
+      scheduleRender();
+    },
+
+    /**
+     * Clear active provenance highlights.
+     */
+    clearActiveProvenance() {
+      activeProvenanceLabelIds = { strong: [], soft: [] };
+      scheduleRender();
     }
   };
 }

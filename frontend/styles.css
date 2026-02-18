@@ -826,8 +826,8 @@ body {
 
 .highlight-rect {
     position: absolute;
-    pointer-events: auto;
-    cursor: pointer;
+    pointer-events: none;
+    cursor: text;
     transition: background 0.15s ease;
 }
 
@@ -1501,7 +1501,7 @@ body {
    ======================================== */
 .provenance-tooltip {
     position: fixed;
-    width: 280px;
+    width: 320px;
     background-color: var(--bg-surface);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-md);
@@ -1530,9 +1530,28 @@ body {
     font-size: 0.8rem;
     color: var(--text-secondary);
     line-height: 1.5;
-    max-height: 4.5em; /* ~3 lines */
+    max-height: 9em; /* ~6 lines */
     overflow-y: auto;
     margin-bottom: 0.5rem;
+    padding-right: 4px;
+}
+
+/* Custom scrollbar for provenance reason */
+.provenance-reason::-webkit-scrollbar {
+    width: 6px;
+}
+
+.provenance-reason::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.provenance-reason::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 3px;
+}
+
+.provenance-reason::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 .provenance-divider {
@@ -1604,11 +1623,12 @@ body {
    Provenance Sentence Highlights
    ======================================== */
 .highlight-rect.provenance-highlight-soft {
-    background: rgba(34, 211, 238, 0.15) !important;
+    background: rgba(34, 211, 238, 0.3) !important;
     transition: background 0.2s ease;
 }
 
 .highlight-rect.provenance-highlight-strong {
-    background: rgba(34, 211, 238, 0.35) !important;
+    background: rgba(34, 211, 238, 0.55) !important;
+    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.4);
     transition: background 0.2s ease;
 }

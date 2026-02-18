@@ -3,7 +3,7 @@
  * Click a provenance icon → tooltip with reason + stepper to navigate linked sentences.
  */
 
-import { findMarksByFrontendLocation } from '../marking/index.js?v=18';
+import { findMarksByFrontendLocation, setActiveProvenance, clearActiveProvenance } from '../marking/index.js?v=26';
 
 // Module state
 let formFiller = null;
@@ -184,7 +184,7 @@ function handleDocumentClick(e) {
 function openProvenanceCard(fieldId, buttonEl) {
   // Close any existing card first
   if (activeFieldId) {
-    clearHighlights();
+    clearActiveProvenance();
   }
 
   activeFieldId = fieldId;
@@ -233,8 +233,8 @@ function openProvenanceCard(fieldId, buttonEl) {
   positionTooltip(buttonEl);
   tooltip?.classList.remove('hidden');
 
-  // Apply highlights
-  applyHighlights();
+  // Apply highlights via highlighting system (persists across scroll/re-renders)
+  updateProvenanceHighlights();
 
   // Scroll to first sentence
   if (currentRefs.length > 0) {
@@ -252,7 +252,7 @@ function closeProvenanceCard() {
   activeButtonEl = null;
 
   tooltip?.classList.add('hidden');
-  clearHighlights();
+  clearActiveProvenance();
 }
 
 /**
@@ -379,7 +379,7 @@ function handlePrev() {
 
   activeRefIndex = (activeRefIndex - 1 + currentRefs.length) % currentRefs.length;
   updateStepper();
-  applyHighlights();
+  updateProvenanceHighlights();
   scrollToRef(activeRefIndex);
 }
 
@@ -391,51 +391,32 @@ function handleNext() {
 
   activeRefIndex = (activeRefIndex + 1) % currentRefs.length;
   updateStepper();
-  applyHighlights();
+  updateProvenanceHighlights();
   scrollToRef(activeRefIndex);
 }
 
 /**
- * Apply soft highlights to all refs, strong highlight to active ref.
- * Highlights ALL rects with matching labelId (for wrapped sentences).
+ * Update provenance highlights via the highlighting system.
+ * This approach persists across re-renders (scroll, resize, content changes).
  */
-function applyHighlights() {
-  // Clear existing provenance highlights
-  clearHighlights();
-
-  const overlayEl = document.getElementById('highlight-overlay');
-  if (!overlayEl) return;
-
-  // Apply highlights to ALL rects with matching labelIds
-  currentRefs.forEach((ref, idx) => {
-    const allRects = overlayEl.querySelectorAll(`.highlight-rect[data-label-id="${ref.labelId}"]`);
-    for (const rect of allRects) {
-      if (idx === activeRefIndex) {
-        rect.classList.add('provenance-highlight-strong');
-      } else {
-        rect.classList.add('provenance-highlight-soft');
-      }
-    }
-  });
-}
-
-/**
- * Clear all provenance highlights.
- */
-function clearHighlights() {
-  const overlayEl = document.getElementById('highlight-overlay');
-  if (!overlayEl) return;
-
-  const rects = overlayEl.querySelectorAll('.highlight-rect');
-  for (const rect of rects) {
-    rect.classList.remove('provenance-highlight-soft', 'provenance-highlight-strong');
+function updateProvenanceHighlights() {
+  if (currentRefs.length === 0) {
+    clearActiveProvenance();
+    return;
   }
+
+  // Current reference gets strong highlight, others get soft
+  const strongIds = [currentRefs[activeRefIndex].labelId];
+  const softIds = currentRefs
+    .filter((_, idx) => idx !== activeRefIndex)
+    .map(ref => ref.labelId);
+
+  setActiveProvenance(strongIds, softIds);
 }
 
 /**
  * Scroll to a specific reference.
- * Re-applies highlights after scroll since the highlighting system
- * may re-render rects during scroll, clearing our classes.
+ * Highlights now persist automatically via the highlighting system.
  */
 function scrollToRef(index) {
   const ref = currentRefs[index];
@@ -450,16 +431,5 @@ function scrollToRef(index) {
       behavior: 'smooth',
       block: 'center',
     });
-
-    // Re-apply highlights multiple times to ensure they persist
-    // The highlighting system may re-render rects during/after scroll
-    const reapply = () => {
-      if (activeFieldId) {
-        applyHighlights();
-      }
-    };
-    setTimeout(reapply, 100);
-    setTimeout(reapply, 300);
-    setTimeout(reapply, 500);
   }
 }
