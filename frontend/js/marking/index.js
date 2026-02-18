@@ -625,21 +625,6 @@ export async function triggerManualMark() {
   triggerMarking();
 }
 
-// Legacy exports for backwards compatibility
-export function renderSentenceHighlights(sentenceMarks) {
-  console.warn("[Marking] renderSentenceHighlights is deprecated");
-}
-
-export function renderHighlightRanges(ranges) {
-  console.warn("[Marking] renderHighlightRanges is deprecated");
-}
-
-export function clearSentenceHighlights() {
-  if (highlightingSystem) {
-    highlightingSystem.clear();
-  }
-}
-
 export function findMarksByFrontendLocation(location) {
   // Return label IDs that match this location
   const results = [];
