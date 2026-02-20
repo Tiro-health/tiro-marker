@@ -11,7 +11,6 @@ from backend.agents.populate.extraction import (
     ExtractionAnswer,
     ExtractionTask,
     extract_labeled_content,
-    extract_marked_content,
     get_label_ids_from_provenance,
     run_extractions,
 )
@@ -85,7 +84,9 @@ def get_unit(item: QuestionnaireItemProtocol) -> str | None:
         Unit string if found, None otherwise
     """
     # Check for questionnaire-unit extension
-    QUESTIONNAIRE_UNIT_URL = "http://hl7.org/fhir/StructureDefinition/questionnaire-unit"
+    QUESTIONNAIRE_UNIT_URL = (
+        "http://hl7.org/fhir/StructureDefinition/questionnaire-unit"
+    )
 
     for ext in item.extension:
         if ext.url == QUESTIONNAIRE_UNIT_URL and ext.valueCoding is not None:
@@ -101,11 +102,10 @@ def build_extraction_tasks(
 ) -> list[ExtractionTask]:
     """Build extraction tasks by walking the blueprint.
 
-    Uses provenance-based label lookup when available (new approach),
-    falling back to marked HTML extraction for backwards compatibility.
+    Uses provenance-based label lookup to extract content from labeled HTML.
 
     Args:
-        html: Labeled or marked HTML
+        html: Labeled HTML with data-label attributes
         blueprint: QR blueprint with item IDs and provenances in .contained
         q_items: Map of linkId -> questionnaire item
 
@@ -140,16 +140,11 @@ def build_extraction_tasks(
             item_breadcrumb = (breadcrumb or []) + [current_text]
 
             if q_item and q_item.type not in ("group", "display") and item.id:
-                # Try provenance-based extraction first (new approach)
-                content: str | None = None
+                # Extract content using provenance-based label lookup
                 label_ids = get_label_ids_from_provenance(item.id, blueprint)
-
-                if label_ids:
-                    content = extract_labeled_content(html, label_ids)
-
-                # Fallback to marked content extraction (backwards compatibility)
-                if content is None:
-                    content = extract_marked_content(html, item.id)
+                content = (
+                    extract_labeled_content(html, label_ids) if label_ids else None
+                )
 
                 if content:
                     # Collect sibling questions for disambiguation
@@ -165,7 +160,9 @@ def build_extraction_tasks(
                             options=get_coding_options(q_item),
                             unit=get_unit(q_item),
                             repeats=bool(q_item.repeats),
-                            sibling_questions=sibling_questions if sibling_questions else None,
+                            sibling_questions=sibling_questions
+                            if sibling_questions
+                            else None,
                             breadcrumb=item_breadcrumb,
                         )
                     )
@@ -187,37 +184,43 @@ def build_extraction_tasks(
     return tasks
 
 
-def update_provenance_with_reason(
-    contained: list[dict],  # type: ignore[type-arg]
-    item_id: str,
-    reason: str,
-) -> None:
-    """Update a Provenance resource in contained with extraction reasoning.
+def build_provenance_index(
+    contained: list[dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    """Build an index mapping item_id -> Provenance resource.
 
     Args:
-        contained: The contained resources list (modified in place)
-        item_id: The item ID to match in provenance targets
-        reason: The extraction reasoning to add
+        contained: The contained resources list
+
+    Returns:
+        Dict mapping item_id to its corresponding Provenance resource
     """
-    # Target element URL for matching provenance
     TARGET_ELEMENT_URL = "http://hl7.org/fhir/StructureDefinition/targetElement"
+    index: dict[str, dict[str, object]] = {}
 
     for resource in contained:
         if resource.get("resourceType") != "Provenance":
             continue
 
-        # Check if target matches item_id
         targets = resource.get("target", [])
+        if not isinstance(targets, list):
+            continue
+
         for target in targets:
+            if not isinstance(target, dict):
+                continue
             extensions = target.get("extension", [])
+            if not isinstance(extensions, list):
+                continue
             for ext in extensions:
-                if (
-                    ext.get("url") == TARGET_ELEMENT_URL
-                    and ext.get("valueUri") == item_id
+                if not isinstance(ext, dict):
+                    continue
+                if ext.get("url") == TARGET_ELEMENT_URL and isinstance(
+                    ext.get("valueUri"), str
                 ):
-                    # Found matching provenance, add the why field
-                    resource["why"] = reason
-                    return
+                    index[ext["valueUri"]] = resource
+
+    return index
 
 
 def collect_items_by_id(
@@ -272,9 +275,14 @@ def remove_empty_items(
 
         # Determine if item has content
         has_answer_value = any(
-            ans.valueCoding or ans.valueString or ans.valueBoolean is not None
-            or ans.valueDecimal is not None or ans.valueInteger is not None
-            or ans.valueDate or ans.valueDateTime or ans.valueTime
+            ans.valueCoding
+            or ans.valueString
+            or ans.valueBoolean is not None
+            or ans.valueDecimal is not None
+            or ans.valueInteger is not None
+            or ans.valueDate
+            or ans.valueDateTime
+            or ans.valueTime
             for ans in item.answer
         )
         has_children = bool(item.item) or any(ans.item for ans in item.answer)
@@ -302,8 +310,10 @@ def fill_blueprint(
     """
     # Update provenances with extraction reasoning
     contained = list(blueprint.contained) if blueprint.contained else []
+    provenance_index = build_provenance_index(contained)
     for item_id, extraction in extractions.items():
-        update_provenance_with_reason(contained, item_id, extraction.reason)
+        if item_id in provenance_index:
+            provenance_index[item_id]["why"] = extraction.reason
 
     # Build flat map of id -> item
     item_map = collect_items_by_id(blueprint.item)
@@ -320,7 +330,21 @@ def fill_blueprint(
                 if not extraction.answers:
                     # Clear the answers (item will be removed)
                     item.answer = []
-                # Otherwise keep existing structure with children
+                else:
+                    # Merge extraction values into existing answer, preserving children
+                    for existing_ans, new_ans in zip(item.answer, extraction.answers):
+                        # Copy all value fields from extraction
+                        existing_ans.valueBoolean = new_ans.valueBoolean
+                        existing_ans.valueDecimal = new_ans.valueDecimal
+                        existing_ans.valueInteger = new_ans.valueInteger
+                        existing_ans.valueDate = new_ans.valueDate
+                        existing_ans.valueDateTime = new_ans.valueDateTime
+                        existing_ans.valueTime = new_ans.valueTime
+                        existing_ans.valueString = new_ans.valueString
+                        existing_ans.valueUri = new_ans.valueUri
+                        existing_ans.valueCoding = new_ans.valueCoding
+                        existing_ans.valueReference = new_ans.valueReference
+                        # Keep existing_ans.item unchanged (preserves children)
             else:
                 # Set answer directly (empty answers = item will be removed later)
                 item.answer = extraction.answers
@@ -334,7 +358,7 @@ def fill_blueprint(
 
 
 async def populate_from_html(
-    marked_html: str,
+    labeled_html: str,
     blueprint: QuestionnaireResponse,
     q_items: Sequence[QuestionnaireItemProtocol],
     model_name: ModelName = ModelName.GEMINI_FLASH_25,
@@ -342,7 +366,7 @@ async def populate_from_html(
     """Fill blueprint with extracted answers from marked HTML.
 
     Args:
-        marked_html: HTML with <mark data-location="..."> tags
+        labeled_html: HTML with <p data-location="..."> attributes
         blueprint: QR blueprint with item IDs matching data-location
         q_items: Questionnaire items for type information
         model_name: LLM model to use for extraction
@@ -354,7 +378,7 @@ async def populate_from_html(
     item_map = build_item_map(q_items)
 
     # Build extraction tasks
-    tasks = build_extraction_tasks(marked_html, blueprint, item_map)
+    tasks = build_extraction_tasks(labeled_html, blueprint, item_map)
 
     # Run all extractions in parallel
     with logfire.span(
