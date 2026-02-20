@@ -154,20 +154,6 @@ def create_coding_model(
     Returns:
         A Pydantic model class with value constrained to the options
     """
-    if not options:
-        # Fallback to string if no options provided
-        if multi_select:
-            return create_model(
-                "MultiCodingExtraction",
-                __base__=ExtractionResult,
-                values=(list[str], Field(default=[], description="Selected options")),
-            )
-        return create_model(
-            "CodingExtraction",
-            __base__=ExtractionResult,
-            value=(str | None, Field(default=None, description="Selected option")),
-        )
-
     # Create a Literal type from the options
     OptionType = Literal[tuple(options)]  # type: ignore[valid-type]
 
@@ -344,7 +330,7 @@ async def extract_answer(
     # Handle multi-select vs single-select
     if task.repeats and task.item_type == "coding":
         # Multi-select: values is a list
-        values = getattr(result.output, "values", [])
+        values = result.output.values  # type: ignore[attr-defined]
         if not values:
             return ExtractionAnswer(item_id=task.item_id, answers=[], reason=reason)
         answers = [
@@ -355,7 +341,7 @@ async def extract_answer(
         return ExtractionAnswer(item_id=task.item_id, answers=answers, reason=reason)
     else:
         # Single value
-        value = getattr(result.output, "value", None)
+        value = result.output.value  # type: ignore[attr-defined]
         if value is None:
             return ExtractionAnswer(item_id=task.item_id, answers=[], reason=reason)
         answer = value_to_answer(task.item_type, value, task.options)
@@ -468,80 +454,3 @@ async def run_extractions(
     return {result.item_id: result for result in results}
 
 
-# =============================================================================
-# HTML Content Extraction
-# =============================================================================
-
-
-def extract_marked_content(html: str, item_id: str) -> str | None:
-    """Extract text content inside all mark tags with matching data-location.
-
-    Finds all mark tags with the given item_id and extracts their content,
-    properly handling nested marks by finding balanced closing tags.
-
-    Args:
-        html: The marked HTML
-        item_id: The item ID to match against data-location attribute
-
-    Returns:
-        The combined text content from all matching mark tags, or None if not found
-    """
-    # Find all starting positions of marks with this ID
-    start_pattern = rf'<mark\s+data-location="{re.escape(item_id)}"[^>]*>'
-    start_matches = list(re.finditer(start_pattern, html, re.IGNORECASE))
-
-    if not start_matches:
-        return None
-
-    extracted_parts = []
-
-    for start_match in start_matches:
-        content_start = start_match.end()
-
-        # Find the balanced closing </mark> by counting nesting
-        depth = 1
-        pos = content_start
-        while depth > 0 and pos < len(html):
-            next_open = html.find("<mark", pos)
-            next_close = html.find("</mark>", pos)
-
-            if next_close == -1:
-                break  # No closing tag found
-
-            if next_open != -1 and next_open < next_close:
-                # Found another opening mark before closing
-                depth += 1
-                pos = next_open + 5  # Move past "<mark"
-            else:
-                # Found closing mark
-                depth -= 1
-                if depth == 0:
-                    # This is our balanced closing tag
-                    content = html[content_start:next_close]
-                    extracted_parts.append(content)
-                pos = next_close + 7  # Move past "</mark>"
-
-    if not extracted_parts:
-        return None
-
-    # Remove nested marks and other HTML tags, then combine
-    combined_parts = []
-    for content in extracted_parts:
-        # Remove all mark tags (keeps content inside them)
-        cleaned = re.sub(r"</?mark[^>]*>", "", content)
-        # Remove other HTML tags
-        text = re.sub(r"<[^>]+>", " ", cleaned)
-        # Normalize whitespace
-        text = " ".join(text.split())
-        if text.strip():
-            combined_parts.append(text.strip())
-
-    # Deduplicate - remove parts that are substrings of other parts
-    unique_parts = []
-    for part in combined_parts:
-        is_substring = any(part != other and part in other for other in combined_parts)
-        if not is_substring:
-            unique_parts.append(part)
-
-    combined = " ".join(unique_parts)
-    return combined.strip() if combined.strip() else None
