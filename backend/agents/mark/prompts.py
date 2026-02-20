@@ -40,9 +40,20 @@ def _get_coding_options(item: QuestionnaireItemProtocol) -> list[str]:
     return options
 
 
-def _format_question_tag(item: QuestionnaireItemProtocol) -> str:
-    """Format <question> tag with type and unit attributes."""
+def _format_question_section(item: QuestionnaireItemProtocol) -> str:
+    """Format question section with type, options, and other metadata.
+
+    Includes:
+    - Question tag with type attribute
+    - Valid options for coding types
+    - Unit for quantity types
+    - Format hints for date/time types
+    - Multiple allowed indicator for repeating coding
+    """
     text = item.text or item.linkId
+    lines: list[str] = []
+
+    # Build question tag attributes
     attrs = [f'type="{item.type}"']
 
     # Add unit if present
@@ -54,7 +65,24 @@ def _format_question_tag(item: QuestionnaireItemProtocol) -> str:
     if item.type in _TYPE_FORMAT_HINTS:
         attrs.append(f'format="{_TYPE_FORMAT_HINTS[item.type]}"')
 
-    return f"<question {' '.join(attrs)}>{text}</question>"
+    lines.append(f"<question {' '.join(attrs)}>{text}</question>")
+
+    # Add valid options for coding types
+    if item.type == "coding":
+        options = _get_coding_options(item)
+        if options:
+            lines.append(f"  <valid_options>{', '.join(options)}</valid_options>")
+            # Indicate if multiple selections are allowed
+            if item.repeats:
+                lines.append("  <multiple_allowed>true</multiple_allowed>")
+
+    # Add type-specific hints for numeric types
+    if item.type == "decimal":
+        lines.append("  <value_type>decimal number (e.g., 15.5, 0.25)</value_type>")
+    elif item.type == "integer":
+        lines.append("  <value_type>whole number (e.g., 1, 42, 100)</value_type>")
+
+    return "\n  ".join(lines)
 
 
 def _format_child_hint(item: QuestionnaireItemProtocol) -> str:
@@ -128,7 +156,7 @@ def format_default_prompt(
     parent_ctx: "ParentContext | None" = None,
 ) -> str:
     """Format prompt for default strategy (single answer value)."""
-    question_tag = _format_question_tag(item)
+    question_section = _format_question_section(item)
     ctx = get_context()
 
     if item.item:
@@ -172,7 +200,7 @@ def format_default_prompt(
 
     return f"""<prompt>
   {format_global_context()}{questionnaire_section}
-  {question_tag}{nested_section}{parent_section}{siblings_section}
+  {question_section}{nested_section}{parent_section}{siblings_section}
   <instruction>{instruction} Empty list if not found.</instruction>
   <clinical_note>{html}</clinical_note>
 </prompt>"""
