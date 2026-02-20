@@ -8,5 +8,10 @@
     "id": "operatieverslag",
     "title": "operatieverslag",
     "file": "operatieverslag.json"
+  },
+  {
+    "id": "1755",
+    "title": "MR knie gestandaardiseerd verslag",
+    "file": "mr-knie.json"
   }
 ]
