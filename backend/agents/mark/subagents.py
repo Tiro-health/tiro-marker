@@ -20,7 +20,7 @@ from backend.agents.mark.prompts import (
 )
 from backend.agents.mark.qr_blueprint import MarkedItem
 from backend.agents.protocols import QuestionnaireItemProtocol
-from backend.ai_models import ModelName, create_agent
+from backend.ai_models import ModelName, create_agent, run_agent_with_retry
 from backend.models.fhir.common import Coding
 from backend.models.fhir.questionnaire_response import QuestionnaireResponseItemAnswer
 
@@ -269,7 +269,7 @@ async def default_strategy(
         prompt = format_default_prompt(item, html, siblings, parent_ctx)
 
         agent = create_agent(model_name, DefaultLabelsResponse, SYSTEM_PROMPT)
-        result = await agent.run(prompt)
+        result = await run_agent_with_retry(agent, prompt)
 
         mark = MarkResult(
             qr_id=item_id,  # Location-based ID for data-location
@@ -408,7 +408,7 @@ async def repeating_group_strategy(
     prompt = format_repeating_group_prompt(item, html)
 
     agent = create_agent(model_name, RepeatingGroupResponse, SYSTEM_PROMPT)
-    result = await agent.run(prompt)
+    result = await run_agent_with_retry(agent, prompt)
 
     extended_marks: list[ExtendedMarkResult] = []
     children: list[ChildInput] = []
@@ -503,7 +503,7 @@ async def repeating_coding_strategy(
     prompt = format_repeating_coding_prompt(item, options, html)
 
     agent = create_agent(model_name, response_model, SYSTEM_PROMPT)
-    result = await agent.run(prompt)
+    result = await run_agent_with_retry(agent, prompt)
 
     extended_marks: list[ExtendedMarkResult] = []
     children: list[ChildInput] = []
@@ -577,7 +577,6 @@ async def repeating_coding_strategy(
             # Children get an option-specific path
             # e.g., dosage -> emergency-assessment.medications.option-xxx.medication-dosage.answer
             if item.item:
-
                 # Build parent context for children of this option
                 child_parent_ctx = ParentContext(
                     linkId=item.linkId,

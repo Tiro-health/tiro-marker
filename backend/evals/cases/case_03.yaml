@@ -71,7 +71,6 @@ questionnaire:
       - numbness
       - tingling
       - weakness
-      - none
 
 expected_answers:
   # Boolean - pain present (implied from "Patient reports lower back pain")
@@ -111,8 +110,7 @@ expected_answers:
     expected:
       - "rest"
 
-  # Neurological symptoms - "none" (no radiation, numbness, tingling)
+  # Neurological symptoms - empty (no symptoms mentioned)
   - fhirpath: "item.where(linkId='neurological-symptoms').answer.valueCoding.display"
     match: set
-    expected:
-      - "none"
+    expected: []

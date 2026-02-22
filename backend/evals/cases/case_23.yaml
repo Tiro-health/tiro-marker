@@ -1,0 +1,362 @@
+name: "Complex medical terminology - HAF model comparison test"
+description: |
+  Dense clinical note with complex medical terminology, rare conditions, and specialized jargon.
+  Designed to compare Health AI Foundation (HAF) models like MedGemma against standard LLMs.
+  Tests understanding of: rare syndromes, complex pathophysiology, specialized procedures,
+  Latin/Greek medical terms, multi-system involvement, and nuanced clinical reasoning.
+
+questionnaire:
+  # === PRIMARY DIAGNOSIS ===
+  - linkId: primary-diagnosis
+    type: string
+    text: Primary diagnosis
+
+  - linkId: syndrome-inheritance
+    type: coding
+    text: Inheritance pattern of the genetic syndrome
+    answerOptions:
+      - "Autosomal dominant"
+      - "Autosomal recessive"
+      - "X-linked dominant"
+      - "X-linked recessive"
+      - "Mitochondrial"
+      - "Polygenic"
+
+  # === CARDIAC FINDINGS ===
+  - linkId: cardiac-valve-affected
+    type: coding
+    text: Primary cardiac valve affected
+    answerOptions:
+      - "Mitral valve"
+      - "Aortic valve"
+      - "Tricuspid valve"
+      - "Pulmonary valve"
+
+  - linkId: valve-pathology
+    type: coding
+    text: Type of valvular pathology
+    answerOptions:
+      - "Stenosis"
+      - "Regurgitation"
+      - "Mixed stenosis and regurgitation"
+      - "Prolapse"
+
+  - linkId: aortic-root-diameter
+    type: decimal
+    text: Aortic root diameter at sinuses of Valsalva
+    unit: cm
+
+  - linkId: aortic-root-z-score
+    type: decimal
+    text: Aortic root Z-score
+
+  - linkId: dissection-classification
+    type: coding
+    text: Stanford classification of aortic dissection
+    answerOptions:
+      - "Type A"
+      - "Type B"
+
+  # === OPHTHALMOLOGIC FINDINGS ===
+  - linkId: lens-pathology
+    type: coding
+    text: Crystalline lens pathology
+    answerOptions:
+      - "Ectopia lentis superotemporal"
+      - "Ectopia lentis inferonasal"
+      - "Ectopia lentis superior"
+      - "Microspherophakia"
+      - "Lens subluxation"
+
+  - linkId: myopia-severity
+    type: decimal
+    text: Spherical equivalent refractive error
+    unit: diopters
+
+  - linkId: retinal-finding
+    type: coding
+    text: Retinal finding
+    answerOptions:
+      - "Lattice degeneration"
+      - "Retinal detachment"
+      - "Peripheral retinal holes"
+      - "None"
+
+  # === SKELETAL FINDINGS ===
+  - linkId: arm-span-ratio
+    type: decimal
+    text: Arm span to height ratio
+
+  - linkId: us-ls-ratio
+    type: decimal
+    text: Upper segment to lower segment ratio
+
+  - linkId: wrist-sign
+    type: boolean
+    text: Walker-Murdoch (wrist) sign positive
+
+  - linkId: thumb-sign
+    type: boolean
+    text: Steinberg (thumb) sign positive
+
+  - linkId: scoliosis-angle
+    type: integer
+    text: Cobb angle of scoliosis
+    unit: degrees
+
+  - linkId: pectus-type
+    type: coding
+    text: Type of chest wall deformity
+    answerOptions:
+      - "Pectus excavatum"
+      - "Pectus carinatum"
+      - "None"
+
+  - linkId: haller-index
+    type: decimal
+    text: Haller index for pectus severity
+
+  # === PULMONARY ===
+  - linkId: pneumothorax-history
+    type: boolean
+    text: History of spontaneous pneumothorax
+
+  - linkId: dural-ectasia
+    type: boolean
+    text: Dural ectasia on MRI
+
+  # === GENETIC TESTING ===
+  - linkId: gene-mutation
+    type: string
+    text: Specific gene mutation identified
+
+  - linkId: mutation-type
+    type: coding
+    text: Type of genetic mutation
+    answerOptions:
+      - "Missense"
+      - "Nonsense"
+      - "Frameshift"
+      - "Splice site"
+      - "In-frame deletion"
+
+  - linkId: exon-location
+    type: integer
+    text: Exon number of mutation
+
+  # === SURGICAL HISTORY ===
+  - linkId: bentall-procedure
+    type: boolean
+    text: Previous Bentall procedure performed
+
+  - linkId: surgical-approach
+    type: coding
+    text: Aortic root replacement approach
+    answerOptions:
+      - "Bentall procedure (composite graft)"
+      - "David procedure (valve-sparing)"
+      - "Yacoub procedure (remodeling)"
+      - "None performed"
+
+  - linkId: prosthetic-valve-type
+    type: coding
+    text: Type of prosthetic valve
+    answerOptions:
+      - "Mechanical (bileaflet)"
+      - "Mechanical (tilting disc)"
+      - "Bioprosthetic (porcine)"
+      - "Bioprosthetic (bovine pericardial)"
+      - "Not applicable"
+
+  - linkId: target-inr
+    type: decimal
+    text: Target INR range midpoint for anticoagulation
+
+  # === MEDICATIONS ===
+  - linkId: beta-blocker
+    type: coding
+    text: Beta-blocker prescribed
+    answerOptions:
+      - "Atenolol"
+      - "Metoprolol"
+      - "Bisoprolol"
+      - "Propranolol"
+      - "Carvedilol"
+      - "None"
+
+  - linkId: arb-therapy
+    type: coding
+    text: ARB prescribed for aortic root protection
+    answerOptions:
+      - "Losartan"
+      - "Irbesartan"
+      - "Valsartan"
+      - "None"
+
+  - linkId: arb-dose
+    type: integer
+    text: ARB daily dose
+    unit: mg
+
+  # === FAMILY HISTORY ===
+  - linkId: family-sudden-death
+    type: boolean
+    text: Family history of sudden cardiac death
+
+  - linkId: affected-relatives-count
+    type: integer
+    text: Number of first-degree relatives affected
+
+  # === GHENT CRITERIA ===
+  - linkId: systemic-score
+    type: integer
+    text: Revised Ghent criteria systemic score
+
+  - linkId: meets-ghent-criteria
+    type: boolean
+    text: Meets revised Ghent diagnostic criteria
+
+expected_answers:
+  # === PRIMARY DIAGNOSIS ===
+  - fhirpath: "item.where(linkId='primary-diagnosis').answer.valueString"
+    match: llm
+    expected: "Marfan syndrome"
+    question: "What is the primary diagnosis?"
+
+  - fhirpath: "item.where(linkId='syndrome-inheritance').answer.valueCoding.display"
+    match: exact
+    expected: "Autosomal dominant"
+
+  # === CARDIAC FINDINGS ===
+  - fhirpath: "item.where(linkId='cardiac-valve-affected').answer.valueCoding.display"
+    match: exact
+    expected: "Mitral valve"
+
+  - fhirpath: "item.where(linkId='valve-pathology').answer.valueCoding.display"
+    match: exact
+    expected: "Prolapse"
+
+  - fhirpath: "item.where(linkId='aortic-root-diameter').answer.valueDecimal"
+    match: exact
+    expected: 4.8
+
+  - fhirpath: "item.where(linkId='aortic-root-z-score').answer.valueDecimal"
+    match: exact
+    expected: 3.2
+
+  - fhirpath: "item.where(linkId='dissection-classification').answer.count()"
+    match: exact
+    expected: 0
+
+  # === OPHTHALMOLOGIC FINDINGS ===
+  - fhirpath: "item.where(linkId='lens-pathology').answer.valueCoding.display"
+    match: exact
+    expected: "Ectopia lentis superotemporal"
+
+  - fhirpath: "item.where(linkId='myopia-severity').answer.valueDecimal"
+    match: exact
+    expected: -8.5
+
+  - fhirpath: "item.where(linkId='retinal-finding').answer.valueCoding.display"
+    match: exact
+    expected: "Lattice degeneration"
+
+  # === SKELETAL FINDINGS ===
+  - fhirpath: "item.where(linkId='arm-span-ratio').answer.valueDecimal"
+    match: exact
+    expected: 1.08
+
+  - fhirpath: "item.where(linkId='us-ls-ratio').answer.valueDecimal"
+    match: exact
+    expected: 0.82
+
+  - fhirpath: "item.where(linkId='wrist-sign').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  - fhirpath: "item.where(linkId='thumb-sign').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  - fhirpath: "item.where(linkId='scoliosis-angle').answer.valueInteger"
+    match: exact
+    expected: 28
+
+  - fhirpath: "item.where(linkId='pectus-type').answer.valueCoding.display"
+    match: exact
+    expected: "Pectus excavatum"
+
+  - fhirpath: "item.where(linkId='haller-index').answer.valueDecimal"
+    match: exact
+    expected: 3.8
+
+  # === PULMONARY ===
+  - fhirpath: "item.where(linkId='pneumothorax-history').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  - fhirpath: "item.where(linkId='dural-ectasia').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  # === GENETIC TESTING ===
+  - fhirpath: "item.where(linkId='gene-mutation').answer.valueString"
+    match: llm
+    expected: "FBN1 c.4082G>A (p.Cys1361Tyr)"
+    question: "What is the specific gene mutation identified?"
+
+  - fhirpath: "item.where(linkId='mutation-type').answer.valueCoding.display"
+    match: exact
+    expected: "Missense"
+
+  - fhirpath: "item.where(linkId='exon-location').answer.valueInteger"
+    match: exact
+    expected: 33
+
+  # === SURGICAL HISTORY ===
+  - fhirpath: "item.where(linkId='bentall-procedure').answer.valueBoolean"
+    match: exact
+    expected: false
+
+  - fhirpath: "item.where(linkId='surgical-approach').answer.valueCoding.display"
+    match: exact
+    expected: "None performed"
+
+  - fhirpath: "item.where(linkId='prosthetic-valve-type').answer.valueCoding.display"
+    match: exact
+    expected: "Not applicable"
+
+  - fhirpath: "item.where(linkId='target-inr').answer.count()"
+    match: exact
+    expected: 0
+
+  # === MEDICATIONS ===
+  - fhirpath: "item.where(linkId='beta-blocker').answer.valueCoding.display"
+    match: exact
+    expected: "Atenolol"
+
+  - fhirpath: "item.where(linkId='arb-therapy').answer.valueCoding.display"
+    match: exact
+    expected: "Losartan"
+
+  - fhirpath: "item.where(linkId='arb-dose').answer.valueInteger"
+    match: exact
+    expected: 100
+
+  # === FAMILY HISTORY ===
+  - fhirpath: "item.where(linkId='family-sudden-death').answer.valueBoolean"
+    match: exact
+    expected: true
+
+  - fhirpath: "item.where(linkId='affected-relatives-count').answer.valueInteger"
+    match: exact
+    expected: 3
+
+  # === GHENT CRITERIA ===
+  - fhirpath: "item.where(linkId='systemic-score').answer.valueInteger"
+    match: exact
+    expected: 9
+
+  - fhirpath: "item.where(linkId='meets-ghent-criteria').answer.valueBoolean"
+    match: exact
+    expected: true

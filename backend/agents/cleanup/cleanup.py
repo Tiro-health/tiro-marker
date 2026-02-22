@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from backend.ai_models import ModelName, create_agent
+from backend.ai_models import ModelName, create_agent, run_agent_with_retry
 from backend.agents.cleanup.prompts import SYSTEM_PROMPT, format_cleanup_prompt
 from backend.config import settings
 from backend.speech.medasr import TranscribeResult
@@ -36,7 +36,7 @@ async def cleanup_transcription(
 
     # Run cleanup
     prompt = format_cleanup_prompt(result.text)
-    cleanup_result = await agent.run(prompt)
+    cleanup_result = await run_agent_with_retry(agent, prompt)
 
     return TranscribeResult(
         text=cleanup_result.output.text,

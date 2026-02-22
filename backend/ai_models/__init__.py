@@ -4,6 +4,8 @@ from backend.ai_models.llm import (
     ModelName,
     create_agent,
     get_model,
+    network_retry,
+    run_agent_with_retry,
 )
 from backend.ai_models.medgemma import MedGemmaModel
 
@@ -12,4 +14,6 @@ __all__ = [
     "ModelName",
     "create_agent",
     "get_model",
+    "network_retry",
+    "run_agent_with_retry",
 ]

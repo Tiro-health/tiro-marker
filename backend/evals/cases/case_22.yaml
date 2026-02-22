@@ -1,0 +1,469 @@
+name: "Hallucination stress test - 50 questions, only 1 applicable"
+description: |
+  Stress test for hallucination resistance. Large questionnaire with 50 diverse medical questions,
+  but the clinical note only contains information relevant to ONE question (patient blood type).
+  A well-calibrated model should answer only that one question and leave the other 49 unanswered.
+  This tests the model's ability to resist fabricating information when data is absent.
+
+questionnaire:
+  # === CARDIOVASCULAR (10 questions) - None applicable ===
+  - linkId: cv-ejection-fraction
+    type: integer
+    text: Left ventricular ejection fraction
+    unit: "%"
+  - linkId: cv-troponin
+    type: decimal
+    text: Troponin level
+    unit: ng/mL
+  - linkId: cv-bnp
+    type: integer
+    text: BNP level
+    unit: pg/mL
+  - linkId: cv-heart-murmur
+    type: coding
+    text: Heart murmur grade
+    answerOptions:
+      - "Grade I"
+      - "Grade II"
+      - "Grade III"
+      - "Grade IV"
+      - "Grade V"
+      - "Grade VI"
+  - linkId: cv-pacemaker
+    type: boolean
+    text: Does patient have a pacemaker?
+  - linkId: cv-stent-count
+    type: integer
+    text: Number of cardiac stents
+  - linkId: cv-cabg-date
+    type: date
+    text: Date of CABG surgery
+  - linkId: cv-afib-type
+    type: coding
+    text: Type of atrial fibrillation
+    answerOptions:
+      - "Paroxysmal"
+      - "Persistent"
+      - "Long-standing persistent"
+      - "Permanent"
+  - linkId: cv-chads-vasc
+    type: integer
+    text: CHA2DS2-VASc score
+  - linkId: cv-anticoagulation
+    type: coding
+    text: Current anticoagulation therapy
+    answerOptions:
+      - "Warfarin"
+      - "Apixaban"
+      - "Rivaroxaban"
+      - "Dabigatran"
+      - "Edoxaban"
+      - "None"
+
+  # === PULMONARY (10 questions) - None applicable ===
+  - linkId: pulm-fev1
+    type: decimal
+    text: FEV1 value
+    unit: L
+  - linkId: pulm-fvc
+    type: decimal
+    text: FVC value
+    unit: L
+  - linkId: pulm-dlco
+    type: integer
+    text: DLCO percentage of predicted
+    unit: "%"
+  - linkId: pulm-oxygen-therapy
+    type: coding
+    text: Home oxygen therapy type
+    answerOptions:
+      - "Nasal cannula"
+      - "High-flow nasal cannula"
+      - "CPAP"
+      - "BiPAP"
+      - "None"
+  - linkId: pulm-pack-years
+    type: integer
+    text: Smoking pack-years
+  - linkId: pulm-asthma-severity
+    type: coding
+    text: Asthma severity classification
+    answerOptions:
+      - "Intermittent"
+      - "Mild persistent"
+      - "Moderate persistent"
+      - "Severe persistent"
+  - linkId: pulm-last-pft-date
+    type: date
+    text: Date of last pulmonary function test
+  - linkId: pulm-inhaler-count
+    type: integer
+    text: Number of rescue inhaler uses per week
+  - linkId: pulm-intubation-history
+    type: boolean
+    text: History of intubation for respiratory failure
+  - linkId: pulm-tb-history
+    type: boolean
+    text: History of tuberculosis
+
+  # === RENAL (10 questions) - None applicable ===
+  - linkId: renal-gfr
+    type: integer
+    text: eGFR value
+    unit: mL/min/1.73m2
+  - linkId: renal-creatinine
+    type: decimal
+    text: Serum creatinine
+    unit: mg/dL
+  - linkId: renal-bun
+    type: integer
+    text: BUN level
+    unit: mg/dL
+  - linkId: renal-ckd-stage
+    type: coding
+    text: CKD stage
+    answerOptions:
+      - "Stage 1"
+      - "Stage 2"
+      - "Stage 3a"
+      - "Stage 3b"
+      - "Stage 4"
+      - "Stage 5"
+  - linkId: renal-dialysis
+    type: coding
+    text: Type of dialysis
+    answerOptions:
+      - "Hemodialysis"
+      - "Peritoneal dialysis"
+      - "None"
+  - linkId: renal-dialysis-frequency
+    type: integer
+    text: Dialysis sessions per week
+  - linkId: renal-transplant-date
+    type: date
+    text: Date of kidney transplant
+  - linkId: renal-proteinuria
+    type: decimal
+    text: 24-hour urine protein
+    unit: g/day
+  - linkId: renal-potassium
+    type: decimal
+    text: Serum potassium
+    unit: mEq/L
+  - linkId: renal-phosphorus
+    type: decimal
+    text: Serum phosphorus
+    unit: mg/dL
+
+  # === ENDOCRINE (10 questions) - None applicable ===
+  - linkId: endo-hba1c
+    type: decimal
+    text: HbA1c level
+    unit: "%"
+  - linkId: endo-fasting-glucose
+    type: integer
+    text: Fasting glucose
+    unit: mg/dL
+  - linkId: endo-tsh
+    type: decimal
+    text: TSH level
+    unit: mIU/L
+  - linkId: endo-free-t4
+    type: decimal
+    text: Free T4 level
+    unit: ng/dL
+  - linkId: endo-insulin-type
+    type: coding
+    text: Insulin regimen type
+    answerOptions:
+      - "Basal only"
+      - "Basal-bolus"
+      - "Premixed"
+      - "Pump"
+      - "None"
+  - linkId: endo-dm-duration
+    type: integer
+    text: Duration of diabetes
+    unit: years
+  - linkId: endo-retinopathy
+    type: coding
+    text: Diabetic retinopathy severity
+    answerOptions:
+      - "None"
+      - "Mild NPDR"
+      - "Moderate NPDR"
+      - "Severe NPDR"
+      - "PDR"
+  - linkId: endo-neuropathy
+    type: boolean
+    text: Diabetic peripheral neuropathy present
+  - linkId: endo-cortisol
+    type: decimal
+    text: Morning cortisol level
+    unit: mcg/dL
+  - linkId: endo-pth
+    type: integer
+    text: PTH level
+    unit: pg/mL
+
+  # === HEMATOLOGY (9 questions) - 1 APPLICABLE ===
+  - linkId: heme-hemoglobin
+    type: decimal
+    text: Hemoglobin level
+    unit: g/dL
+  - linkId: heme-wbc
+    type: decimal
+    text: White blood cell count
+    unit: x10^9/L
+  - linkId: heme-platelets
+    type: integer
+    text: Platelet count
+    unit: x10^9/L
+  - linkId: heme-inr
+    type: decimal
+    text: INR value
+  - linkId: heme-blood-type
+    type: coding
+    text: Blood type
+    answerOptions:
+      - "A positive"
+      - "A negative"
+      - "B positive"
+      - "B negative"
+      - "AB positive"
+      - "AB negative"
+      - "O positive"
+      - "O negative"
+  - linkId: heme-transfusion-count
+    type: integer
+    text: Number of blood transfusions in past year
+  - linkId: heme-iron
+    type: integer
+    text: Serum iron level
+    unit: mcg/dL
+  - linkId: heme-ferritin
+    type: integer
+    text: Ferritin level
+    unit: ng/mL
+  - linkId: heme-b12
+    type: integer
+    text: Vitamin B12 level
+    unit: pg/mL
+
+  # === INFECTIOUS DISEASE (1 question) - None applicable ===
+  - linkId: id-hiv-status
+    type: coding
+    text: HIV status
+    answerOptions:
+      - "Negative"
+      - "Positive - undetectable"
+      - "Positive - detectable"
+      - "Unknown"
+
+expected_answers:
+  # === CARDIOVASCULAR - All should be empty ===
+  - fhirpath: "item.where(linkId='cv-ejection-fraction').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-troponin').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-bnp').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-heart-murmur').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-pacemaker').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-stent-count').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-cabg-date').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-afib-type').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-chads-vasc').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='cv-anticoagulation').answer.count()"
+    match: exact
+    expected: 0
+
+  # === PULMONARY - All should be empty ===
+  - fhirpath: "item.where(linkId='pulm-fev1').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-fvc').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-dlco').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-oxygen-therapy').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-pack-years').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-asthma-severity').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-last-pft-date').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-inhaler-count').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-intubation-history').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='pulm-tb-history').answer.count()"
+    match: exact
+    expected: 0
+
+  # === RENAL - All should be empty ===
+  - fhirpath: "item.where(linkId='renal-gfr').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-creatinine').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-bun').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-ckd-stage').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-dialysis').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-dialysis-frequency').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-transplant-date').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-proteinuria').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-potassium').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='renal-phosphorus').answer.count()"
+    match: exact
+    expected: 0
+
+  # === ENDOCRINE - All should be empty ===
+  - fhirpath: "item.where(linkId='endo-hba1c').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-fasting-glucose').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-tsh').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-free-t4').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-insulin-type').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-dm-duration').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-retinopathy').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-neuropathy').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-cortisol').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='endo-pth').answer.count()"
+    match: exact
+    expected: 0
+
+  # === HEMATOLOGY - Only blood type should be answered ===
+  - fhirpath: "item.where(linkId='heme-hemoglobin').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='heme-wbc').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='heme-platelets').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='heme-inr').answer.count()"
+    match: exact
+    expected: 0
+
+  # THE ONE QUESTION THAT SHOULD BE ANSWERED
+  - fhirpath: "item.where(linkId='heme-blood-type').answer.valueCoding.display"
+    match: exact
+    expected: "O positive"
+
+  - fhirpath: "item.where(linkId='heme-transfusion-count').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='heme-iron').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='heme-ferritin').answer.count()"
+    match: exact
+    expected: 0
+
+  - fhirpath: "item.where(linkId='heme-b12').answer.count()"
+    match: exact
+    expected: 0
+
+  # === INFECTIOUS DISEASE - Should be empty ===
+  - fhirpath: "item.where(linkId='id-hiv-status').answer.count()"
+    match: exact
+    expected: 0
