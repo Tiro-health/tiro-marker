@@ -322,29 +322,42 @@ def fill_blueprint(
     for item_id, extraction in extractions.items():
         if item_id in item_map:
             item = item_map[item_id]
-            # Check if existing answers have children (repeating coding items)
+            # Check if existing answers have children (nested items under answers)
             has_children_in_answers = any(ans.item for ans in item.answer)
             if has_children_in_answers:
-                # Don't replace - children would be lost
-                # Check if extraction rejected this item
-                if not extraction.answers:
-                    # Clear the answers (item will be removed)
-                    item.answer = []
+                if extraction.answers:
+                    # Check if this is a repeating coding item (answers have valueCoding)
+                    is_repeating_coding = any(ans.valueCoding for ans in item.answer)
+
+                    if is_repeating_coding:
+                        # Filter blueprint answers to only keep confirmed codings
+                        confirmed_codings: set[str] = set()
+                        for ans in extraction.answers:
+                            if ans.valueCoding and ans.valueCoding.display:
+                                confirmed_codings.add(ans.valueCoding.display)
+
+                        item.answer = [
+                            ans
+                            for ans in item.answer
+                            if ans.valueCoding
+                            and ans.valueCoding.display in confirmed_codings
+                        ]
+                    else:
+                        # Non-coding with children: merge values (preserving children)
+                        for existing_ans, new_ans in zip(item.answer, extraction.answers):
+                            existing_ans.valueBoolean = new_ans.valueBoolean
+                            existing_ans.valueDecimal = new_ans.valueDecimal
+                            existing_ans.valueInteger = new_ans.valueInteger
+                            existing_ans.valueDate = new_ans.valueDate
+                            existing_ans.valueDateTime = new_ans.valueDateTime
+                            existing_ans.valueTime = new_ans.valueTime
+                            existing_ans.valueString = new_ans.valueString
+                            existing_ans.valueUri = new_ans.valueUri
+                            existing_ans.valueCoding = new_ans.valueCoding
+                            existing_ans.valueReference = new_ans.valueReference
                 else:
-                    # Merge extraction values into existing answer, preserving children
-                    for existing_ans, new_ans in zip(item.answer, extraction.answers):
-                        # Copy all value fields from extraction
-                        existing_ans.valueBoolean = new_ans.valueBoolean
-                        existing_ans.valueDecimal = new_ans.valueDecimal
-                        existing_ans.valueInteger = new_ans.valueInteger
-                        existing_ans.valueDate = new_ans.valueDate
-                        existing_ans.valueDateTime = new_ans.valueDateTime
-                        existing_ans.valueTime = new_ans.valueTime
-                        existing_ans.valueString = new_ans.valueString
-                        existing_ans.valueUri = new_ans.valueUri
-                        existing_ans.valueCoding = new_ans.valueCoding
-                        existing_ans.valueReference = new_ans.valueReference
-                        # Keep existing_ans.item unchanged (preserves children)
+                    # Extraction returned empty = none confirmed, clear all
+                    item.answer = []
             else:
                 # Set answer directly (empty answers = item will be removed later)
                 item.answer = extraction.answers

@@ -4,7 +4,6 @@ import pytest
 
 from backend.agents.populate.extraction import (
     extract_labeled_content,
-    extract_marked_content,
     get_label_ids_from_provenance,
 )
 from backend.models.fhir.extensions import HTML_ELEMENT_ID_URL
@@ -203,21 +202,3 @@ class TestExtractLabeledContent:
         assert result == "Same content."
 
 
-class TestExtractMarkedContent:
-    """Tests for backwards-compatible marked content extraction."""
-
-    def test_extracts_marked_content(self) -> None:
-        """Test extracting content from mark tags."""
-        html = '<mark data-location="item-1">Some marked text.</mark>'
-
-        result = extract_marked_content(html, "item-1")
-
-        assert result == "Some marked text."
-
-    def test_returns_none_for_missing_mark(self) -> None:
-        """Test that missing mark returns None."""
-        html = '<mark data-location="item-1">Some text.</mark>'
-
-        result = extract_marked_content(html, "item-999")
-
-        assert result is None

@@ -9,7 +9,7 @@ import logfire
 from pydantic import BaseModel, Field, create_model
 
 from backend.agents.populate.prompts import SYSTEM_PROMPT, format_extraction_prompt
-from backend.ai_models import ModelName, create_agent
+from backend.ai_models import ModelName, create_agent, run_agent_with_retry
 from backend.models.fhir.common import Coding
 from backend.models.fhir.extensions import HTML_ELEMENT_ID_URL
 from backend.models.fhir.questionnaire_response import (
@@ -319,7 +319,7 @@ async def extract_answer(
     # Create and run the agent
     agent = create_agent(model_name, output_model, SYSTEM_PROMPT)
     with logfire.span("Extract: {text}", text=task.text or task.linkId):
-        result = await agent.run(prompt)
+        result = await run_agent_with_retry(agent, prompt)
 
     reason = result.output.reason
 

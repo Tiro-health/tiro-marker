@@ -14,8 +14,9 @@ questionnaire:
             type: string
             text: Severity
           - linkId: duration
-            type: string
+            type: decimal
             text: Duration
+            unit: hours
           - linkId: treatment
             type: string
             text: Treatment given
@@ -32,9 +33,9 @@ expected_answers:
     expected: "8 out of 10"
 
   # Nested: visit-info (group) > primary-symptom (string) > duration (via answer.item)
-  - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.item.where(linkId='duration').answer.valueString"
-    match: llm
-    expected: "3 hours"
+  - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.item.where(linkId='duration').answer.valueDecimal"
+    match: exact
+    expected: 3
 
   # Nested: visit-info (group) > primary-symptom (string) > treatment (via answer.item)
   - fhirpath: "item.where(linkId='visit-info').item.where(linkId='primary-symptom').answer.item.where(linkId='treatment').answer.valueString"
