@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, create_model
 
 from backend.agents.mark.labeling import extract_html_for_labels, get_root_labels
 from backend.agents.mark.prompts import (
+    MEDGEMMA_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     format_default_prompt,
     format_repeating_coding_prompt,
@@ -23,6 +24,13 @@ from backend.agents.protocols import QuestionnaireItemProtocol
 from backend.ai_models import ModelName, create_agent, run_agent_with_retry
 from backend.models.fhir.common import Coding
 from backend.models.fhir.questionnaire_response import QuestionnaireResponseItemAnswer
+
+
+def get_system_prompt(model_name: ModelName) -> str:
+    """Get the appropriate system prompt for the model."""
+    if model_name == ModelName.MEDGEMMA:
+        return MEDGEMMA_SYSTEM_PROMPT
+    return SYSTEM_PROMPT
 
 
 @dataclass
@@ -268,13 +276,18 @@ async def default_strategy(
     if item.type not in ("group", "display"):
         prompt = format_default_prompt(item, html, siblings, parent_ctx)
 
-        agent = create_agent(model_name, DefaultLabelsResponse, SYSTEM_PROMPT)
-        result = await run_agent_with_retry(agent, prompt)
+        agent = create_agent(model_name, DefaultLabelsResponse, get_system_prompt(model_name))
+        try:
+            result = await run_agent_with_retry(agent, prompt)
+            labels = result.output.labels
+        except Exception:
+            # Graceful degradation: return empty labels on agent failure
+            labels = []
 
         mark = MarkResult(
             qr_id=item_id,  # Location-based ID for data-location
             frontend_location=f"{location}.answer",  # Hierarchical path for form linking
-            labels=result.output.labels,
+            labels=labels,
         )
         marked_item = MarkedItem(
             item_id=item_id,
@@ -407,8 +420,13 @@ async def repeating_group_strategy(
     """Repeating group: LLM detects instances, marks each."""
     prompt = format_repeating_group_prompt(item, html)
 
-    agent = create_agent(model_name, RepeatingGroupResponse, SYSTEM_PROMPT)
-    result = await run_agent_with_retry(agent, prompt)
+    agent = create_agent(model_name, RepeatingGroupResponse, get_system_prompt(model_name))
+    try:
+        result = await run_agent_with_retry(agent, prompt)
+        instances = result.output.instances
+    except Exception:
+        # Graceful degradation: return empty instances on agent failure
+        instances = []
 
     extended_marks: list[ExtendedMarkResult] = []
     children: list[ChildInput] = []
@@ -418,7 +436,7 @@ async def repeating_group_strategy(
     parent_breadcrumb = parent_ctx.breadcrumb if parent_ctx else None
     child_breadcrumb = (parent_breadcrumb or []) + [current_text]
 
-    for i, instance in enumerate(result.output.instances):
+    for i, instance in enumerate(instances):
         instance_location = f"{location}.{i}"
         # Use location string as ID (matches frontend ID generation)
         item_id = instance_location
@@ -502,8 +520,13 @@ async def repeating_coding_strategy(
 
     prompt = format_repeating_coding_prompt(item, options, html)
 
-    agent = create_agent(model_name, response_model, SYSTEM_PROMPT)
-    result = await run_agent_with_retry(agent, prompt)
+    agent = create_agent(model_name, response_model, get_system_prompt(model_name))
+    try:
+        result = await run_agent_with_retry(agent, prompt)
+        result_output = result.output
+    except Exception:
+        # Graceful degradation: return empty response model on agent failure
+        result_output = response_model()
 
     extended_marks: list[ExtendedMarkResult] = []
     children: list[ChildInput] = []
@@ -517,7 +540,7 @@ async def repeating_coding_strategy(
     option_index = 0
 
     for field_name, code in field_to_code.items():
-        labels = getattr(result.output, field_name, [])
+        labels = getattr(result_output, field_name, [])
         if labels:
             # Parse code into system|code if it contains a pipe
             code_parts = code.split("|", 1)
