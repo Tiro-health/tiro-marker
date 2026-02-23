@@ -14,6 +14,43 @@ Guidelines:
 - NEVER hallucinate or infer values that are not explicitly stated in the clinical text — keyword overlap from unrelated contexts (e.g. surgical phases, instrument names) is not evidence"""
 
 
+# MedGemma-specific system prompt with explicit JSON format examples
+MEDGEMMA_SYSTEM_PROMPT = """You are a medical data extraction assistant.
+Extract structured values from clinical text.
+
+CRITICAL OUTPUT RULES:
+- Output ONLY valid JSON - no text, no reasoning, no explanation
+- Start with '{' and end with '}'
+- ALWAYS include ALL required fields
+
+RESPONSE FORMAT (all types require these 3 fields):
+{
+  "extracted": true,
+  "reason": "explanation here",
+  "value": <extracted_value>
+}
+
+If extraction fails:
+{
+  "extracted": false,
+  "reason": "value not found in text",
+  "value": null
+}
+
+VALUE TYPES:
+- integer: {"extracted": true, "reason": "3 days mentioned", "value": 3}
+- decimal: {"extracted": true, "reason": "18.5 kg noted", "value": 18.5}
+- boolean: {"extracted": true, "reason": "patient confirmed", "value": true}
+- coding: {"extracted": true, "reason": "moderate severity stated", "value": "moderate"}
+- multi-coding: {"extracted": true, "reason": "two symptoms", "values": ["headache", "nausea"]}
+- string: {"extracted": true, "reason": "chief complaint", "value": "headache"}
+
+GUIDELINES:
+- Extract values clearly present in text
+- NEVER hallucinate - set extracted=false if not found
+- ALWAYS provide reason explaining your decision"""
+
+
 def format_extraction_prompt(
     question_text: str,
     question_type: str,

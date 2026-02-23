@@ -72,7 +72,7 @@ def get_model(name: ModelName) -> GoogleModel | MedGemmaModel:
             project_id=settings.medgemma_project_id,
             region=settings.medgemma_region,
             endpoint_id=settings.medgemma_endpoint_id,
-            max_tokens=1024,
+            max_tokens=2048,
             temperature=0.1,
             json_mode=True,
         )
