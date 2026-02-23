@@ -6,8 +6,8 @@ AI-powered FHIR Questionnaire filling assistant. Entry for the [MedGemma Impact 
 
 Extracts structured data from clinical notes to fill FHIR Questionnaires:
 
-1. **Marking Agent** - Annotates relevant text spans with `<mark>` tags
-2. **Populate Agent** - Extracts values to generate FHIR QuestionnaireResponses
+1. **Marking Agent** - Annotates relevant text spans by highligting them
+2. **Populate Agent** - Extracts values from highlights to generate FHIR QuestionnaireResponses
 
 ## Quick Start
 
