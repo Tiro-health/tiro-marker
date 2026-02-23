@@ -5,6 +5,11 @@
     "file": "emergency-assessment.json"
   },
   {
+    "id": "diabetes-blood-pressure",
+    "title": "Blood Pressure Control in Diabetic Patients",
+    "file": "diabetes-blood-pressure.json"
+  },
+  {
     "id": "operatieverslag",
     "title": "operatieverslag",
     "file": "operatieverslag.json"
