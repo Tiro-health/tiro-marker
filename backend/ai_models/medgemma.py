@@ -40,7 +40,7 @@ class MedGemmaModel(Model):
         endpoint_id: str,
         max_tokens: int = 1024,
         temperature: float = 0.2,
-        json_mode: bool = False,
+        json_mode: bool = True,
     ) -> None:
         self.endpoint_host = endpoint_host
         self.project_id = project_id
@@ -73,7 +73,6 @@ class MedGemmaModel(Model):
         """Format PydanticAI messages into chatCompletions format."""
         formatted: list[dict[str, str]] = []
         system_prompt = ""
-
         for message in messages:
             if isinstance(message, ModelRequest):
                 if message.instructions:
@@ -97,25 +96,73 @@ class MedGemmaModel(Model):
 
         if system_prompt:
             if self.json_mode:
-                system_prompt = f"{system_prompt}\n\nRespond with valid JSON only."
+                system_prompt = (
+                    f"{system_prompt}\n\n"
+                    "CRITICAL: Output ONLY valid JSON. "
+                    "Do NOT output any reasoning, thoughts, explanations, or text. "
+                    "Your response must START with '{' and END with '}'. "
+                    "No text before or after the JSON object."
+                )
             formatted.insert(0, {"role": "system", "content": system_prompt})
         elif self.json_mode:
             formatted.insert(
-                0, {"role": "system", "content": "Respond with valid JSON only."}
+                0,
+                {
+                    "role": "system",
+                    "content": (
+                        "CRITICAL: Output ONLY valid JSON. "
+                        "Do NOT output any reasoning, thoughts, explanations, or text. "
+                        "Your response must START with '{' and END with '}'. "
+                        "No text before or after the JSON object."
+                    ),
+                },
             )
+
+        # DEBUG: Log what system prompt is being used
+        system_msg = next((m for m in formatted if m.get("role") == "system"), None)
+        if system_msg:
+            print(f"[MedGemma] System prompt length: {len(system_msg['content'])}")
+            print(
+                f"[MedGemma] Has JSON instruction: {'CRITICAL' in system_msg['content']}"
+            )
+        else:
+            print("[MedGemma] WARNING: No system prompt found!")
 
         return formatted
 
     def _extract_json(self, text: str) -> str:
-        """Extract JSON object from model response."""
-        json_objects = re.findall(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text, re.DOTALL)
+        """Extract JSON object from model response, stripping any preamble."""
+        # Strip any text before the first '{' (handles thought/reasoning blocks)
+        json_start = text.find("{")
+        if json_start == -1:
+            return text  # No JSON found
 
+        potential_json = text[json_start:]
+
+        # Try to parse progressively shorter strings until valid JSON found
+        # This handles truncation by finding the longest valid JSON
+        for end_pos in range(len(potential_json), 0, -1):
+            candidate = potential_json[:end_pos]
+            try:
+                parsed = json.loads(candidate)
+                # Skip placeholder values
+                if isinstance(parsed, dict):
+                    has_placeholder = any(
+                        v == "..." for v in parsed.values() if isinstance(v, str)
+                    )
+                    if has_placeholder:
+                        continue
+                return candidate
+            except json.JSONDecodeError:
+                continue
+
+        # Fallback: try original regex approach for edge cases
+        json_objects = re.findall(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text, re.DOTALL)
         for json_str in json_objects:
             try:
-                parsed: dict[str, Any] = json.loads(json_str)
-                # Skip placeholder values
+                parsed_fallback: dict[str, Any] = json.loads(json_str)
                 has_placeholder = any(
-                    v == "..." for v in parsed.values() if isinstance(v, str)
+                    v == "..." for v in parsed_fallback.values() if isinstance(v, str)
                 )
                 if not has_placeholder:
                     return json_str

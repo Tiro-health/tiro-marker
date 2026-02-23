@@ -776,6 +776,10 @@ async function handlePopulateWithResult(markResult, questionnaire = null) {
     // Store the response for provenance lookups (SDK strips custom fields like 'why')
     setPopulateResponse(questionnaireResponse);
 
+    // Reset first to clear dirty fields, then set new response
+    if (typeof clinicalForm.reset === 'function') {
+      clinicalForm.reset();
+    }
     if (typeof clinicalForm.setResponse === 'function') {
       await clinicalForm.setResponse(questionnaireResponse);
     } else {

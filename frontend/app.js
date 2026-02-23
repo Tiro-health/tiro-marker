@@ -108,6 +108,10 @@ async function handlePopulate() {
 
     // Set the response on the form
     if (clinicalForm) {
+      // Reset first to clear dirty fields, then set new response
+      if (typeof clinicalForm.reset === "function") {
+        clinicalForm.reset();
+      }
       if (typeof clinicalForm.setResponse === "function") {
         await clinicalForm.setResponse(questionnaireResponse);
       } else {

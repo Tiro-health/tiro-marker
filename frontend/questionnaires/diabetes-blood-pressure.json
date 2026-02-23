@@ -1,0 +1,141 @@
+{
+    "resourceType": "Questionnaire",
+    "url": "http://example.org/Questionnaire/diabetes-blood-pressure",
+    "status": "draft",
+    "title": "Blood Pressure Control in Diabetic Patients",
+    "item": [
+        {
+            "linkId": "diabetes-bp-group",
+            "type": "group",
+            "text": "Blood Pressure Control in Diabetic Patients",
+            "extension": [
+                {
+                    "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                    "valueCodeableConcept": {
+                        "coding": [
+                            {
+                                "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                "code": "block"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "item": [
+                {
+                    "linkId": "diabetes-diagnosed",
+                    "type": "coding",
+                    "text": "Diabetes diagnosed",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "yes",
+                                "display": "Yes"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "no",
+                                "display": "No"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "systolic-bp",
+                    "type": "decimal",
+                    "text": "Systolic blood pressure",
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                            "valueCoding": {
+                                "system": "http://unitsofmeasure.org",
+                                "code": "mm[Hg]",
+                                "display": "mmHg"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "diastolic-bp",
+                    "type": "decimal",
+                    "text": "Diastolic blood pressure",
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                            "valueCoding": {
+                                "system": "http://unitsofmeasure.org",
+                                "code": "mm[Hg]",
+                                "display": "mmHg"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "antihypertensive-prescribed",
+                    "type": "coding",
+                    "text": "Antihypertensive medication prescribed",
+                    "answerOption": [
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "yes",
+                                "display": "Yes"
+                            }
+                        },
+                        {
+                            "valueCoding": {
+                                "system": "http://example.org/cs/yesno",
+                                "code": "no",
+                                "display": "No"
+                            }
+                        }
+                    ],
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+                            "valueCodeableConcept": {
+                                "coding": [
+                                    {
+                                        "system": "http://fhir.tiro.health/CodeSystem/tiro-questionnaire-item-control",
+                                        "code": "chips"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "linkId": "hba1c",
+                    "type": "decimal",
+                    "text": "Most recent HbA1c",
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+                            "valueCoding": {
+                                "system": "http://unitsofmeasure.org",
+                                "code": "%",
+                                "display": "%"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

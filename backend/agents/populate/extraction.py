@@ -8,8 +8,12 @@ from typing import Any, Literal
 import logfire
 from pydantic import BaseModel, Field, create_model
 
-from backend.agents.populate.prompts import SYSTEM_PROMPT, format_extraction_prompt
-from backend.ai_models import ModelName, create_agent
+from backend.agents.populate.prompts import (
+    MEDGEMMA_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    format_extraction_prompt,
+)
+from backend.ai_models import ModelName, create_agent, run_agent_with_retry
 from backend.models.fhir.common import Coding
 from backend.models.fhir.extensions import HTML_ELEMENT_ID_URL
 from backend.models.fhir.questionnaire_response import (
@@ -19,6 +23,13 @@ from backend.models.fhir.questionnaire_response import (
 
 # Target element URL for provenance (same as in mark.py)
 TARGET_ELEMENT_URL = "http://hl7.org/fhir/StructureDefinition/targetElement"
+
+
+def get_system_prompt(model_name: ModelName) -> str:
+    """Get the appropriate system prompt for the model."""
+    if model_name == ModelName.MEDGEMMA:
+        return MEDGEMMA_SYSTEM_PROMPT
+    return SYSTEM_PROMPT
 
 
 # =============================================================================
@@ -317,9 +328,17 @@ async def extract_answer(
     )
 
     # Create and run the agent
-    agent = create_agent(model_name, output_model, SYSTEM_PROMPT)
-    with logfire.span("Extract: {text}", text=task.text or task.linkId):
-        result = await agent.run(prompt)
+    agent = create_agent(model_name, output_model, get_system_prompt(model_name))
+    try:
+        with logfire.span("Extract: {text}", text=task.text or task.linkId):
+            result = await run_agent_with_retry(agent, prompt)
+    except Exception:
+        # Graceful degradation: return empty extraction on agent failure
+        return ExtractionAnswer(
+            item_id=task.item_id,
+            answers=[],
+            reason="AI agent error after max retries",
+        )
 
     reason = result.output.reason
 

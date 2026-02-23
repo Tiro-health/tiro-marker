@@ -70,6 +70,8 @@ class PopulateOutput:
 
     response: QuestionnaireResponse
     response_dict: dict[str, Any]  # For FHIRPath evaluation
+    mark_duration_ms: float = 0.0  # Marking phase duration in milliseconds
+    populate_duration_ms: float = 0.0  # Population phase duration in milliseconds
 
 
 class ExpectedAnswer(BaseModel):
@@ -541,6 +543,23 @@ Return matches=true if semantically equivalent, false otherwise."""
         return f"{correct}/{total}"
 
 
+class PipelineTiming(Evaluator[PopulateInput, PopulateOutput]):
+    """Report timing breakdown for marking and population phases."""
+
+    def evaluate(
+        self, ctx: EvaluatorContext[PopulateInput, PopulateOutput]
+    ) -> dict[str, str]:
+        mark_ms = ctx.output.mark_duration_ms
+        populate_ms = ctx.output.populate_duration_ms
+        total_ms = mark_ms + populate_ms
+
+        return {
+            "mark_time": f"{mark_ms / 1000:.2f}s",
+            "populate_time": f"{populate_ms / 1000:.2f}s",
+            "total_time": f"{total_ms / 1000:.2f}s",
+        }
+
+
 # =============================================================================
 # Task Function Factory
 # =============================================================================
@@ -548,26 +567,36 @@ Return matches=true if semantically equivalent, false otherwise."""
 
 def create_populate_task(model_name: ModelName) -> Any:
     """Create a populate task function for a specific model."""
+    import time
 
     async def populate_task(inputs: PopulateInput) -> PopulateOutput:
         """Run the full mark -> populate pipeline."""
         # Run mark agent with specified model
+        mark_start = time.perf_counter()
         mark_result = await mark_html(
             html=inputs.html,
             q_items=inputs.questionnaire.item or [],
             model_name=model_name,
         )
+        mark_duration_ms = (time.perf_counter() - mark_start) * 1000
 
         # Run populate agent with specified model
+        populate_start = time.perf_counter()
         response = await populate_from_html(
-            marked_html=mark_result.labeled_html,
+            labeled_html=mark_result.labeled_html,
             blueprint=mark_result.blueprint,
             q_items=inputs.questionnaire.item or [],
             model_name=model_name,
         )
+        populate_duration_ms = (time.perf_counter() - populate_start) * 1000
 
         response_dict = response.model_dump(exclude_none=True, by_alias=True)
-        return PopulateOutput(response=response, response_dict=response_dict)
+        return PopulateOutput(
+            response=response,
+            response_dict=response_dict,
+            mark_duration_ms=mark_duration_ms,
+            populate_duration_ms=populate_duration_ms,
+        )
 
     return populate_task
 
@@ -593,6 +622,7 @@ async def run_populate_evals(
     evaluators: list[Evaluator[PopulateInput, PopulateOutput]] = [
         FHIRPathExactMatch(),
         FHIRPathSetMatch(),
+        PipelineTiming(),
     ]
 
     if use_llm_judge:

@@ -6,12 +6,20 @@ Supports multiple models with automatic output type handling:
 - MedGemma: PromptedOutput (no native tool calling)
 """
 
+import asyncio
 from enum import Enum
 from typing import Any, TypeVar
 
+import httpx
 from pydantic import BaseModel
 from pydantic_ai import Agent, PromptedOutput
 from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from backend.ai_models.medgemma import MedGemmaModel
 from backend.config import settings
@@ -64,7 +72,7 @@ def get_model(name: ModelName) -> GoogleModel | MedGemmaModel:
             project_id=settings.medgemma_project_id,
             region=settings.medgemma_region,
             endpoint_id=settings.medgemma_endpoint_id,
-            max_tokens=1024,
+            max_tokens=2048,
             temperature=0.1,
             json_mode=True,
         )
@@ -102,3 +110,26 @@ def create_agent(
         retries=retries,
         model_settings=model_settings,
     )
+
+
+# Network retry decorator for transient connection errors
+network_retry = retry(
+    retry=retry_if_exception_type(
+        (httpx.ConnectError, httpx.ReadTimeout, asyncio.TimeoutError)
+    ),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    reraise=True,
+)
+
+
+@network_retry
+async def run_agent_with_retry(agent: Agent[Any, T], prompt: str) -> Any:
+    """Run an agent with automatic retry on network errors.
+
+    Retries up to 3 times with exponential backoff (1s, 2s, 4s) on:
+    - httpx.ConnectError
+    - httpx.ReadTimeout
+    - asyncio.TimeoutError
+    """
+    return await agent.run(prompt)

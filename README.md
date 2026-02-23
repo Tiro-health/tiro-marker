@@ -1,59 +1,65 @@
-# tiro-marker
+# Tiro.Marker
 
-Entry for the [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge) on Kaggle.
+AI-powered FHIR Questionnaire filling assistant. Entry for the [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge).
 
-## About the Challenge
+## What it does
 
-The MedGemma Impact Challenge invites participants to build human-centered AI applications using [MedGemma](https://research.google/blog/next-generation-medical-image-interpretation-with-medgemma-15-and-medical-speech-to-text-with-medasr/) and other open models from Google's Health AI Developer Foundations (HAI-DEF).
+Extracts structured data from clinical notes to fill FHIR Questionnaires:
 
-## Our Solution
+1. **Marking Agent** - Annotates relevant text spans with `<mark>` tags
+2. **Populate Agent** - Extracts values to generate FHIR QuestionnaireResponses
 
-**Problem**: Clinicians spend significant time manually extracting structured data from clinical notes to fill out FHIR Questionnaires.
+## Quick Start
 
-**Solution**: An AI-powered tool that automatically identifies relevant text spans in clinical documents and extracts values to populate FHIR QuestionnaireResponses.
+### Prerequisites
 
-## Architecture
+- Python 3.10+
+- [Poetry](https://python-poetry.org/docs/#installation)
 
-### Backend
-
-FastAPI service with two AI-powered agents:
-
-- **Marking Agent**: Analyzes HTML clinical notes and annotates text with `<mark>` tags linking relevant spans to questionnaire items. See [backend/agents/mark/Readme.md](backend/agents/mark/Readme.md).
-
-- **Populate Agent**: Extracts values from marked HTML to generate FHIR QuestionnaireResponses.
-
-### Frontend
-
-Web interface for visualizing and reviewing the marking and population results.
-
-## Development
-
-### Setup
+### Install
 
 ```bash
 poetry install
 ```
 
-### Environment
+### Environment Variables
 
-Create a `.env` file:
-```
-GEMINI_API_KEY=your-api-key
-LOGFIRE_TOKEN=your-logfire-token
-```
-
-### Run tests
+Create a `.env` file in the project root:
 
 ```bash
-poetry run pytest
+# Google Gemini API key
+GEMINI_API_KEY=your-gemini-api-key
+
+# Observability
+LOGFIRE_TOKEN=your-logfire-token
+
+# MedGemma on Vertex AI
+MEDGEMMA_ENDPOINT_HOST=your-endpoint.region.aiplatform.googleapis.com
+MEDGEMMA_PROJECT_ID=your-gcp-project-id
+MEDGEMMA_REGION=us-central1
+MEDGEMMA_ENDPOINT_ID=your-medgemma-endpoint-id
+
+# MedASR on Vertex AI (speech-to-text)
+MEDASR_ENDPOINT_HOST=your-endpoint.region.aiplatform.googleapis.com
+MEDASR_PROJECT_ID=your-gcp-project-id
+MEDASR_REGION=us-central1
+MEDASR_ENDPOINT_ID=your-medasr-endpoint-id
+
+# Configuration
+DEFAULT_MODEL=gemini-2.5-flash
+DEBUG=false
 ```
 
-### Run server
+### Run
 
 ```bash
 poetry run uvicorn backend.main:app --reload
 ```
 
-This starts the backend API and serves the frontend. Open **http://localhost:8000** in your browser to access the UI.
+Open http://localhost:8000 - API docs at http://localhost:8000/docs
 
-- API documentation is available at http://localhost:8000/docs
+## Tech Stack
+
+- **Backend**: Python, FastAPI, Pydantic AI
+- **Frontend**: Vanilla JS, Lexical editor
+- **LLM**: Gemini 2.5-Flash, MedGemma (via Vertex AI)
